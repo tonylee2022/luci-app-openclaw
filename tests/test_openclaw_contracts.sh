@@ -136,6 +136,7 @@ grep -q "openclaw-workspace.sh" Makefile || fail "workspace helper must be packa
 grep -q "openclaw-backup.sh" Makefile || fail "backup safety helper must be packaged"
 grep -q "oc_sync_workspace_tools" root/usr/bin/openclaw-env || fail "setup and upgrade must sync workspace guidance"
 grep -q "luci-app-openclaw:openwrt-runtime:start" root/usr/libexec/openclaw-workspace.sh || fail "workspace guidance must use a managed block"
+grep -q 'OC_OPERATING_FILE' root/usr/libexec/openclaw-workspace.sh || fail "workspace guidance must inject into OPERATING.md"
 if grep -R -E -q 'openclaw gateway (start|stop|restart)' root scripts htdocs; then
 	fail "project code must not use unsupported Gateway lifecycle commands"
 fi

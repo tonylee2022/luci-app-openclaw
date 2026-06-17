@@ -935,7 +935,7 @@ case "${1:-}" in
 		do_upgrade
 		;;
 	node)
-		download_node "$NODE_VERSION"
+		download_node "${2:-$NODE_VERSION}"
 		;;
 	factory-reset)
 		do_factory_reset
@@ -947,7 +947,7 @@ case "${1:-}" in
 		echo "  setup-offline  — 离线安装 (从本地文件安装，由 .run 安装器调用)"
 		echo "  check          — 检查环境状态"
 		echo "  upgrade        — 升级 OpenClaw 到最新版"
-		echo "  node           — 仅下载/更新 Node.js"
+		echo "  node [x.y.z]   — 仅下载/更新 Node.js（不加版本号则使用默认版本）"
 		echo "  factory-reset  — 恢复出厂设置 (清除所有配置)"
 		exit 1
 		;;

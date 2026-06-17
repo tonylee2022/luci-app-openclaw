@@ -2,6 +2,8 @@
 
 OC_TOOLS_BLOCK_START='<!-- luci-app-openclaw:openwrt-runtime:start -->'
 OC_TOOLS_BLOCK_END='<!-- luci-app-openclaw:openwrt-runtime:end -->'
+OC_OPERATING_FILE='AGENTS.md'
+OC_TOOLS_FILE='TOOLS.md'
 
 oc_workspace_warn() {
 	if command -v log_warn >/dev/null 2>&1; then
@@ -31,25 +33,25 @@ try {
 }
 
 oc_sync_workspace_tools() {
-	local workspace tools_file start_count end_count tmp_file block_file relative current segment old_ifs
+	local workspace target_file start_count end_count tmp_file block_file relative current segment old_ifs
 	workspace=$(oc_workspace_path)
 
 	case "$workspace" in
 		"${OC_STATE_DIR}"/*) ;;
 		*)
-			oc_workspace_warn "工作区位于 OpenClaw 状态目录之外，跳过 TOOLS.md 运行环境说明: $workspace"
+			oc_workspace_warn "工作区位于 OpenClaw 状态目录之外，跳过运行环境说明注入: $workspace"
 			return 0
 			;;
 	esac
 	case "$workspace/" in
 		*/../*|*/./*|*//* )
-			oc_workspace_warn "工作区路径包含不安全的路径段，跳过 TOOLS.md 运行环境说明: $workspace"
+			oc_workspace_warn "工作区路径包含不安全的路径段，跳过运行环境说明注入: $workspace"
 			return 0
 			;;
 	esac
 
 	if [ -L "$OC_STATE_DIR" ]; then
-		oc_workspace_warn "OpenClaw 状态目录是符号链接，跳过 TOOLS.md 运行环境说明: $OC_STATE_DIR"
+		oc_workspace_warn "OpenClaw 状态目录是符号链接，跳过运行环境说明注入: $OC_STATE_DIR"
 		return 0
 	fi
 	relative=${workspace#"${OC_STATE_DIR}/"}
@@ -60,16 +62,16 @@ oc_sync_workspace_tools() {
 		current="${current}/${segment}"
 		if [ -L "$current" ]; then
 			IFS=$old_ifs
-			oc_workspace_warn "工作区路径包含符号链接，跳过 TOOLS.md 运行环境说明: $current"
+			oc_workspace_warn "工作区路径包含符号链接，跳过运行环境说明注入: $current"
 			return 0
 		fi
 	done
 	IFS=$old_ifs
 
 	mkdir -p "$workspace" || return 1
-	tools_file="${workspace}/TOOLS.md"
-	if [ -L "$tools_file" ]; then
-		oc_workspace_warn "TOOLS.md 是符号链接，跳过运行环境说明: $tools_file"
+	target_file="${workspace}/${OC_OPERATING_FILE}"
+	if [ -L "$target_file" ]; then
+		oc_workspace_warn "${OC_OPERATING_FILE} 是符号链接，跳过运行环境说明注入: $target_file"
 		return 0
 	fi
 
@@ -81,16 +83,14 @@ oc_sync_workspace_tools() {
 
 	cat > "$block_file" <<EOF
 $OC_TOOLS_BLOCK_START
-## OpenWrt runtime environment
+## 7. 部署环境硬约束（由 luci-app-openclaw 注入，禁止手动编辑此区块）
 
-This OpenClaw instance is deployed by luci-app-openclaw and its Gateway process is managed by OpenWrt procd.
+本实例由 luci-app-openclaw 部署，Gateway 进程由 OpenWrt procd 以 root 身份管理。
+`openclaw` 用户**没有权限**执行 init 脚本或控制服务生命周期，不要尝试。
 
-- Restart the complete service: \`/etc/init.d/openclaw restart\`
-- Restart only the Gateway instance: \`/etc/init.d/openclaw restart_gateway\`
-- Query service status: \`/etc/init.d/openclaw status_service\`
-- \`openclaw gateway health\` and \`openclaw gateway status\` are query commands; lifecycle operations for this deployment use the init script above.
+需要重启服务或 Gateway 时：告知**用户**通过 LuCI 界面操作，或以 root 身份 SSH 执行。
 
-Runtime directories:
+运行目录（只读参考，不要修改）：
 
 - OpenClaw HOME: \`$OC_HOME\`
 - OpenClaw state: \`$OC_STATE_DIR\`
@@ -100,11 +100,11 @@ Runtime directories:
 $OC_TOOLS_BLOCK_END
 EOF
 
-	if [ -f "$tools_file" ]; then
-		start_count=$(grep -F -x -c "$OC_TOOLS_BLOCK_START" "$tools_file" 2>/dev/null || true)
-		end_count=$(grep -F -x -c "$OC_TOOLS_BLOCK_END" "$tools_file" 2>/dev/null || true)
+	if [ -f "$target_file" ]; then
+		start_count=$(grep -F -x -c "$OC_TOOLS_BLOCK_START" "$target_file" 2>/dev/null || true)
+		end_count=$(grep -F -x -c "$OC_TOOLS_BLOCK_END" "$target_file" 2>/dev/null || true)
 		if [ "$start_count" -eq 0 ] && [ "$end_count" -eq 0 ]; then
-			cat "$tools_file" > "$tmp_file"
+			cat "$target_file" > "$tmp_file"
 			[ ! -s "$tmp_file" ] || printf '\n' >> "$tmp_file"
 			cat "$block_file" >> "$tmp_file"
 		elif [ "$start_count" -eq 1 ] && [ "$end_count" -eq 1 ]; then
@@ -117,9 +117,9 @@ EOF
 				}
 				skipping && $0 == end { skipping = 0; next }
 				!skipping { print }
-			' "$tools_file" > "$tmp_file"
+			' "$target_file" > "$tmp_file"
 		else
-			oc_workspace_warn "TOOLS.md 中的托管标记不完整或重复，未修改用户文件: $tools_file"
+			oc_workspace_warn "${OC_OPERATING_FILE} 中的托管标记不完整或重复，未修改用户文件: $target_file"
 			rm -f "$tmp_file" "$block_file"
 			return 0
 		fi
@@ -127,7 +127,7 @@ EOF
 		cat "$block_file" > "$tmp_file"
 	fi
 
-	mv "$tmp_file" "$tools_file"
+	mv "$tmp_file" "$target_file"
 	rm -f "$block_file"
-	chown openclaw:openclaw "$workspace" "$tools_file" 2>/dev/null || true
+	chown openclaw:openclaw "$workspace" "$target_file" 2>/dev/null || true
 }

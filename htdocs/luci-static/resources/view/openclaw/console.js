@@ -1,10 +1,12 @@
 'use strict';
 'require view';
 'require openclaw.api as api';
+'require openclaw.ui as ocui';
 
 return view.extend({
 	load: function() { return Promise.all([ api.status(), api.gatewayToken() ]); },
 	render: function(results) {
+		ocui.applyTheme();
 		var status = results[0].data || {}, token = results[1].data || {};
 		var body;
 		if (!status.gateway_running) {

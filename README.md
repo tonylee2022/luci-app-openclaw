@@ -5,7 +5,7 @@
 
 OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 
-在路由器上运行 OpenClaw，并通过 LuCI 图形界面完成运行环境安装、服务管理、模型/渠道配置、升级与备份——大量功能用官方 CLI 驱动，尽量减少对交互式向导的依赖。OpenClaw 始终以非 root 的 `openclaw` 用户运行。
+在路由器上运行 OpenClaw，并通过 LuCI 图形界面完成运行环境安装、服务管理、模型/渠道配置、升级与备份。OpenClaw 始终以非 root 的 `openclaw` 用户运行。
 
 <div align="center">
   <img src="docs/images/overview.png" alt="OpenClaw LuCI 基本设置" width="900" style="border-radius:8px;" />
@@ -27,34 +27,34 @@ OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 ## ✨ 功能特性
 
 ### 基本设置（服务 → OpenClaw → 基本设置）
-- **状态概览**：运行状态徽标（运行中 / 启动中 / 已停止，带呼吸光环、固定配色不随主题漂移）、开机自启（可一键切换）、网关与配置终端端口、活跃模型、消息渠道、PID、内存、Node.js / OpenClaw / 插件版本、安装路径、剩余空间。
-- **快捷操作**：安装运行环境、启动 / 重启 / 仅重启网关 / 停止、切换开机自启、检测升级（LuCI 插件）、环境升级、备份/恢复、卸载环境。每个操作点击即在信息栏提示「XX 命令已提交」，长任务带日志面板与「关闭=停止并杀进程」语义。
-- **安装运行环境**：自动列出可用磁盘挂载点及可用空间（排除 overlay/tmpfs 等），选择安装位置 + 版本（稳定版/最新版），安装前做容量与写入权限检查。
-- **环境升级**：升级 OpenClaw 到最新版、原地升级捆绑 npm、升级指定版本 Node.js（升级后自动重启网关）。
+- **状态概览**：运行状态徽标（运行中 / 启动中 / 已停止）、开机自启（可一键切换）、网关与配置终端端口、活跃模型、消息渠道、PID、内存、Node.js / OpenClaw / 插件版本、安装路径、剩余空间。
+- **快捷操作**：安装运行环境、启动 / 重启 / 仅重启网关 / 停止、切换开机自启、检测升级（LuCI 插件）、环境升级、备份/恢复、卸载环境。每个操作点击即在信息栏提示进度，长任务带实时日志面板。
+- **安装运行环境**：自动列出可用磁盘挂载点及可用空间，选择安装位置 + 版本（稳定版/最新版），安装前做容量与写入权限检查。
+- **环境升级**：升级 OpenClaw 到最新版、更新内置 npm、升级指定版本 Node.js（升级后自动重启网关）。
 - **备份与恢复**：创建「仅配置」或「完整」备份，支持验证 / 恢复 / 删除。备份默认保存在**安装目录之外**（`<安装基础目录>/openclaw-backups`），因此**卸载环境不会删除备份**；备份目录可在备份窗口内自定义（须位于安装目录之外）。
 - **快速指南** 与项目链接。
 
 ### 配置管理（服务 → OpenClaw → 配置管理）
 - **官方配置**：在网页内嵌的真实终端（ttyd）里以 `openclaw` 身份运行官方 `openclaw configure` 向导；或一键进入 **openclaw-shell** 命令行，直接敲 CLI 配置/交互，面板内含「重启网关」并就地显示完整重启进度。
-- **提供商**：展示已配置提供商（授权方式、已配置模型数，数据源自 `agents.defaults.models` 与 `auth.profiles`）；「设置活跃模型」从已授权的已配置模型中选择并切换默认模型。
+- **提供商**：展示已配置提供商（授权方式、已配置模型数）；「设置活跃模型」从已配置模型中选择并切换默认模型。
 - **渠道**：仅列出已配置渠道。
-  - **微信渠道**：安装插件 / 扫码登录（清晰可扫的二维码）/ 检测升级 / 卸载 / 已登录账号管理；登录前自动幂等启用插件，避免核心升级后掉注册导致登录失败。
-  - **Telegram 渠道**：填入 Bot Token 一键配置（`channels add`，绕开易错的向导）；并提供**配对**：填配对码审批私信发起者 / 查看待配对请求。
+  - **微信渠道**：安装插件 / 扫码登录（清晰可扫的二维码）/ 检测升级 / 卸载 / 已登录账号管理。
+  - **Telegram 渠道**：填入 Bot Token 一键配置；并提供**配对**：填配对码审批私信发起者 / 查看待配对请求。
 - **健康检查**：运行 `openclaw doctor`（lint / 一键修复）。
 - **日志**：网关日志查看（行数 50/100/200、加载、清空、2 秒自动刷新）。
 
 ### 其它
 - **Web 控制台**：嵌入 OpenClaw 控制台。
 - **主题适配**：插件自带明/暗两套样式，跟随当前 LuCI 主题（如 Argon）的明暗自动切换。
-- **安全模型**：OpenClaw 以 `openclaw` 系统用户运行；`openclaw` / `openclaw-shell` 在以 root 调用时自动降权，避免产生 root 属主文件与触发 OpenClaw 的临时目录安全校验失败。
+- **安全模型**：OpenClaw 以 `openclaw` 系统用户运行；`openclaw` / `openclaw-shell` 在以 root 调用时自动降权到正确用户身份。
 
 ## 系统要求
 
 | 项目 | 要求 |
 |------|------|
-| 固件 | OpenWrt **23.05+** 及其衍生版（LEDE / ImmortalWrt / iStoreOS 等；需 ucode 支持，即 21.02+） |
+| 固件 | OpenWrt **23.05+** 及其衍生版（LEDE / ImmortalWrt / iStoreOS 等） |
 | 架构 | x86_64 或 aarch64 (ARM64) |
-| C 库 | musl（自动检测；离线包仅支持 musl） |
+| C 库 | musl（自动检测） |
 | 依赖 | luci-base、rpcd-mod-ucode、curl、openssl-util、tar、script-utils、ttyd、qrencode、libstdcpp |
 | 存储 | **2GB 以上可用空间** |
 | 内存 | 推荐 1GB 及以上 |
@@ -63,8 +63,8 @@ OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 
 | 组件 | 默认版本 | 说明 |
 |------|----------|------|
-| OpenClaw | `2026.6.6` | 维护者验证稳定版；「最新版」/升级使用 npm 正式 `latest` 标签 |
-| Node.js | `22.22.3` | 最低要求 `22.19.0`；安装后还会按 OpenClaw `engines.node` 强校验 |
+| OpenClaw | `2026.6.6` | 默认安装版本；可选「最新版」 |
+| Node.js | `22.22.3` | 最低要求 `22.19.0` |
 | 微信插件 | 官方兼容版本 | `@tencent-weixin/openclaw-weixin@latest` |
 
 ## 📦 安装
@@ -99,33 +99,31 @@ make package/luci-app-openclaw/compile V=s
 
 ## 🔰 首次使用
 
-1. 打开 LuCI → **服务 → OpenClaw → 基本设置**，点击「安装运行环境」，选择有 ≥2GB 空间的挂载点与版本，等待安装完成（会自动启动服务）。
-2. 到 **配置管理 → 官方配置**，用「官方配置向导」或「openclaw-shell」配置工作区、模型、网关等；或在 **Web 控制台** 添加模型与 API Key。
+1. 打开 LuCI → **服务 → OpenClaw → 基本设置**，点击「安装运行环境」，选择有 ≥2GB 空间的挂载点与版本，等待安装完成后**刷新页面**，再点击「启动」按钮启动服务。
+2. 到 **配置管理 → 官方配置**，用「官方配置向导」或「openclaw-shell」添加提供商与 API Key。
 3. 到 **配置管理 → 渠道** 配置消息渠道：微信（安装插件 → 扫码登录）、Telegram（填 Bot Token → 配对）。
 4. 配置改动后点「重启」/「重启网关」使其生效；状态徽标显示「运行中」即正常。
 
 ## 命令行使用
 
-安装后提供以下命令（均以 `openclaw` 用户身份运行，root 调用会自动降权）：
+SSH 进入路由器后，可用以下命令（均以 `openclaw` 用户身份运行）：
 
 ```bash
-openclaw --version              # 运行 OpenClaw CLI（仅对当前命令注入环境）
-openclaw status
 openclaw-shell                  # 进入隔离的 openclaw 用户子 Shell（exit 退出）
 openclaw-env check              # 检查运行环境
-openclaw-env upgrade            # 升级 OpenClaw 到 npm latest
-openclaw-env node               # 下载/更新默认 Node.js（可用 NODE_VERSION=x.y.z 指定版本）
+openclaw-env upgrade            # 升级 OpenClaw 到最新版
+openclaw-env node [x.y.z]       # 安装/更新 Node.js（不加版本号则使用默认版本）
 ```
 
 自定义安装路径时，可为单次命令设置 `OPENCLAW_INSTALL_PATH`：
 
 ```bash
-OPENCLAW_INSTALL_PATH=/mnt/data openclaw status
+OPENCLAW_INSTALL_PATH=/mnt/data openclaw-shell
 ```
 
 ## 自定义安装路径
 
-UCI 字段为 `openclaw.main.install_path`，语义为**基础目录**，实际运行目录固定展开为 `<基础目录>/openclaw`：
+UCI 字段为 `openclaw.main.install_path`，实际运行目录固定展开为 `<基础目录>/openclaw`：
 
 ```bash
 uci set openclaw.main.install_path='/mnt/data'
@@ -133,7 +131,7 @@ uci commit openclaw
 openclaw-env setup
 ```
 
-全新安装的目录布局（接近官方 HOME）：
+安装后的目录布局：
 
 ```text
 /mnt/data/openclaw/
@@ -144,13 +142,41 @@ openclaw-env setup
 └── .tmp/          # npm/插件运行临时目录
 ```
 
-安装前会执行写入探针；overlay 已满、只读或外置盘未挂载时会在下载前失败并给出明确日志。当前版本不支持旧布局原地升级，检测到旧布局或安装目录有未知文件时会停止并提示先卸载。
+磁盘已满、只读或外置盘未挂载时，安装前会提示失败；安装目录已有未知文件时会停止并提示清理后再试。
+
+## 🤖 AI 工作区集成
+
+安装完成后，插件会自动在 OpenClaw 工作区的 `AGENTS.md` 中写入本机部署信息，包括运行目录路径和权限边界。AI 由此了解哪些操作（如重启服务）需要通过 LuCI 界面或 root 完成，而不会在自身权限之外反复尝试。
+
+注入内容如下（`$OC_HOME` 等变量在运行时展开为实际路径）：
+
+```
+<!-- luci-app-openclaw:openwrt-runtime:start -->
+## 7. 部署环境硬约束（由 luci-app-openclaw 注入，禁止手动编辑此区块）
+
+本实例由 luci-app-openclaw 部署，Gateway 进程由 OpenWrt procd 以 root 身份管理。
+`openclaw` 用户**没有权限**执行 init 脚本或控制服务生命周期，不要尝试。
+
+需要重启服务或 Gateway 时：告知**用户**通过 LuCI 界面操作，或以 root 身份 SSH 执行。
+
+运行目录（只读参考，不要修改）：
+
+- OpenClaw HOME: `/opt/openclaw`
+- OpenClaw state: `/opt/openclaw/.openclaw`
+- npm prefix: `/opt/openclaw/.npm-global`
+- npm cache: `/opt/openclaw/.npm`
+- temporary files: `/opt/openclaw/.tmp`
+<!-- luci-app-openclaw:openwrt-runtime:end -->
+```
+
+（路径以默认 `/opt` 为例，实际值跟随用户安装目录。）
+
+工作区中你自己编写的内容不受影响；插件只维护其专属的标记区块，升级时自动更新。
 
 ## 🔒 安全模型
 
-- OpenClaw 强制以 `openclaw` 系统用户运行：以 root 运行会因其临时目录安全校验（要求目录属主等于当前 uid）被拒，且会在 home 目录留下 root 属主文件。
-- `/usr/bin/openclaw` 与 `openclaw-shell` 在被 root 调用时**自动 `su` 降权**到 `openclaw` 用户；配置终端（ttyd）也以 `openclaw` 身份运行。
-- 插件的启用、禁用、白名单、拒绝列表等策略完全由 OpenClaw 官方机制与用户配置管理，本项目不创建、补全、迁移或清理这些策略。
+- OpenClaw 以 `openclaw` 系统用户运行；`/usr/bin/openclaw` 与 `openclaw-shell` 在被 root 调用时自动降权，配置终端（ttyd）也以 `openclaw` 身份运行。
+- 插件的启用、禁用、白名单、拒绝列表等策略完全由 OpenClaw 官方机制与用户配置管理，本项目不干预这些策略。
 
 ## 📜 版权与开源声明
 
@@ -168,22 +194,22 @@ luci-app-openclaw/
 ├── Makefile                          # OpenWrt 包定义
 ├── htdocs/luci-static/resources/
 │   ├── openclaw/                     # 共享 RPC 客户端、UI 助手、样式、二维码库
-│   └── view/openclaw/                # 现代 LuCI JavaScript 页面（基本设置/配置管理/控制台）
+│   └── view/openclaw/                # LuCI JavaScript 页面（基本设置/配置管理/控制台）
 ├── root/
 │   ├── etc/
 │   │   ├── config/openclaw           # UCI 配置
 │   │   ├── init.d/openclaw           # procd 服务脚本
 │   │   └── uci-defaults/99-openclaw  # 初始化脚本
 │   └── usr/
-│       ├── libexec/                  # 共享 Shell helper 与 RPC 执行层（openclaw-rpc.sh、openclaw-paths.sh、openclaw-wizard.sh）
-│       ├── bin/openclaw              # OpenClaw CLI 隔离包装器（root 调用自动降权）
-│       ├── bin/openclaw-shell        # 隔离子 Shell（切换到 openclaw 用户）
+│       ├── libexec/                  # Shell helper 与 RPC 执行层
+│       ├── bin/openclaw              # OpenClaw CLI 包装器
+│       ├── bin/openclaw-shell        # 隔离子 Shell
 │       ├── bin/openclaw-env          # 环境安装/检查/升级工具
 │       └── share/
 │           ├── luci/menu.d/          # LuCI 菜单
-│           ├── rpcd/                 # ucode API（luci.openclaw）与 ACL
+│           ├── rpcd/                 # ucode API 与 ACL
 │           └── openclaw/             # 配置终端资源
-├── scripts/                          # 本地 .ipk / .run 构建与发布脚本
+├── scripts/                          # .ipk / .run 构建与发布脚本
 └── .github/workflows/                # 在线构建并发布到 GitHub Release
 ```
 

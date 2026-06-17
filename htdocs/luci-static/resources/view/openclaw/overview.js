@@ -55,6 +55,7 @@ return view.extend({
 			};
 			Object.keys(values).forEach(function(key) { var el = document.getElementById('oc-' + key); if (el) el.textContent = values[key]; });
 			this._enabled = d.enabled;
+			if (d.stable_version) this._stableVersion = d.stable_version;
 			if (this.autostartBtn) this.autostartBtn.textContent = (d.enabled === '1') ? _('禁用自启') : _('启用自启');
 			var badge = document.getElementById('oc-state');
 			// 复用按钮配色: 运行中=positive(绿), 启动中=自定义琥珀, 其余=negative(红); 圆角见 oc-state-badge
@@ -84,8 +85,12 @@ return view.extend({
 			this.taskClose.style.display = 'none';
 		}
 		else if (data.done) {
-			this.taskState.className = 'oc-task-state ' + (data.exit_code === 0 ? 'oc-task-success' : 'oc-task-error');
-			this.taskState.textContent = data.exit_code === 0 ? _('任务已完成。') : _('任务失败，退出码：%s').format(data.exit_code);
+			var ok = data.exit_code === 0;
+			this.taskState.className = 'oc-task-state ' + (ok ? 'oc-task-success' : 'oc-task-error');
+			if (ok && title === _('安装运行环境'))
+				this.taskState.textContent = _('安装完成！请刷新页面后点击「启动」按钮启动服务。');
+			else
+				this.taskState.textContent = ok ? _('任务已完成。') : _('任务失败，退出码：%s').format(data.exit_code);
 			this.taskClose.style.display = '';
 			this.updateStatus();
 		}
@@ -128,7 +133,8 @@ return view.extend({
 	},
 
 	showSetup: function() {
-		var version = E('select', { 'class': 'cbi-input-select' }, [ E('option', { value: 'stable' }, _('稳定版')), E('option', { value: 'latest' }, _('最新版')) ]);
+		var stableLabel = this._stableVersion ? _('稳定版 (%s)').format(this._stableVersion) : _('稳定版');
+		var version = E('select', { 'class': 'cbi-input-select' }, [ E('option', { value: 'stable' }, stableLabel), E('option', { value: 'latest' }, _('最新版 (latest)')) ]);
 		// 挂载点下拉(由 install_targets 填充) + 手动输入(默认隐藏)
 		var mountSel = E('select', { 'class': 'cbi-input-select oc-input' }, [ E('option', { value: '' }, _('正在探测挂载点...')) ]);
 		var path = E('input', { 'class': 'cbi-input-text oc-input', value: '/opt', 'style': 'display:none' });
@@ -338,9 +344,11 @@ return view.extend({
 	},
 
 	waitForGateway: function(expectRunning) {
+		poll.stop();
 		var self = this;
 		var start = Date.now();
 		var timeoutMs = 40000, stepMs = 1500;
+		function done() { poll.start(); }
 		function tick() {
 			return self.updateStatus().then(function(d) {
 				d = d || {};
@@ -349,12 +357,14 @@ return view.extend({
 				var failed = (d.gateway_failed === true);
 				if (expectRunning) {
 					if (running) {
+						done();
 						self.actionStatus.className = 'oc-action-status oc-task-success';
 						self.actionStatus.textContent = _('网关已就绪，运行中。');
 						self.hideActionStatusLater();
 						return;
 					}
 					if (failed) {
+						done();
 						self.actionStatus.className = 'oc-action-status oc-task-error';
 						self.actionStatus.textContent = _('网关启动失败，请在日志中排查。');
 						return;
@@ -362,6 +372,7 @@ return view.extend({
 				}
 				else {
 					if (!running && !starting) {
+						done();
 						self.actionStatus.className = 'oc-action-status oc-task-success';
 						self.actionStatus.textContent = _('网关已停止。');
 						self.hideActionStatusLater();
@@ -369,22 +380,31 @@ return view.extend({
 					}
 				}
 				if (Date.now() - start > timeoutMs) {
+					done();
 					self.actionStatus.className = 'oc-action-status oc-task-error';
 					self.actionStatus.textContent = _('操作超时，网关未在预期时间内就绪，请稍后刷新查看。');
 					return;
 				}
-				// 进行中: 内联提示 + 状态徽章统一显示为「过渡中」
+				// 进行中: 徽章跟随后台真实相位（重启=停止中→启动中，停止=停止中）
+				var badgeVariant, badgeText, statusText;
+				if (!expectRunning || !starting) {
+					badgeVariant = 'oc-state-stopping'; badgeText = _('停止中');
+					statusText = expectRunning ? _('正在重启网关，等待停止...') : _('正在停止网关...');
+				} else {
+					badgeVariant = 'oc-state-starting'; badgeText = _('启动中');
+					statusText = _('网关启动中，请稍候...');
+				}
 				self.actionStatus.className = 'oc-action-status oc-task-running';
-				self.actionStatus.textContent = expectRunning ? _('网关启动中，请稍候...') : _('正在停止网关...');
+				self.actionStatus.textContent = statusText;
 				var badge = document.getElementById('oc-state');
 				if (badge) {
-					badge.textContent = expectRunning ? _('启动中') : _('停止中');
-					badge.className = 'oc-badge oc-warn';
+					badge.textContent = badgeText;
+					badge.className = 'cbi-button ' + badgeVariant + ' oc-state-badge';
 				}
 				return new Promise(function(resolve) { window.setTimeout(resolve, stepMs); }).then(tick);
 			});
 		}
-		return tick();
+		return tick().catch(function(e) { done(); throw e; });
 	},
 
 	showEnvUpgrade: function() {
@@ -449,6 +469,7 @@ return view.extend({
 
 	render: function(data) {
 		var self = this;
+		this._stableVersion = ((data[0] || {}).data || {}).stable_version || '';
 		ocui.applyTheme();
 		var ghLink = E('a', { href: 'https://github.com/tonylee2022/luci-app-openclaw', target: '_blank', rel: 'noopener', 'class': 'oc-gh' });
 		ghLink.innerHTML = '<svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>github.com/tonylee2022/luci-app-openclaw</span>';

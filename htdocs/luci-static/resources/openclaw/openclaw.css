@@ -87,7 +87,7 @@
 .oc-dark .oc-capacity-checking { color: #8ab4f8; background: rgba(138,180,248,.12); border-color: rgba(138,180,248,.3); }
 .oc-dark .oc-capacity-ok    { color: #81c995; background: rgba(129,201,149,.12); border-color: rgba(129,201,149,.3); }
 .oc-dark .oc-capacity-error { color: #f28b82; background: rgba(242,139,130,.12); border-color: rgba(242,139,130,.3); }
-.oc-dark .oc-iframe { background: #1e1e1e; }
+.oc-dark .oc-iframe { background: #1e1e1e; border-color: #3a3a3a; }
 @keyframes oc-spin { to { transform: rotate(360deg); } }
 .oc-btn-loading::after { content: ''; display: inline-block; width: .75em; height: .75em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: oc-spin .7s linear infinite; margin-left: .45em; vertical-align: middle; }
 .cbi-button:disabled { opacity: 0.65; cursor: not-allowed; }
@@ -109,8 +109,9 @@
 @media (prefers-reduced-motion: reduce) { #oc-state { animation: none; } }
 .oc-state-run      { background: #2f8a3e !important; border-color: #2f8a3e !important; --oc-ring: rgba(76,175,80,.7); }
 .oc-state-stop     { background: #c62828 !important; border-color: #c62828 !important; --oc-ring: rgba(198,40,40,.7); }
-.oc-state-starting { background: #b8860b !important; border-color: #b8860b !important; --oc-ring: rgba(184,134,11,.75); }
-/* 插件按钮统一配色: 不随主题明暗在蓝/绿间漂移 —— positive=绿, 停止=琥珀 */
+.oc-state-starting { background: #e67e22 !important; border-color: #e67e22 !important; --oc-ring: rgba(230,126,34,.75); }
+.oc-state-stopping { background: #d4a017 !important; border-color: #d4a017 !important; --oc-ring: rgba(212,160,23,.75); }
+/* 插件按钮统一配色: 不随主题明暗在蓝/绿间漂移 —— positive=绿, 停止=深琥珀 */
 .oc-actions .cbi-button-positive { background: #2f8a3e !important; border-color: #2f8a3e !important; color: #fff !important; }
 .oc-actions .oc-btn-amber { background: #b8860b !important; border-color: #b8860b !important; color: #fff !important; }
 /* LuCI 通知关闭修复: Argon 主题未给 .alert-message 定义 opacity 过渡，

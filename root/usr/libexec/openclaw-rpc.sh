@@ -208,8 +208,8 @@ case "${1:-}" in
 		ver="${2:-}"
 		echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Node 版本号格式无效 (如 22.22.3)"
 		load_paths
-		# openclaw-env node 下载/解压到 NODE_BASE(root 运行), 完成后 chown 给 openclaw + 重启网关。
-		cmd="NODE_VERSION=$(oc_quote "$ver") OC_INSTALL_PATH=$(oc_quote "$OPENCLAW_INSTALL_PATH") /usr/bin/openclaw-env node; rc=\$?; chown -R openclaw:openclaw $(oc_quote "$NODE_BASE") 2>/dev/null; /etc/init.d/openclaw restart; exit \$rc"
+		# openclaw-env node <ver> 下载/解压到 NODE_BASE(root 运行), 完成后 chown 给 openclaw + 重启网关。
+		cmd="OC_INSTALL_PATH=$(oc_quote "$OPENCLAW_INSTALL_PATH") /usr/bin/openclaw-env node $(oc_quote "$ver"); rc=\$?; chown -R openclaw:openclaw $(oc_quote "$NODE_BASE") 2>/dev/null; /etc/init.d/openclaw restart; exit \$rc"
 		start_task /tmp/openclaw-env-upgrade "$cmd"
 		;;
 	uninstall)
@@ -221,8 +221,9 @@ case "${1:-}" in
 		echo "正在停止 OpenClaw 服务..."
 		/etc/init.d/openclaw stop >/dev/null 2>&1 || true
 		/etc/init.d/openclaw disable >/dev/null 2>&1 || true
-		uci set openclaw.main.enabled=0
-		uci commit openclaw
+		uci delete openclaw.main 2>/dev/null || true
+		uci commit openclaw 2>/dev/null || true
+		rm -f /etc/config/openclaw
 		echo "正在删除运行环境: $OC_ROOT"
 		# 删除指向本安装目录的 node 工具软链 (仅删指向 $OC_ROOT 的, 不动系统 node)
 		for b in node npm npx pnpm corepack; do

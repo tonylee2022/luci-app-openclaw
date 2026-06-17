@@ -141,6 +141,9 @@ function status() {
 	for (let channel in channels) channel_text += (length(channel_text) ? ', ' : '') + channel;
 	let cached = static_status(p);
 	let memory_kb = pid ? +run(`awk '/VmRSS/{print $2}' /proc/${pid}/status`) : 0;
+	let env_src = readfile('/usr/bin/openclaw-env') || '';
+	let stable_m = match(env_src, /OC_TESTED_VERSION="([^"]+)"/);
+	let stable_version = stable_m ? stable_m[1] : '';
 	return reply(true, '', {
 		enabled: `${uci_get('enabled') || '0'}`,
 		port, pty_port, install_path: p.root, gateway_running: gateway,
@@ -149,7 +152,8 @@ function status() {
 		gateway_exit_code: gateway_instance.exit_code ?? '', pty_running: pty, pid,
 		memory_kb, uptime: '', node_version: cached.node_version,
 		oc_version: cached.oc_version, plugin_version: cached.plugin_version, disk_free: cached.disk_free,
-		active_model: config?.agents?.defaults?.model?.primary || '', channels: channel_text
+		active_model: config?.agents?.defaults?.model?.primary || '', channels: channel_text,
+		stable_version
 	});
 }
 
