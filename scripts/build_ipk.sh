@@ -158,12 +158,14 @@ cat > "$CTRL_DIR/postinst" << 'EOF'
 	
 	# 清理 LuCI 缓存
 	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* /tmp/luci-indexcache.*.json 2>/dev/null
-	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
-	
-	# 重启 Web PTY (使其加载新文件和新 token)
+
+	# 重启 Web PTY (使其加载新文件); procd 会自动 respawn
 	PTY_PID=$(pgrep -f 'web-pty.js' 2>/dev/null | head -1)
 	[ -n "$PTY_PID" ] && kill "$PTY_PID" 2>/dev/null || true
-	
+
+	# rpcd 的 ucode 模块常驻内存，新版后端需重启 rpcd 才能生效。
+	# 经 LuCI「检测升级」路径安装时，重启由前端在安装完成后提示用户确认；
+	# 手动 opkg install 时，请自行执行: /etc/init.d/rpcd restart
 	exit 0
 }
 EOF

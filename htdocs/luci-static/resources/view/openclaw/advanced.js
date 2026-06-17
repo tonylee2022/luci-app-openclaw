@@ -6,11 +6,6 @@
 'require openclaw.api as api';
 'require openclaw.ui as ocui';
 
-function notify(result) {
-	ui.addNotification(null, E('p', {}, result.message || (result.ok ? _('操作成功') : _('操作失败'))), result.ok ? 'info' : 'error');
-	return result;
-}
-
 // 带 spinner + 防重复点击的按钮 (与 overview.js 一致)
 function button(label, css, handler) {
 	var btn = E('button', { 'type': 'button', 'class': 'cbi-button ' + css }, label);
@@ -21,7 +16,7 @@ function button(label, css, handler) {
 		btn.disabled = true;
 		btn.classList.add('oc-btn-loading');
 		Promise.resolve().then(function() { return handler(ev); }).catch(function(err) {
-			ui.addNotification(null, E('p', {}, String(err)), 'error');
+			console.error('[openclaw]', err);
 		}).finally(function() {
 			btn.disabled = false;
 			btn.classList.remove('oc-btn-loading');
@@ -551,8 +546,7 @@ return view.extend({
 			}, this));
 		}, this);
 		return api.wechatLogin().then(L.bind(function(result) {
-			notify(result);
-			if (!result.ok) return;
+			if (!result.ok) { ocui.setStatus(this.wxStatus, 'error', result.message || _('登录启动失败')); return; }
 			ui.showModal(_('微信扫码登录'), [ qrEl, urlEl, E('div', { 'class': 'right' }, [
 				closeButton(_('关闭'), function() { poll.remove(fn); api.wechatLoginCancel(); })
 			]) ]);

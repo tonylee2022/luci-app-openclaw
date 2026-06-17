@@ -6,11 +6,6 @@
 'require openclaw.api as api';
 'require openclaw.ui as ocui';
 
-function notify(result) {
-	ui.addNotification(null, E('p', {}, result.message || (result.ok ? _('操作成功') : _('操作失败'))), result.ok ? 'info' : 'error');
-	return result;
-}
-
 function button(label, css, handler) {
 	var btn = E('button', { 'type': 'button', 'class': 'cbi-button ' + css }, label);
 	btn.addEventListener('click', function(ev) {
@@ -20,7 +15,7 @@ function button(label, css, handler) {
 		btn.disabled = true;
 		btn.classList.add('oc-btn-loading');
 		Promise.resolve().then(function() { return handler(ev); }).catch(function(err) {
-			ui.addNotification(null, E('p', {}, String(err)), 'error');
+			console.error('[openclaw]', err);
 		}).finally(function() {
 			btn.disabled = false;
 			btn.classList.remove('oc-btn-loading');
@@ -268,11 +263,18 @@ return view.extend({
 	},
 
 	checkUpgrade: function() {
+		var self = this;
 		return api.updateCheck().then(L.bind(function(result) {
-			notify(result);
-			if (!result.ok || !result.data.plugin_has_update)
+			if (!result.ok) {
+				ocui.setStatus(self.actionStatus, 'error', result.message || _('检测失败'));
 				return;
-			if (!confirm(_('发现版本 %s，立即升级？').format(result.data.plugin_latest)))
+			}
+			if (!result.data.plugin_has_update) {
+				ocui.setStatus(self.actionStatus, 'success', _('当前已是最新版本（%s）').format(result.data.plugin_current));
+				ocui.hideStatusLater(self.actionStatus);
+				return;
+			}
+			if (!confirm(_('发现新版本 %s（当前 %s），立即升级？').format(result.data.plugin_latest, result.data.plugin_current)))
 				return;
 			var version = result.data.plugin_latest;
 			return ocui.runOp(this.actionStatus, {
@@ -282,7 +284,14 @@ return view.extend({
 				cancel: function() { return api.taskCancel('openclaw-plugin-upgrade'); },
 				onClose: L.bind(function() { if (this.taskPanel) this.taskPanel.style.display = 'none'; }, this),
 				pollLog: function() { return api.upgradeLog(); },
-				onLog: L.bind(function(d) { this.updateTaskPanel(_('升级 LuCI 插件'), { ok: true, data: d }); }, this)
+				onLog: L.bind(function(d) { self.updateTaskPanel(_('升级 LuCI 插件'), { ok: true, data: d }); }, self),
+				onDone: function(ok) {
+					if (!ok) return;
+					if (!confirm(_('插件升级完成！\n\n后端服务（rpcd）需要重启才能加载新版本，重启后需要重新登录 LuCI。\n\n是否立即重启后端服务？')))
+						return;
+					ocui.setStatus(self.actionStatus, 'running', _('正在重启后端服务...'));
+					api.rpcdRestart();
+				}
 			});
 		}, this));
 	},
@@ -301,7 +310,7 @@ return view.extend({
 	serviceAction: function(action) {
 		return api.serviceAction(action).then(L.bind(function(result) {
 			if (!result.ok) {
-				notify(result);
+				ocui.setStatus(this.actionStatus, 'error', result.message || _('操作失败'));
 				return;
 			}
 			// 信息栏已由按钮包装显示「XX命令已提交」, 此处直接进入等待/刷新

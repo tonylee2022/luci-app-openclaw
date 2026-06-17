@@ -403,7 +403,8 @@ const methods = {
 	telegram_pair: { args: { code: '' }, call: (r) => match(r.args.code, /^[A-Za-z0-9]{4,16}$/) ? run_action('telegram-pair', [r.args.code]) : reply(false, '配对码格式无效') },
 	telegram_pairing_list: { call: () => cli_json('telegram-pairing-list') },
 	wechat_upgrade: { call: () => run_action('wechat-upgrade') },
-	wechat_uninstall: { call: () => run_action('wechat-uninstall') }
+	wechat_uninstall: { call: () => run_action('wechat-uninstall') },
+	rpcd_restart: { call: () => { system('(sleep 1; /etc/init.d/rpcd restart) &'); return reply(true, ''); } }
 };
 
 return { 'luci.openclaw': methods };

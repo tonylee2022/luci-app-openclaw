@@ -242,8 +242,8 @@ case "${1:-}" in
 	upgrade)
 		version="${2:-}"
 		echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "版本号格式无效"
-		url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-app-openclaw_${version}.run"
-		cmd="curl -fsSL --connect-timeout 15 --max-time 120 -o /tmp/luci-app-openclaw-update.run $(oc_quote "$url"); rc=\$?; if [ \$rc -ne 0 ]; then exit \$rc; fi; size=\$(wc -c < /tmp/luci-app-openclaw-update.run); [ \$size -ge 10000 ] || exit 1; grep -aq '^__ARCHIVE_BELOW__$' /tmp/luci-app-openclaw-update.run || exit 1; sh /tmp/luci-app-openclaw-update.run; rc=\$?; rm -f /tmp/luci-app-openclaw-update.run; exit \$rc"
+		url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-app-openclaw_${version}-1_all.ipk"
+		cmd="curl -fsSL --connect-timeout 15 --max-time 120 -o /tmp/luci-app-openclaw-update.ipk $(oc_quote "$url"); rc=\$?; if [ \$rc -ne 0 ]; then echo '下载失败'; exit \$rc; fi; opkg install --force-reinstall /tmp/luci-app-openclaw-update.ipk; rc=\$?; rm -f /tmp/luci-app-openclaw-update.ipk; exit \$rc"
 		start_task /tmp/openclaw-plugin-upgrade "$cmd"
 		;;
 	cli-doctor-lint)

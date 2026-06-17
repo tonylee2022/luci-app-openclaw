@@ -87,7 +87,7 @@ for method in status system_info install_path_probe update_check setup_log upgra
 done
 if grep -q 'system_check:' root/usr/share/rpcd/ucode/luci.openclaw; then fail "write probe must not remain in legacy system_check"; fi
 grep -Eq '\^\(start\|stop\|restart\|enable\|disable\|restart_gateway\)\$' root/usr/share/rpcd/ucode/luci.openclaw || fail "service action allowlist missing"
-grep -Fq "grep -aq '^__ARCHIVE_BELOW__$'" root/usr/libexec/openclaw-rpc.sh || fail "downloaded run installer marker validation missing"
+grep -Fq -- "-1_all.ipk" root/usr/libexec/openclaw-rpc.sh || fail "upgrade must download ipk package"
 grep -Fq "oc_safe_openclaw_root" root/usr/libexec/openclaw-rpc.sh || fail "uninstall safety check missing"
 grep -q "@tencent-weixin/openclaw-weixin@" root/usr/libexec/openclaw-rpc.sh || fail "wechat install must use the official Weixin plugin package"
 grep -q "Local login saved auth" root/usr/libexec/openclaw-rpc.sh || fail "successful Weixin local auth must be recognized"

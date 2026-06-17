@@ -63,5 +63,6 @@ return baseclass.extend({
 	telegramPair: call('telegram_pair', [ 'code' ]),
 	telegramPairingList: call('telegram_pairing_list'),
 	wechatUpgrade: call('wechat_upgrade'),
-	wechatUninstall: call('wechat_uninstall')
+	wechatUninstall: call('wechat_uninstall'),
+	rpcdRestart: call('rpcd_restart')
 });

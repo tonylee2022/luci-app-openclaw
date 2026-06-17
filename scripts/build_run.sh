@@ -203,16 +203,12 @@ rm -rf /usr/lib/lua/luci/model/cbi/openclaw /usr/lib/lua/luci/view/openclaw /usr
 # 清除 LuCI 缓存
 rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
 rm -f /tmp/luci-indexcache.*.json 2>/dev/null
-/etc/init.d/rpcd restart >/dev/null 2>&1 || true
 
-# 重启 Web PTY 服务 (使其加载新文件和新 token)
-# PTY 是 procd 管理的实例, kill 后 procd 会自动 respawn
+# 重启 Web PTY 服务 (使其加载新文件); procd 实例 kill 后自动 respawn
 PTY_PID=$(pgrep -f 'web-pty.js' 2>/dev/null | head -1)
-if [ -n "$PTY_PID" ]; then
-	echo "重启配置终端服务..."
-	kill "$PTY_PID" 2>/dev/null
-	sleep 1
-fi
+[ -n "$PTY_PID" ] && kill "$PTY_PID" 2>/dev/null
+# rpcd 的 ucode 模块常驻内存, 新版后端需重启 rpcd 才能生效。
+# 重启由 LuCI 前端在安装成功后提示用户确认, 不在此处执行。
 
 echo ""
 echo "✅ 安装完成！"
