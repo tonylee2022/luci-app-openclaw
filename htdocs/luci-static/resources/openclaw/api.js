@@ -1,0 +1,67 @@
+'use strict';
+'require baseclass';
+'require rpc';
+
+function call(method, params) {
+	return rpc.declare({
+		object: 'luci.openclaw',
+		method: method,
+		params: params || [],
+		expect: { '': { ok: false, message: _('无效的 RPC 响应'), data: {} } }
+	});
+}
+
+return baseclass.extend({
+	status: call('status'),
+	systemInfo: call('system_info', [ 'install_path' ]),
+	installPathProbe: call('install_path_probe', [ 'install_path' ]),
+	installTargets: call('install_targets'),
+	updateCheck: call('update_check'),
+	setupLog: call('setup_log'),
+	uninstallLog: call('uninstall_log'),
+	upgradeLog: call('upgrade_log'),
+	backupList: call('backup_list'),
+	backupVerify: call('backup_verify', [ 'file' ]),
+	gatewayToken: call('gateway_token'),
+	wechatStatus: call('wechat_status'),
+	wechatInstallLog: call('wechat_install_log'),
+	wechatLoginStatus: call('wechat_login_status'),
+	wechatUpdateCheck: call('wechat_update_check'),
+	serviceAction: call('service_action', [ 'action' ]),
+	autostartSet: call('autostart_set', [ 'enabled' ]),
+	setup: call('setup', [ 'version', 'install_path' ]),
+	uninstall: call('uninstall'),
+	upgrade: call('upgrade', [ 'version' ]),
+	envUpgradeOpenclaw: call('env_upgrade_openclaw'),
+	envUpgradeNpm: call('env_upgrade_npm'),
+	envUpgradeNode: call('env_upgrade_node', [ 'version' ]),
+	envUpgradeLog: call('env_upgrade_log'),
+	backupCreate: call('backup_create', [ 'only_config' ]),
+	backupRestore: call('backup_restore', [ 'file' ]),
+	backupDelete: call('backup_delete', [ 'file' ]),
+	backupPathSet: call('backup_path_set', [ 'path' ]),
+	wechatInstall: call('wechat_install'),
+	wechatLogin: call('wechat_login'),
+	wechatLoginCancel: call('wechat_login_cancel'),
+	doctorLint: call('doctor_lint'),
+	doctorFix: call('doctor_fix'),
+	doctorFixLog: call('doctor_fix_log'),
+	health: call('health'),
+	channelsList: call('channels_list'),
+	channelsStatus: call('channels_status'),
+	logsTail: call('logs_tail', [ 'lines' ]),
+	configSummary: call('config_summary'),
+	modelSet: call('model_set', [ 'model' ]),
+	qrEncode: call('qr_encode', [ 'text' ]),
+	taskCancel: call('task_cancel', [ 'name' ]),
+	wizardStatus: call('wizard_status'),
+	wizardStart: call('wizard_start', [ 'section' ]),
+	wizardStop: call('wizard_stop'),
+	wechatLogout: call('wechat_logout', [ 'account' ]),
+	telegramAdd: call('telegram_add', [ 'token' ]),
+	telegramAddLog: call('telegram_add_log'),
+	telegramPair: call('telegram_pair', [ 'code' ]),
+	telegramPairingList: call('telegram_pairing_list'),
+	wechatUpgrade: call('wechat_upgrade'),
+	wechatUninstall: call('wechat_uninstall')
+});

@@ -1,0 +1,31 @@
+#!/bin/sh
+
+[ -r /usr/libexec/openclaw-paths.sh ] && . /usr/libexec/openclaw-paths.sh
+
+configured_path="${OPENCLAW_INSTALL_PATH:-$(uci -q get openclaw.main.install_path 2>/dev/null || echo /opt)}"
+oc_load_paths "$configured_path" || { echo "Invalid OpenClaw install path: $configured_path" >&2; exit 1; }
+
+[ -x "$NODE_BASE/bin/node" ] || { echo "OpenClaw Node.js not found: $NODE_BASE/bin/node" >&2; exit 127; }
+
+# 进入 OpenClaw 环境的一次性子 shell。
+# 关键: OpenClaw 必须以 openclaw 用户运行 —— 以 root 运行会触发其 temp dir 安全校验
+# (属主须等于当前 uid) 而拒绝启动, 并在家目录留下 root 属主文件。
+# 所以这里同时切换身份(su 到 openclaw)并设置环境变量, 真正"成为 OpenClaw"。退出即恢复父会话。
+# 安装路径已校验(无空格/引号), 故下方单引号包裹值是安全的; \$PATH 延迟到子 shell 内展开。
+run_env="
+export HOME='$OC_HOME' OPENCLAW_HOME='$OC_HOME' OPENCLAW_STATE_DIR='$OC_STATE_DIR' OPENCLAW_CONFIG_PATH='$CONFIG_FILE'
+export NPM_CONFIG_PREFIX='$OC_GLOBAL' NPM_CONFIG_CACHE='$OC_NPM_CACHE' TMPDIR='$OC_TMP' NODE_ICU_DATA='$NODE_BASE/share/icu'
+export PATH='$NODE_BASE/bin:$OC_GLOBAL/bin':\$PATH
+echo 'OpenClaw environment: $OC_ROOT (user: openclaw)'
+echo 'Exit this shell to restore the parent environment.'
+if [ -x /usr/bin/zsh ]; then exec /usr/bin/zsh -f; fi
+exec /bin/sh
+"
+
+if [ "$(id -u)" = 0 ] && id openclaw >/dev/null 2>&1; then
+	# -- 终止 su 选项解析; 子 shell 以 openclaw 身份在当前 tty 上交互运行。
+	exec su -s /bin/sh -c "$run_env" -- openclaw
+fi
+
+# 已是 openclaw 用户(或系统无 openclaw 用户): 仅设环境后进入 shell。
+eval "$run_env"

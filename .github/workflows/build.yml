@@ -1,0 +1,142 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'          # 推送 v 版本标签 (如 v1.0.0) 自动构建并发布 Release
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (留空则读取 VERSION 文件)'
+        required: false
+        type: string
+        default: ''
+      create_release:
+        description: '是否创建 Release'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    name: Build packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          INPUT_VER="${{ github.event.inputs.version }}"
+          if [ -n "$INPUT_VER" ]; then
+            VER="$INPUT_VER"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            # 标签触发: 取标签名并去掉前导 v (v1.0.0 -> 1.0.0)
+            VER="${GITHUB_REF_NAME#v}"
+          elif [ -f VERSION ]; then
+            VER="$(cat VERSION | tr -d '[:space:]')"
+          else
+            VER="$(date -u +%Y.%m.%d)"
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VER" >> "$GITHUB_OUTPUT"
+          echo "Version: $VER"
+
+      - name: Extract build versions from source
+        id: build_versions
+        run: |
+          # 从 openclaw-env 中提取版本号 (唯一的版本真相源)
+          # NODE_VERSION_V2 是当前推荐的 Node.js 版本
+          NODE_VER=$(grep -oP 'NODE_VERSION_V2="\K[0-9.]+' root/usr/bin/openclaw-env)
+          OC_VER=$(grep -oP 'OC_TESTED_VERSION="\K[0-9.]+' root/usr/bin/openclaw-env)
+          echo "node_version=${NODE_VER}" >> "$GITHUB_OUTPUT"
+          echo "oc_version=${OC_VER}" >> "$GITHUB_OUTPUT"
+          echo "Node.js: v${NODE_VER}"
+          echo "OpenClaw: v${OC_VER}"
+
+      - name: Inject version
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          echo "$VER" > VERSION
+          # 同步到 Makefile
+          sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$VER/" Makefile
+
+      - name: Validate source
+        run: |
+          find root scripts tests -type f \( -name '*.sh' -o -path 'root/usr/bin/*' -o -path 'root/etc/init.d/*' -o -path 'root/etc/uci-defaults/*' \) -exec sh -n {} +
+          sh tests/test_openclaw_contracts.sh
+          sh tests/test_openclaw_backup.sh
+          sh tests/test_openclaw_lock.sh
+          sh tests/test_openclaw_plugin_policy.sh
+          sh tests/test_openclaw_modern_luci.sh
+          sh tests/test_openclaw_node.sh
+          sh tests/test_openclaw_paths.sh
+          sh tests/test_openclaw_workspace.sh
+
+      - name: Build .run installer (online)
+        run: |
+          chmod +x scripts/build_run.sh
+          sh scripts/build_run.sh dist
+
+      - name: Build .ipk package
+        run: |
+          chmod +x scripts/build_ipk.sh
+          sh scripts/build_ipk.sh dist
+
+      - name: List outputs
+        run: |
+          echo "=== Build artifacts ==="
+          ls -lh dist/
+          echo ""
+          echo "=== SHA256 checksums ==="
+          sha256sum dist/*.run dist/*.ipk 2>/dev/null || true
+
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          CHANGELOG=$(awk "/^## \\[${VER}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="暂无更新日志"
+          fi
+          {
+            echo "content<<CHANGELOG_EOF"
+            echo "$CHANGELOG"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: luci-app-openclaw-${{ steps.version.outputs.version }}
+          path: dist/*
+          retention-days: 30
+          compression-level: 0
+
+      - name: Create Release
+        if: github.ref_type == 'tag' || github.event.inputs.create_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.version }}
+          files: dist/*
+          draft: false
+          prerelease: false
+          body: |
+            ${{ steps.changelog.outputs.content }}
+
+            ---
+
+            **在线安装** (需联网，自动下载 Node.js + OpenClaw)
+            ```
+            # iStoreOS
+            sh luci-app-openclaw_${{ steps.version.outputs.version }}.run
+
+            # OpenWrt
+            opkg install luci-app-openclaw_${{ steps.version.outputs.version }}-1_all.ipk
+            ```
+
+            [使用文档](https://github.com/tonylee2022/luci-app-openclaw#readme) · [问题反馈](https://github.com/tonylee2022/luci-app-openclaw/issues)

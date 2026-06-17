@@ -1,0 +1,14 @@
+# 仓库内所有文本文件统一用 LF 存储与检出。
+# 本项目是 OpenWrt/busybox 上运行的 shell 脚本与 ucode/JS/JSON，
+# CRLF 会破坏 #!/bin/sh shebang、here-doc 与 ucode 解析，必须强制 LF。
+* text=auto eol=lf
+
+# 无扩展名的可执行脚本(root/usr/bin/* 等)由上面的 text=auto 自动识别为文本并用 LF。
+
+# 二进制资源不做行尾转换。
+*.png binary
+*.jpg binary
+*.gz binary
+*.xz binary
+*.ipk binary
+*.run binary

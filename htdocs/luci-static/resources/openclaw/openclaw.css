@@ -1,0 +1,120 @@
+.oc-header { margin-bottom: 1.25rem; }
+.oc-header h2 { margin-bottom: .35rem; }
+.oc-muted { color: #667; }
+.oc-card { border: 1px solid #d5d8dc; border-radius: .5rem; margin-bottom: 1rem; overflow: hidden; background: var(--background-color-high, #fff); }
+.oc-card-title { padding: .7rem 1rem; font-weight: 600; background: var(--background-color-medium, #f4f6f8); }
+.oc-card-body { padding: 1rem; }
+.oc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .7rem 1.2rem; }
+.oc-field { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid #eee; padding: .45rem 0; }
+.oc-field span:first-child { color: #667; }
+.oc-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.oc-badge { display: inline-block; border-radius: 1rem; padding: .15rem .7rem; font-weight: 600; }
+.oc-ok { color: #137333; background: #e6f4ea; }
+.oc-warn { color: #8a4b00; background: #fef7e0; }
+.oc-error { color: #b3261e; background: #fce8e6; }
+/* 状态徽章: 鲜亮实底 + 白字 + 外发光环，聚焦到状态位置 (明暗模式通用，靠更高优先级覆盖) */
+.oc-badge.oc-ok, .oc-badge.oc-warn, .oc-badge.oc-error { color: #fff; font-weight: 700; padding: .22rem .85rem; letter-spacing: .02em; }
+.oc-badge.oc-ok    { background: #556b2f; box-shadow: 0 0 0 2px rgba(85,107,47,.28); }
+.oc-badge.oc-warn  { background: #b8860b; box-shadow: 0 0 0 2px rgba(184,134,11,.28); }
+.oc-badge.oc-error { background: #b22222; box-shadow: 0 0 0 2px rgba(178,34,34,.28); }
+.oc-log { min-height: 12rem; max-height: 28rem; overflow: auto; white-space: pre-wrap; background: #161b22; color: #c9d1d9; padding: .9rem; border-radius: .4rem; }
+.oc-table { width: 100%; border-collapse: collapse; }
+.oc-table th, .oc-table td { padding: .5rem; border-bottom: 1px solid #ddd; text-align: left; }
+.oc-table-actions { display: flex; gap: .35rem; }
+.oc-iframe { width: 100%; min-height: 70vh; border: 1px solid #d5d8dc; border-radius: .5rem; background: #fff; }
+.oc-input { width: 100%; box-sizing: border-box; }
+.oc-form-row { display: grid; grid-template-columns: 7rem minmax(0, 1fr); align-items: center; gap: .75rem; margin: .75rem 0; }
+.oc-task-state { margin: .8rem 0; padding: .7rem .85rem; border-radius: .4rem; border: 1px solid #d5d8dc; }
+.oc-task-running { color: #174ea6; background: #e8f0fe; border-color: #aecbfa; }
+.oc-task-success { color: #137333; background: #e6f4ea; border-color: #a8dab5; }
+.oc-task-error { color: #b3261e; background: #fce8e6; border-color: #f5b7b1; white-space: pre-wrap; }
+.oc-capacity { margin: .85rem 0; padding: .8rem; border: 1px solid #d5d8dc; border-radius: .4rem; background: #f7f8fa; }
+.oc-capacity-title { font-weight: 600; margin-bottom: .55rem; }
+.oc-capacity-grid { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: .35rem .75rem; }
+.oc-capacity-grid span { color: #667; }
+.oc-capacity-checking { color: #174ea6; background: #e8f0fe; border-color: #aecbfa; }
+.oc-capacity-ok { color: #137333; background: #e6f4ea; border-color: #a8dab5; }
+.oc-capacity-error { color: #b3261e; background: #fce8e6; border-color: #f5b7b1; }
+.oc-qr { white-space: pre; overflow: auto; font-family: 'Courier New', Courier, monospace; font-size: 6px; line-height: 1; letter-spacing: 2px; background: #fff !important; color: #000 !important; min-height: 0; max-height: 80vh; display: inline-block; padding: 8px; border-radius: .4rem; }
+.oc-wxqr-img { display: inline-block; background: #fff; padding: 8px; border-radius: .4rem; }
+.oc-wxqr-img img, .oc-wxqr-img svg { display: block; width: 13rem; height: 13rem; }
+@media (max-width: 600px) { .oc-field { display: block; } .oc-field span { display: block; margin-bottom: .2rem; } .oc-table { display: block; overflow-x: auto; } .oc-form-row, .oc-capacity-grid { grid-template-columns: 1fr; gap: .3rem; } }
+.oc-status-list .oc-field { justify-content: flex-start; gap: 0; }
+.oc-status-list .oc-field > span:first-child { flex: 0 0 8rem; padding-right: .75rem; }
+.oc-value { flex: 1; word-break: break-all; }
+.oc-section-label { font-size: .72em; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #999; margin: 1.1rem 0 .15rem; }
+.oc-section-label:first-child { margin-top: 0; }
+.oc-task-wrap { max-width: 48rem; }
+/* 配置管理标签栏 */
+.oc-tabs { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: 1rem; border-bottom: 1px solid #d5d8dc; }
+.oc-tab { padding: .55rem 1.1rem; border: none; background: transparent; cursor: pointer; font-size: .95em; color: #667; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.oc-tab:hover { color: #137333; }
+.oc-tab-active { color: #137333; font-weight: 600; border-bottom-color: #137333; }
+/* 健康检查 findings */
+.oc-finding { display: flex; gap: .6rem; padding: .6rem .2rem; border-bottom: 1px solid #eee; align-items: flex-start; }
+.oc-finding-body { flex: 1; min-width: 0; }
+.oc-finding-msg { word-break: break-word; }
+.oc-finding-hint { font-size: .85em; color: #667; margin-top: .25rem; white-space: pre-wrap; word-break: break-word; }
+.oc-finding-id { font-size: .75em; color: #999; margin-top: .2rem; }
+.oc-badge.oc-info { color: #fff; background: #5a6b7b; box-shadow: 0 0 0 2px rgba(90,107,123,.28); font-weight: 700; padding: .22rem .85rem; }
+.oc-kv { display: grid; grid-template-columns: 8rem minmax(0,1fr); gap: .3rem .8rem; margin: .3rem 0; }
+.oc-kv > span:nth-child(odd) { color: #667; }
+.oc-task-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.oc-task-title button { flex: 0 0 auto; }
+/* 暗色: 由 JS(ocui.applyTheme) 给 <html> 加 .oc-dark 类触发, 跟随当前 LuCI 主题明暗 */
+.oc-dark .oc-card { background: #252525; border-color: #3a3a3a; }
+.oc-dark .oc-card-title { background: #2e2e2e; }
+.oc-dark .oc-field { border-bottom-color: #3a3a3a; }
+.oc-dark .oc-field span:first-child { color: #888; }
+.oc-dark .oc-muted { color: #888; }
+.oc-dark .oc-section-label { color: #777; }
+.oc-dark .oc-tabs { border-bottom-color: #3a3a3a; }
+.oc-dark .oc-tab { color: #aaa; }
+.oc-dark .oc-tab:hover, .oc-dark .oc-tab-active { color: #81c995; border-bottom-color: #81c995; }
+.oc-dark .oc-finding { border-bottom-color: #3a3a3a; }
+.oc-dark .oc-finding-hint { color: #aaa; }
+.oc-dark .oc-finding-id { color: #777; }
+.oc-dark .oc-kv > span:nth-child(odd) { color: #888; }
+.oc-dark .oc-table th, .oc-dark .oc-table td { border-bottom-color: #3a3a3a; }
+.oc-dark .oc-ok  { color: #81c995; background: rgba(129,201,149,.15); }
+.oc-dark .oc-warn { color: #ffa857; background: rgba(255,168,87,.15); }
+.oc-dark .oc-error { color: #f28b82; background: rgba(242,139,130,.15); }
+.oc-dark .oc-task-state { border-color: #3a3a3a; }
+.oc-dark .oc-task-running { color: #8ab4f8; background: rgba(138,180,248,.12); border-color: rgba(138,180,248,.3); }
+.oc-dark .oc-task-success { color: #81c995; background: rgba(129,201,149,.12); border-color: rgba(129,201,149,.3); }
+.oc-dark .oc-task-error   { color: #f28b82; background: rgba(242,139,130,.12); border-color: rgba(242,139,130,.3); }
+.oc-dark .oc-capacity { background: #252525; border-color: #3a3a3a; }
+.oc-dark .oc-capacity-checking { color: #8ab4f8; background: rgba(138,180,248,.12); border-color: rgba(138,180,248,.3); }
+.oc-dark .oc-capacity-ok    { color: #81c995; background: rgba(129,201,149,.12); border-color: rgba(129,201,149,.3); }
+.oc-dark .oc-capacity-error { color: #f28b82; background: rgba(242,139,130,.12); border-color: rgba(242,139,130,.3); }
+.oc-dark .oc-iframe { background: #1e1e1e; }
+@keyframes oc-spin { to { transform: rotate(360deg); } }
+.oc-btn-loading::after { content: ''; display: inline-block; width: .75em; height: .75em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: oc-spin .7s linear infinite; margin-left: .45em; vertical-align: middle; }
+.cbi-button:disabled { opacity: 0.65; cursor: not-allowed; }
+.oc-action-status { margin-top: .75rem; padding: .55rem .85rem; border-radius: .4rem; font-size: .9em; border: 1px solid transparent; }
+/* 行内迷你按钮: 压扁高度/统一字号, 使所在行与其它状态行等高 */
+.oc-mini { padding: .05rem .6rem !important; font-size: .82em !important; line-height: 1.5 !important; min-height: 0 !important; height: auto !important; margin-left: .6rem; vertical-align: middle; }
+.oc-gh { display: inline-flex; align-items: center; gap: .35rem; text-decoration: none; vertical-align: middle; }
+.oc-gh svg { flex: 0 0 auto; }
+.oc-guide { margin: 0; padding-left: 1.3rem; }
+.oc-guide li { margin: .35rem 0; line-height: 1.5; color: #555; }
+.oc-dark .oc-guide li { color: #aaa; }
+/* 状态徽标: 用 id 提升优先级, 压过主题按钮规则 —— 统一尺寸/圆角/白字; 背景色由状态类提供 */
+/* 柔光呼吸: 徽标外发一圈柔和辉光(box-shadow blur), 明暗/大小呼吸, 不向外扩散; 颜色随状态(--oc-ring) */
+#oc-state { border: none !important; cursor: default; color: #fff !important; border-radius: 1.2rem !important; padding: .2rem .9rem !important; font-size: .85em !important; line-height: 1.5 !important; min-height: 0 !important; height: auto !important; animation: oc-glow 2.2s ease-in-out infinite; }
+@keyframes oc-glow {
+	0%, 100% { box-shadow: 0 0 2px 0 var(--oc-ring, rgba(255,255,255,.5)); }
+	50%      { box-shadow: 0 0 7px 1px var(--oc-ring, rgba(255,255,255,.5)); }
+}
+@media (prefers-reduced-motion: reduce) { #oc-state { animation: none; } }
+.oc-state-run      { background: #2f8a3e !important; border-color: #2f8a3e !important; --oc-ring: rgba(76,175,80,.7); }
+.oc-state-stop     { background: #c62828 !important; border-color: #c62828 !important; --oc-ring: rgba(198,40,40,.7); }
+.oc-state-starting { background: #b8860b !important; border-color: #b8860b !important; --oc-ring: rgba(184,134,11,.75); }
+/* 插件按钮统一配色: 不随主题明暗在蓝/绿间漂移 —— positive=绿, 停止=琥珀 */
+.oc-actions .cbi-button-positive { background: #2f8a3e !important; border-color: #2f8a3e !important; color: #fff !important; }
+.oc-actions .oc-btn-amber { background: #b8860b !important; border-color: #b8860b !important; color: #fff !important; }
+/* LuCI 通知关闭修复: Argon 主题未给 .alert-message 定义 opacity 过渡，
+   导致 ui.addNotification 的关闭按钮依赖的 transitionend 事件永不触发，节点无法移除。
+   补上过渡后关闭按钮即可正常工作。 */
+.alert-message { opacity: 1; transition: opacity .25s ease; }
+.alert-message.fade-out { opacity: 0; }

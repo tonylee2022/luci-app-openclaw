@@ -1,0 +1,23 @@
+{
+	"admin/services/openclaw": {
+		"title": "OpenClaw",
+		"order": 90,
+		"action": { "type": "firstchild" },
+		"depends": { "acl": [ "luci-app-openclaw" ], "uci": { "openclaw": true } }
+	},
+	"admin/services/openclaw/basic": {
+		"title": "基本设置",
+		"order": 10,
+		"action": { "type": "view", "path": "openclaw/overview" }
+	},
+	"admin/services/openclaw/advanced": {
+		"title": "配置管理",
+		"order": 20,
+		"action": { "type": "view", "path": "openclaw/advanced" }
+	},
+	"admin/services/openclaw/console": {
+		"title": "Web 控制台",
+		"order": 30,
+		"action": { "type": "view", "path": "openclaw/console" }
+	}
+}

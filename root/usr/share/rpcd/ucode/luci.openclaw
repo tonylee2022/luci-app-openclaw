@@ -1,0 +1,409 @@
+'use strict';
+
+import { access, popen, readfile, stat, writefile } from 'fs';
+import { cursor } from 'uci';
+
+// 每次用新游标读 uci: rpcd 会把本 ucode 模块常驻, 模块级缓存游标读不到其它进程
+// (安装/卸载任务用 shell `uci commit`) 提交的改动, 会导致 enabled 等显示陈旧。
+function uci_get(opt) {
+	return cursor().get('openclaw', 'main', opt);
+}
+
+function reply(ok, message, data) {
+	return { ok: !!ok, message: message || '', data: data || {} };
+}
+
+function shellquote(value) {
+	return `'${replace(`${value ?? ''}`, "'", "'\\''")}'`;
+}
+
+function run(command) {
+	let fd = popen(command + ' 2>/dev/null');
+	if (!fd)
+		return '';
+	let output = fd.read('all') || '';
+	fd.close();
+	return trim(output);
+}
+
+function run_action(action, args) {
+	let command = '/usr/libexec/openclaw-rpc.sh ' + shellquote(action);
+	for (let arg in (args || []))
+		command += ' ' + shellquote(arg);
+	let fd = popen(command + " 2>&1; printf '\\n__OPENCLAW_RC__:%s\\n' $?");
+	if (!fd)
+		return reply(false, '无法启动后台操作');
+	let output = fd.read('all') || '';
+	fd.close();
+	let marker = match(output, /\n__OPENCLAW_RC__:([0-9]+)\n?$/);
+	let status = +(marker?.[1] ?? 1);
+	output = replace(output, /\n__OPENCLAW_RC__:[0-9]+\n?$/, '');
+	return status == 0 ? reply(true, trim(output) || '操作已提交') : reply(false, trim(output) || '操作失败');
+}
+
+function normalize_base(value) {
+	let raw = trim(`${value || '/opt'}`);
+	raw = replace(raw, /\/+$/, '');
+	if (!length(raw)) raw = '/opt';
+	// 注意: ucode 用 POSIX ERE, [\s] 会被当成字面量 's', 必须用 [[:space:]]。
+	if (substr(raw, 0, 1) != '/' || match(raw, /[[:space:]'"`$;&|<>()]/)) return null;
+	if (raw == '/' || match(raw, /^\/(proc|sys|dev|tmp|var|etc|usr|bin|sbin|lib|rom|overlay)(\/|$)/)) return null;
+	raw = replace(raw, /\/openclaw$/, '');
+	return length(raw) ? raw : null;
+}
+
+// 校验自定义备份目录: 绝对、无危险字符、非系统目录、且在安装根目录之外。
+// 非法返回 null, 调用方回退到默认 <base>/openclaw-backups。
+function normalize_backup_dir(value, root) {
+	let raw = trim(`${value ?? ''}`);
+	raw = replace(raw, /\/+$/, '');
+	if (!length(raw) || substr(raw, 0, 1) != '/' || match(raw, /[[:space:]'"`$;&|<>()]/)) return null;
+	if (raw == '/' || match(raw, /^\/(proc|sys|dev|tmp|var|etc|usr|bin|sbin|lib|rom|overlay)(\/|$)/)) return null;
+	if (raw == root || substr(raw, 0, length(root) + 1) == root + '/') return null;
+	return raw;
+}
+
+function paths(input) {
+	let base = normalize_base(input ?? uci_get('install_path') ?? '/opt');
+	if (!base) return null;
+	let root = base + '/openclaw';
+	// 备份目录默认在安装根目录之外(同级), 卸载环境不会删除; 可经 UCI backup_path 覆盖。
+	let backup_dir = normalize_backup_dir(uci_get('backup_path'), root) || (base + '/openclaw-backups');
+	return { base, root, node: root + '/node', global: root + '/.npm-global', state: root + '/.openclaw', cache: root + '/.npm', tmp: root + '/.tmp', config: root + '/.openclaw/openclaw.json', backup_dir };
+}
+
+function task_status(prefix, log_path) {
+	log_path = log_path || (prefix + '.log');
+	let pid = trim(readfile(prefix + '.pid') || '');
+	let running = !access(prefix + '.exit') && match(pid, /^[0-9]+$/) && system('kill -0 ' + pid + ' >/dev/null 2>&1') == 0;
+	let code = running ? -1 : +trim(readfile(prefix + '.exit') || '-1');
+	let log = readfile(log_path) || '';
+	let info = stat(log_path);
+	return { running, done: !running && code >= 0, exit_code: code, state: running ? 'running' : code == 0 ? 'success' : code > 0 ? 'failed' : 'idle', log, updated: info?.mtime || 0 };
+}
+
+function package_version(root) {
+	for (let file in [ root + '/.npm-global/lib/node_modules/openclaw/package.json', root + '/.npm-global/node_modules/openclaw/package.json', root + '/node/lib/node_modules/openclaw/package.json' ]) {
+		try {
+			let value = json(readfile(file));
+			if (value?.version) return value.version;
+		} catch (e) {}
+	}
+	return '';
+}
+
+function static_status(p) {
+	let prefix = '/tmp/luci-openclaw-status';
+	let checked = +trim(readfile(prefix + '.time') || '0');
+	let cached_root = trim(readfile(prefix + '.root') || '');
+	if (cached_root == p.root && time() - checked < 60) {
+		return {
+			node_version: trim(readfile(prefix + '.node') || ''),
+			oc_version: trim(readfile(prefix + '.openclaw') || ''),
+			plugin_version: trim(readfile(prefix + '.plugin') || ''),
+			disk_free: trim(readfile(prefix + '.disk') || '')
+		};
+	}
+	let data = {
+		node_version: access(p.node + '/bin/node') ? run(shellquote(p.node + '/bin/node') + ' --version') : '',
+		oc_version: package_version(p.root),
+		plugin_version: trim(readfile('/usr/share/openclaw/VERSION') || ''),
+		disk_free: run('df -h ' + shellquote(p.base) + " | tail -1 | awk '{print $4}'")
+	};
+	writefile(prefix + '.root', p.root);
+	writefile(prefix + '.node', data.node_version);
+	writefile(prefix + '.openclaw', data.oc_version);
+	writefile(prefix + '.plugin', data.plugin_version);
+	writefile(prefix + '.disk', data.disk_free);
+	writefile(prefix + '.time', '' + time());
+	return data;
+}
+
+function status() {
+	let p = paths();
+	if (!p) return reply(false, '安装路径无效');
+	let port = `${uci_get('port') || '18789'}`;
+	let pty_port = `${uci_get('pty_port') || '18793'}`;
+	if (!match(port, /^[0-9]+$/)) port = '18789';
+	if (!match(pty_port, /^[0-9]+$/)) pty_port = '18793';
+	let gateway = +run(`if command -v ss >/dev/null; then ss -tulnp | grep -c ':${port} '; else netstat -tulnp | grep -c ':${port} '; fi || true`) > 0;
+	let pty = +run(`if command -v ss >/dev/null; then ss -tulnp | grep -c ':${pty_port} '; else netstat -tulnp | grep -c ':${pty_port} '; fi || true`) > 0;
+	let pid = gateway ? run(`netstat -tulnp | awk '/:${port} /{split($NF,a,"/");print a[1];exit}'`) : '';
+	let config = {};
+	try { config = json(readfile(p.config)); } catch (e) {}
+	let channels = [];
+	for (let item in [ ['openclaw-weixin', '微信'], ['qqbot', 'QQ'], ['telegram', 'Telegram'], ['discord', 'Discord'], ['feishu', '飞书'], ['slack', 'Slack'] ])
+		if (config?.channels?.[item[0]]) push(channels, item[1]);
+	let service = {};
+	try { service = json(run("ubus call service list '{\"name\":\"openclaw\"}'")); } catch (e) {}
+	let gateway_instance = service?.openclaw?.instances?.gateway || {};
+	let channel_text = '';
+	for (let channel in channels) channel_text += (length(channel_text) ? ', ' : '') + channel;
+	let cached = static_status(p);
+	let memory_kb = pid ? +run(`awk '/VmRSS/{print $2}' /proc/${pid}/status`) : 0;
+	return reply(true, '', {
+		enabled: `${uci_get('enabled') || '0'}`,
+		port, pty_port, install_path: p.root, gateway_running: gateway,
+		gateway_starting: !gateway && gateway_instance.running == true,
+		gateway_failed: !gateway && gateway_instance.exit_code != null && gateway_instance.exit_code != 0,
+		gateway_exit_code: gateway_instance.exit_code ?? '', pty_running: pty, pid,
+		memory_kb, uptime: '', node_version: cached.node_version,
+		oc_version: cached.oc_version, plugin_version: cached.plugin_version, disk_free: cached.disk_free,
+		active_model: config?.agents?.defaults?.model?.primary || '', channels: channel_text
+	});
+}
+
+function system_info(request) {
+	let base = normalize_base(request.args.install_path ?? uci_get('install_path') ?? '/opt');
+	if (!base) return reply(false, '安装路径无效', { path_valid: false, resources_ok: false });
+	let probe = base;
+	while (probe != '/' && !access(probe)) probe = replace(probe, /\/[^\/]+$/, '') || '/';
+	let memory_mb = int(+run("awk '/MemTotal/{print int($2/1024)}' /proc/meminfo"));
+	let disk_mb = int(+run('df -m ' + shellquote(probe) + " | tail -1 | awk '{print $4}'"));
+	let disk_total_mb = int(+run('df -m ' + shellquote(probe) + " | tail -1 | awk '{print $2}'"));
+	let data = { install_path: base, path_valid: true, memory_mb, memory_ok: memory_mb >= 1024, disk_mb, disk_total_mb, disk_ok: disk_mb >= 2048, disk_path: probe, disk_free_str: run('df -h ' + shellquote(probe) + " | tail -1 | awk '{print $4}'"), disk_total_str: run('df -h ' + shellquote(probe) + " | tail -1 | awk '{print $2}'") };
+	data.resources_ok = data.memory_ok && data.disk_ok;
+	return reply(true, data.resources_ok ? '系统资源检测通过' : '系统资源不满足安装要求', data);
+}
+
+// 列出可作安装基路径的真实磁盘挂载点(排除 overlay/tmpfs/squashfs/docker 内部/只读系统挂载)。
+// 让用户从有空间的挂载点里选, 避免默认 /opt 落在狭小的 overlay 上。
+function install_targets() {
+	let want = { ext4: 1, ext3: 1, ext2: 1, f2fs: 1, btrfs: 1, xfs: 1, vfat: 1, exfat: 1, ntfs: 1, ntfs3: 1 };
+	let out = [], seen = {};
+	for (let line in split(run('cat /proc/mounts 2>/dev/null'), '\n')) {
+		let f = split(trim(line), ' ');
+		if (length(f) < 3) continue;
+		let mp = f[1], fstype = f[2];
+		if (!want[fstype] || seen[mp]) continue;
+		seen[mp] = true;
+		// 与 normalize_base 黑名单一致: 跟随能跳过的系统/只读/overlay 挂载, 避免列出会被拒的路径。
+		if (mp == '/' || mp == '/boot' || match(mp, /^\/(proc|sys|dev|tmp|var|etc|usr|bin|sbin|lib|rom|overlay)(\/|$)/)) continue;
+		if (substr(mp, 0, 11) == '/opt/docker' || index(mp, '/docker/') >= 0) continue;
+		let avail = int(+run('df -k ' + shellquote(mp) + " 2>/dev/null | tail -1 | awk '{print $(NF-2)}'"));
+		push(out, {
+			path: mp, fstype,
+			avail_mb: int(avail / 1024),
+			free_str: run('df -h ' + shellquote(mp) + " 2>/dev/null | tail -1 | awk '{print $(NF-2)}'"),
+			total_str: run('df -h ' + shellquote(mp) + " 2>/dev/null | tail -1 | awk '{print $(NF-4)}'"),
+			enough: avail >= 2 * 1024 * 1024
+		});
+	}
+	return reply(true, '', { targets: out });
+}
+
+function install_path_probe(request) {
+	let result = system_info(request);
+	if (!result.ok) return result;
+	let data = result.data;
+	let test = data.disk_path + '/.openclaw-write-test-' + time();
+	let writable = system('mkdir ' + shellquote(test) + ' >/dev/null 2>&1') == 0;
+	if (writable) system('rmdir ' + shellquote(test));
+	data.writable_ok = writable;
+	data.pass = data.resources_ok && writable;
+	return reply(data.pass, data.pass ? '安装环境检测通过' : '安装路径不可写或系统资源不足', data);
+}
+
+function update_check() {
+	let current = trim(readfile('/usr/share/openclaw/VERSION') || '');
+	let cache_file = '/tmp/luci-openclaw-update-cache.json';
+	let cache_time = +trim(readfile('/tmp/luci-openclaw-update-cache.time') || '0');
+	let raw = time() - cache_time < 600 ? (readfile(cache_file) || '') : '';
+	let release = {};
+	if (!length(raw))
+		raw = run("curl -sf --connect-timeout 5 --max-time 10 https://api.github.com/repos/tonylee2022/luci-app-openclaw/releases/latest");
+	try {
+		release = json(raw);
+		if (release?.tag_name) {
+			writefile(cache_file, raw);
+			writefile('/tmp/luci-openclaw-update-cache.time', '' + time());
+		}
+	} catch (e) {}
+	let latest = replace(`${release?.tag_name || ''}`, /^v/, '');
+	return reply(!!latest, latest ? '' : '无法获取最新版本', { plugin_current: current, plugin_latest: latest, plugin_has_update: !!latest && current != latest, release_notes: release?.body || '' });
+}
+
+function backup_list() {
+	let p = paths();
+	if (!p) return reply(false, '安装路径无效');
+	let output = run('ls -t ' + shellquote(p.backup_dir) + '/*-openclaw-backup.tar.gz 2>/dev/null');
+	let backups = [];
+	for (let file in split(output, '\n')) {
+		if (!length(file) || length(backups) >= 20) continue;
+		let info = stat(file), name = replace(file, /^.*\//, ''), size = info?.size || 0;
+		push(backups, { filename: name, size, size_str: size >= 1048576 ? sprintf('%.1f MB', size / 1048576) : sprintf('%.1f KB', size / 1024), time: replace(replace(match(name, /^[0-9-]+T[0-9.-]+Z/)?.[0] || '', 'T', ' '), /Z$/, ''), backup_type: size < 50000 ? 'config' : 'full' });
+	}
+	return reply(true, '', { backups, backup_dir: p.backup_dir, backup_default: p.base + '/openclaw-backups', backup_custom: !!normalize_backup_dir(uci_get('backup_path'), p.root) });
+}
+
+function gateway_token() {
+	return reply(true, '', { token: uci_get('token') || '', pty_token: uci_get('pty_token') || '' });
+}
+
+function wechat_status() {
+	let p = paths();
+	if (!p) return reply(false, '安装路径无效');
+	// 注意: busybox find 不支持 -quit, 用 | head -1 取首个匹配
+	let manifest = run('find ' + shellquote(p.state + '/npm/projects') + " -path '*/node_modules/@tencent-weixin/openclaw-weixin/openclaw.plugin.json' 2>/dev/null | head -1");
+	if (!manifest && access(p.state + '/extensions/openclaw-weixin/openclaw.plugin.json')) manifest = p.state + '/extensions/openclaw-weixin/openclaw.plugin.json';
+	let version = '';
+	try { version = json(readfile(replace(manifest, /openclaw\.plugin\.json$/, 'package.json')))?.version || json(readfile(manifest))?.version || ''; } catch (e) {}
+	let accounts = [];
+	try {
+		let value = json(readfile(p.state + '/openclaw-weixin/accounts.json'));
+		if (type(value) == 'array') for (let id in value) if (type(id) == 'string') push(accounts, { id, name: id });
+	} catch (e) {}
+	return reply(true, '', { plugin_installed: !!manifest, plugin_version: version, logged_in: length(accounts) > 0, accounts, install_path: p.root });
+}
+
+function wechat_update_check() {
+	let state = wechat_status().data, p = paths();
+	let latest = access(p.node + '/bin/npm') ? run(shellquote(p.node + '/bin/npm') + ' view @tencent-weixin/openclaw-weixin version') : '';
+	return reply(!!latest, latest ? '' : '无法查询 npm 版本', { current_version: state.plugin_version || '', latest_version: latest, has_upgrade: !!latest && state.plugin_version != latest });
+}
+
+// ── OpenClaw CLI 诊断/查询 (供配置管理页) ──
+function cli_json(action) {
+	let out = run('/usr/libexec/openclaw-rpc.sh ' + action);
+	if (!length(out)) return reply(false, '命令无输出 (网关可能未运行或 OpenClaw 未安装)', {});
+	try { return reply(true, '', json(out)); }
+	catch (e) { return reply(false, '解析输出失败', { raw: out }); }
+}
+
+function logs_tail(request) {
+	let lines = int(request?.args?.lines ?? 200);
+	if (lines < 1 || lines > 2000) lines = 200;
+	let out = run('/usr/libexec/openclaw-rpc.sh cli-logs ' + lines);
+	// 仅保留精简字段, 丢弃每条日志巨大的转义 raw 字段 (否则超 ubus 消息上限导致响应失败)
+	let entries = [];
+	for (let line in split(out, '\n')) {
+		line = trim(line);
+		if (!length(line)) continue;
+		let obj;
+		try { obj = json(line); } catch (e) { push(entries, { text: substr(line, 0, 500) }); continue; }
+		if (obj.type == 'log')
+			push(entries, { time: obj.time || '', level: obj.level || '', subsystem: obj.subsystem || '', message: substr(`${obj.message || ''}`, 0, 1000) });
+	}
+	return reply(true, '', { lines: entries });
+}
+
+function config_summary() {
+	let p = paths();
+	if (!p) return reply(false, '安装路径无效');
+	let config = {};
+	try { config = json(readfile(p.config)); } catch (e) {}
+
+	let profiles = config?.auth?.profiles || {};
+	let selmodels = config?.agents?.defaults?.models || {};
+	let primary = config?.agents?.defaults?.model?.primary || '';
+
+	// 某提供商的授权方式 (auth.profiles 中 provider 匹配的 mode), 无则 ''。
+	let provider_auth = function(name) {
+		for (let k in profiles) if (profiles[k]?.provider == name) return profiles[k]?.mode || '';
+		return '';
+	};
+
+	// 「已配置提供商」只由两处推导: 已选模型前缀(agents.defaults.models) ∪ 授权档案(auth.profiles)。
+	// models.providers(静态目录) 与 plugins.entries(启用态) 都不作为依据。
+	let nameset = {};
+	for (let m in selmodels) { let i = index(m, '/'); if (i > 0) nameset[substr(m, 0, i)] = true; }
+	for (let k in profiles) { let pr = profiles[k]?.provider; if (pr) nameset[pr] = true; }
+
+	let providers = [];
+	for (let name in nameset) {
+		let mc = 0;
+		for (let m in selmodels) if (substr(m, 0, length(name) + 1) == name + '/') mc++;
+		push(providers, { name, auth: provider_auth(name), model_count: mc });
+	}
+
+	// 允许模型列表 (agents.defaults.models), 带 provider/auth/primary, 供「设置活跃模型」按授权过滤。
+	let allowed_models = [];
+	for (let m in selmodels) {
+		let i = index(m, '/');
+		let prov = i > 0 ? substr(m, 0, i) : '';
+		push(allowed_models, { key: m, alias: selmodels[m]?.alias || '', provider: prov, auth: provider_auth(prov), primary: m == primary });
+	}
+	let channels = [];
+	for (let item in [ ['openclaw-weixin','微信'], ['qqbot','QQ'], ['telegram','Telegram'], ['discord','Discord'], ['feishu','飞书'], ['slack','Slack'] ])
+		if (config?.channels?.[item[0]]) push(channels, { id: item[0], name: item[1] });
+	return reply(true, '', {
+		primary_model: primary,
+		gateway_port: `${config?.gateway?.port || ''}`,
+		gateway_bind: config?.gateway?.bind || '',
+		providers, channels, allowed_models
+	});
+}
+
+// 用 qrencode 把链接生成可扫的二维码 SVG。仅接受 http(s) 链接; shellquote 防注入。
+function qr_encode(req) {
+	let text = `${req?.args?.text ?? ''}`;
+	if (!length(text) || length(text) > 1024) return reply(false, '二维码文本无效');
+	if (!match(text, /^https?:\/\/[!-~]+$/)) return reply(false, '仅支持 http(s) 链接');
+	if (!access('/usr/bin/qrencode')) return reply(false, 'qrencode 未安装');
+	let svg = run('printf %s ' + shellquote(text) + ' | /usr/bin/qrencode -t SVG -o - -m 2 -s 6');
+	if (!length(svg) || !match(svg, /<svg/)) return reply(false, '二维码生成失败');
+	return reply(true, '', { svg });
+}
+
+const methods = {
+	status: { call: status },
+	system_info: { args: { install_path: '/opt' }, call: system_info },
+	install_path_probe: { args: { install_path: '/opt' }, call: install_path_probe },
+	install_targets: { call: install_targets },
+	update_check: { call: update_check },
+	setup_log: { call: () => reply(true, '', task_status('/tmp/openclaw-setup')) },
+	uninstall_log: { call: () => reply(true, '', task_status('/tmp/openclaw-uninstall')) },
+	upgrade_log: { call: () => reply(true, '', task_status('/tmp/openclaw-plugin-upgrade')) },
+	env_upgrade_openclaw: { call: () => run_action('env-upgrade-openclaw') },
+	env_upgrade_npm: { call: () => run_action('env-upgrade-npm') },
+	env_upgrade_node: { args: { version: '' }, call: (r) => match(r.args.version, /^[0-9]+\.[0-9]+\.[0-9]+$/) ? run_action('env-upgrade-node', [r.args.version]) : reply(false, 'Node 版本号格式无效') },
+	env_upgrade_log: { call: () => reply(true, '', task_status('/tmp/openclaw-env-upgrade')) },
+	backup_list: { call: backup_list },
+	backup_path_set: { args: { path: '' }, call: (r) => { let v = trim(`${r.args.path ?? ''}`); let root = paths()?.root; if (length(v) && root && !normalize_backup_dir(v, root)) return reply(false, '备份路径无效: 需为绝对路径且位于安装目录之外'); return run_action('backup-path-set', [v]); } },
+	backup_verify: { args: { file: '' }, call: (r) => run_action('backup-verify', [r.args.file || '']) },
+	gateway_token: { call: gateway_token },
+	wechat_status: { call: wechat_status },
+	wechat_install_log: { call: () => reply(true, '', task_status('/tmp/openclaw-wechat-install')) },
+	wechat_login_status: { call: () => { let data = task_status('/tmp/openclaw-wechat-login', '/tmp/openclaw-wechat-qrcode.txt'); data.qrcode = data.log; data.qrcode_url = match(data.log, /https?:\/\/[A-Za-z0-9._~:\/?#@!$&'()*+,;=%-]+/g)?.[-1]?.[0] || ''; data.logged_in = match(data.log, /(登录成功|成功登录|Login success|Logged in|Local login saved auth)/) != null; if (data.logged_in) data.state = 'success'; else if (data.running && data.qrcode_url) data.state = 'qrcode'; else if (data.running) data.state = 'starting'; return reply(true, '', data); } },
+	wechat_update_check: { call: wechat_update_check },
+	service_action: { args: { action: '' }, call: (r) => match(r.args.action, /^(start|stop|restart|enable|disable|restart_gateway)$/) ? run_action('service', [r.args.action]) : reply(false, '服务操作无效') },
+	autostart_set: { args: { enabled: '' }, call: (r) => match(r.args.enabled, /^[01]$/) ? run_action('autostart', [r.args.enabled]) : reply(false, '参数无效') },
+	setup: { args: { version: '', install_path: '/opt' }, call: (r) => match(r.args.version, /^(stable|latest)$/) && normalize_base(r.args.install_path) ? run_action('setup', [r.args.version, normalize_base(r.args.install_path)]) : reply(false, '安装参数无效') },
+	uninstall: { call: () => run_action('uninstall') },
+	upgrade: { args: { version: '' }, call: (r) => match(r.args.version, /^[0-9]+\.[0-9]+\.[0-9]+$/) ? run_action('upgrade', [r.args.version]) : reply(false, '版本号格式无效') },
+	backup_create: { args: { only_config: true }, call: (r) => run_action('backup-create', [r.args.only_config === false ? '0' : '1']) },
+	backup_restore: { args: { file: '' }, call: (r) => match(r.args.file, /^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$/) ? run_action('backup-restore', [r.args.file]) : reply(false, '备份文件名无效') },
+	backup_delete: { args: { file: '' }, call: (r) => match(r.args.file, /^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$/) ? run_action('backup-delete', [r.args.file]) : reply(false, '备份文件名无效') },
+	wechat_install: { call: () => run_action('wechat-install') },
+	wechat_login: { call: () => run_action('wechat-login') },
+	wechat_login_cancel: { call: () => run_action('wechat-login-cancel') },
+	doctor_lint: { call: () => cli_json('cli-doctor-lint') },
+	doctor_fix: { call: () => run_action('cli-doctor-fix') },
+	doctor_fix_log: { call: () => reply(true, '', task_status('/tmp/openclaw-doctor-fix')) },
+	health: { call: () => cli_json('cli-health') },
+	channels_list: { call: () => cli_json('cli-channels-list') },
+	channels_status: { call: () => cli_json('cli-channels-status') },
+	logs_tail: { args: { lines: 200 }, call: logs_tail },
+	config_summary: { call: config_summary },
+	model_set: { args: { model: '' }, call: (r) => match(r.args.model, /^[A-Za-z0-9_.\/-]+$/) ? run_action('cli-models-set', [r.args.model]) : reply(false, '模型 ID 无效') },
+	qr_encode: { args: { text: '' }, call: qr_encode },
+	task_cancel: { args: { name: '' }, call: (r) => match(r.args.name, /^[A-Za-z0-9-]+$/) ? run_action('task-cancel', [r.args.name]) : reply(false, '任务名无效') },
+	wizard_status: { call: () => reply(true, '', { available: access('/usr/bin/ttyd') }) },
+	wizard_start: { args: { section: 'full' }, call: (r) => {
+		if (!match(r.args.section, /^(model|channels|full|shell)$/)) return reply(false, '无效的向导分段');
+		let res = run_action('wizard-start', [ r.args.section ]);
+		let port = trim(`${res.message || ''}`);
+		if (res.ok && match(port, /^[0-9]{4,5}$/)) return reply(true, '', { port: int(port) });
+		return reply(false, res.message || '向导启动失败');
+	} },
+	wizard_stop: { call: () => run_action('wizard-stop') },
+	wechat_logout: { args: { account: '' }, call: (r) => match(r.args.account, /^[A-Za-z0-9_.-]+$/) ? run_action('wechat-logout', [r.args.account]) : reply(false, '账号 ID 无效') },
+	telegram_add: { args: { token: '' }, call: (r) => match(r.args.token, /^[0-9]+:[A-Za-z0-9_-]+$/) ? run_action('telegram-add', [r.args.token]) : reply(false, 'Bot Token 格式无效') },
+	telegram_add_log: { call: () => reply(true, '', task_status('/tmp/openclaw-telegram-add')) },
+	telegram_pair: { args: { code: '' }, call: (r) => match(r.args.code, /^[A-Za-z0-9]{4,16}$/) ? run_action('telegram-pair', [r.args.code]) : reply(false, '配对码格式无效') },
+	telegram_pairing_list: { call: () => cli_json('telegram-pairing-list') },
+	wechat_upgrade: { call: () => run_action('wechat-upgrade') },
+	wechat_uninstall: { call: () => run_action('wechat-uninstall') }
+};
+
+return { 'luci.openclaw': methods };

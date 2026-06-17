@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# OpenClaw 必须以 openclaw 用户运行: 以 root 运行会让其安全校验把
+# temp dir(/opt/openclaw/.tmp/openclaw-0, 属主不匹配) 判为 unsafe 而拒绝启动,
+# 且会在 openclaw 家目录里留下 root 属主的文件。以 root 调用时自动降权重跑自身。
+if [ "$(id -u)" = 0 ] && id openclaw >/dev/null 2>&1; then
+	# -- 终止 su 自身的选项解析, 否则形如 --channel 的参数会被 su 误当作选项。
+	exec su -s /bin/sh -c 'exec "$@"' -- openclaw sh "$0" "$@"
+fi
+
+[ -r /usr/libexec/openclaw-paths.sh ] && . /usr/libexec/openclaw-paths.sh
+
+configured_path="${OPENCLAW_INSTALL_PATH:-$(uci -q get openclaw.main.install_path 2>/dev/null || echo /opt)}"
+if command -v oc_load_paths >/dev/null 2>&1; then
+	oc_load_paths "$configured_path" || {
+		echo "Invalid OpenClaw install path: $configured_path" >&2
+		exit 1
+	}
+else
+	OC_ROOT="${configured_path%/}/openclaw"
+	NODE_BASE="$OC_ROOT/node"
+	OC_HOME="$OC_ROOT"
+	OC_GLOBAL="$OC_ROOT/.npm-global"
+	OC_DATA="$OC_HOME"
+	OC_STATE_DIR="$OC_HOME/.openclaw"
+	OC_NPM_CACHE="$OC_HOME/.npm"
+	OC_TMP="$OC_HOME/.tmp"
+	CONFIG_FILE="$OC_STATE_DIR/openclaw.json"
+fi
+
+node="$NODE_BASE/bin/node"
+[ -x "$node" ] || { echo "OpenClaw Node.js not found: $node" >&2; exit 127; }
+
+entry=""
+for candidate in "$OC_GLOBAL/lib/node_modules/openclaw/openclaw.mjs" "$OC_GLOBAL/lib/node_modules/openclaw/dist/cli.js" "$OC_GLOBAL/node_modules/openclaw/openclaw.mjs" "$OC_GLOBAL/node_modules/openclaw/dist/cli.js" "$NODE_BASE/lib/node_modules/openclaw/openclaw.mjs" "$NODE_BASE/lib/node_modules/openclaw/dist/cli.js"; do
+	[ -f "$candidate" ] && { entry="$candidate"; break; }
+done
+[ -n "$entry" ] || { echo "OpenClaw CLI entry not found under $OC_ROOT" >&2; exit 127; }
+
+export HOME="$OC_HOME"
+export OPENCLAW_HOME="$OC_HOME"
+export OPENCLAW_STATE_DIR="$OC_STATE_DIR"
+export OPENCLAW_CONFIG_PATH="$CONFIG_FILE"
+export NPM_CONFIG_PREFIX="$OC_GLOBAL"
+export NPM_CONFIG_CACHE="$OC_NPM_CACHE"
+export TMPDIR="$OC_TMP"
+export NODE_ICU_DATA="$NODE_BASE/share/icu"
+export PATH="$NODE_BASE/bin:$OC_GLOBAL/bin:$PATH"
+
+exec "$node" "$entry" "$@"
