@@ -23,12 +23,12 @@ grep -q "uninstallLog: call('uninstall_log')" htdocs/luci-static/resources/openc
 grep -q 'oc-capacity-grid' htdocs/luci-static/resources/view/openclaw/overview.js || fail "install capacity details missing"
 grep -q 'api.upgradeLog()' htdocs/luci-static/resources/view/openclaw/overview.js || fail "upgrade task must use the persistent task panel"
 grep -q "'type': 'button'" htdocs/luci-static/resources/view/openclaw/overview.js || fail "overview buttons must not submit forms"
-grep -q "'type': 'button'" htdocs/luci-static/resources/view/openclaw/wechat.js || fail "wechat buttons must not submit forms"
+grep -q "'type': 'button'" htdocs/luci-static/resources/view/openclaw/advanced.js || fail "channel/config buttons must not submit forms"
 grep -q 'function closeButton' htdocs/luci-static/resources/view/openclaw/overview.js || fail "synchronous modal close helper missing"
 grep -q 'ev.preventDefault()' htdocs/luci-static/resources/view/openclaw/overview.js || fail "modal close must prevent default submission"
 grep -q 'api.setupLog().then' htdocs/luci-static/resources/view/openclaw/overview.js || fail "setup submission recovery check missing"
 grep -q 'showAcceptedTask' htdocs/luci-static/resources/view/openclaw/overview.js || fail "accepted setup must use the persistent task panel"
-if grep -q "button(_('关闭')" htdocs/luci-static/resources/view/openclaw/overview.js htdocs/luci-static/resources/view/openclaw/wechat.js; then
+if grep -q "button(_('关闭')" htdocs/luci-static/resources/view/openclaw/overview.js; then
 	fail "modal close buttons must not use the asynchronous action wrapper"
 fi
 if grep -q 'showTask:' htdocs/luci-static/resources/view/openclaw/overview.js; then

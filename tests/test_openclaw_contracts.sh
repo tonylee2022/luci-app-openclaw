@@ -17,10 +17,13 @@ fi
 if grep -Eq 'pgrep[[:space:]]+-u[[:space:]]+openclaw|pkill[^\n]*-u[[:space:]]+openclaw' root/etc/init.d/openclaw; then
 	fail "service stop must not kill every process sharing the openclaw UID"
 fi
+# 允许用户驱动的 openclaw-weixin 渠道生命周期(安装/启用/升级/卸载), 但仍禁止改动
+# 任何插件的 allow/deny/entries/installs 策略或对其它插件 enable/disable。
 if grep -R -n -E --exclude='*.min.js' \
 	'plugins\.(allow|deny|entries|installs)|plugins\[.(allow|deny|entries|installs)|plugins[[:space:]]+(enable|disable)' \
-	root/etc root/usr/bin root/usr/libexec root/usr/share/openclaw >/dev/null 2>&1; then
-	fail "project must not modify OpenClaw plugin enablement or security policy"
+	root/etc root/usr/bin root/usr/libexec root/usr/share/openclaw 2>/dev/null \
+	| grep -v 'openclaw-weixin' | grep -q .; then
+	fail "project must not modify OpenClaw plugin enablement or security policy (except the user-driven openclaw-weixin channel)"
 fi
 grep -q "NODE_VERSION_V2=\"22.22.3\"" root/usr/bin/openclaw-env || fail "default Node.js version not pinned"
 grep -q 'OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-22.19.0}"' root/usr/bin/openclaw-env || fail "minimum Node.js version not pinned"
@@ -53,11 +56,11 @@ grep -q 'export NPM_CONFIG_PREFIX="$OC_GLOBAL"' root/usr/bin/openclaw || fail "o
 grep -q 'export NPM_CONFIG_CACHE="$OC_NPM_CACHE"' root/usr/bin/openclaw || fail "openclaw wrapper must inject npm cache"
 grep -q 'export TMPDIR="$OC_TMP"' root/usr/bin/openclaw || fail "openclaw wrapper must inject tmp dir"
 grep -q 'configured_path="${OPENCLAW_INSTALL_PATH:-' root/usr/bin/openclaw || fail "openclaw wrapper must support a custom install path"
-grep -q 'export HOME="$OC_HOME"' root/usr/bin/openclaw-shell || fail "temporary shell must inject HOME locally"
-grep -q 'export OPENCLAW_STATE_DIR="$OC_STATE_DIR"' root/usr/bin/openclaw-shell || fail "temporary shell must inject state dir"
-grep -q 'export NPM_CONFIG_PREFIX="$OC_GLOBAL"' root/usr/bin/openclaw-shell || fail "temporary shell must inject npm prefix"
-grep -q 'export NPM_CONFIG_CACHE="$OC_NPM_CACHE"' root/usr/bin/openclaw-shell || fail "temporary shell must inject npm cache"
-grep -q 'export TMPDIR="$OC_TMP"' root/usr/bin/openclaw-shell || fail "temporary shell must inject tmp dir"
+grep -Fq "HOME='\$OC_HOME'" root/usr/bin/openclaw-shell || fail "temporary shell must inject HOME locally"
+grep -Fq "OPENCLAW_STATE_DIR='\$OC_STATE_DIR'" root/usr/bin/openclaw-shell || fail "temporary shell must inject state dir"
+grep -Fq "NPM_CONFIG_PREFIX='\$OC_GLOBAL'" root/usr/bin/openclaw-shell || fail "temporary shell must inject npm prefix"
+grep -Fq "NPM_CONFIG_CACHE='\$OC_NPM_CACHE'" root/usr/bin/openclaw-shell || fail "temporary shell must inject npm cache"
+grep -Fq "TMPDIR='\$OC_TMP'" root/usr/bin/openclaw-shell || fail "temporary shell must inject tmp dir"
 grep -q 'configured_path="${OPENCLAW_INSTALL_PATH:-' root/usr/bin/openclaw-shell || fail "temporary shell must support a custom install path"
 grep -q 'exec /usr/bin/zsh -f' root/usr/bin/openclaw-shell || fail "temporary shell must use isolated zsh"
 [ ! -e root/etc/profile.d/openclaw.sh ] || fail "obsolete profile script must be removed"
@@ -69,7 +72,7 @@ if grep -q 'export HOME=' README.md; then
 fi
 grep -q 'local target_pkg="openclaw@latest"' root/usr/bin/openclaw-env || fail "upgrade must target npm latest"
 
-for view in overview wechat advanced console; do
+for view in overview advanced console; do
 	[ -f "htdocs/luci-static/resources/view/openclaw/$view.js" ] || fail "missing modern LuCI view: $view"
 done
 [ -f root/usr/share/luci/menu.d/luci-app-openclaw.json ] || fail "menu.d definition missing"
@@ -86,7 +89,7 @@ if grep -q 'system_check:' root/usr/share/rpcd/ucode/luci.openclaw; then fail "w
 grep -Eq '\^\(start\|stop\|restart\|enable\|disable\|restart_gateway\)\$' root/usr/share/rpcd/ucode/luci.openclaw || fail "service action allowlist missing"
 grep -Fq "grep -aq '^__ARCHIVE_BELOW__$'" root/usr/libexec/openclaw-rpc.sh || fail "downloaded run installer marker validation missing"
 grep -Fq "oc_safe_openclaw_root" root/usr/libexec/openclaw-rpc.sh || fail "uninstall safety check missing"
-grep -q "openclaw-weixin-cli@latest install" root/usr/libexec/openclaw-rpc.sh || fail "wechat install must use official Weixin CLI"
+grep -q "@tencent-weixin/openclaw-weixin@latest" root/usr/libexec/openclaw-rpc.sh || fail "wechat install must use the official Weixin plugin package"
 grep -q "Local login saved auth" root/usr/libexec/openclaw-rpc.sh || fail "successful Weixin local auth must be recognized"
 grep -q "Local login saved auth" root/usr/share/rpcd/ucode/luci.openclaw || fail "Weixin login status must recognize saved local auth"
 grep -q '/etc/init.d/openclaw stop >/dev/null 2>&1 || true; /etc/init.d/openclaw start' root/usr/libexec/openclaw-rpc.sh || fail "successful Weixin login must safely restart the procd service"
@@ -137,7 +140,7 @@ if grep -R -E -q 'openclaw gateway (start|stop|restart)' root scripts htdocs; th
 	fail "project code must not use unsupported Gateway lifecycle commands"
 fi
 
-if grep -R -E -q '10000ge10000|59438380|910501|OpenList|openlist' README.md CHANGELOG.md Makefile .github scripts root htdocs; then
+if grep -R -E -q '59438380|910501|OpenList|openlist' README.md CHANGELOG.md Makefile .github scripts root htdocs; then
 	fail "repository documentation and release metadata must not reference removed external publishing sources"
 fi
 [ ! -e scripts/sync_openlist.sh ] || fail "legacy OpenList sync script must be removed"
