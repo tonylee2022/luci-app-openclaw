@@ -393,7 +393,13 @@ case "${1:-}" in
 		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
 		# 仅安装插件(不登录, 解耦)。停网关→装插件(openclaw 身份, /usr/bin/openclaw 自动降权)→起网关加载新插件。
 		# 登录请另走「扫码登录」(channels login 热重载, 不碰 OpenClaw 自带的网关重启)。
-		cmd="/etc/init.d/openclaw stop; /usr/bin/openclaw plugins install '@tencent-weixin/openclaw-weixin@latest'; rc=\$?; /usr/bin/openclaw plugins enable openclaw-weixin >/dev/null 2>&1; /etc/init.d/openclaw start; exit \$rc"
+		# 显式解析 npm 最新版后钉住安装: OpenClaw 的 plugins install @latest 会退化到旧版
+		# (实测 @latest→2.4.3, 而 npm latest=2.4.4), 与官方 cli 一致地取 npm 真正 latest。
+		ver=$(su -s /bin/sh openclaw -c "$(oc_cli_env) $NODE_BASE/bin/npm view @tencent-weixin/openclaw-weixin version 2>/dev/null" | tr -d '[:space:]')
+		echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || ver=latest
+		# --force: 已装旧版时替换为解析出的最新版(install 否则会因 "plugin already exists" 失败);
+		# 登录态在 .openclaw/openclaw-weixin/ 单独保存, 不随插件代码替换而丢失。
+		cmd="/etc/init.d/openclaw stop; /usr/bin/openclaw plugins install --force '@tencent-weixin/openclaw-weixin@${ver}'; rc=\$?; /usr/bin/openclaw plugins enable openclaw-weixin >/dev/null 2>&1; /etc/init.d/openclaw start; exit \$rc"
 		start_task /tmp/openclaw-wechat-install "$cmd"
 		;;
 	wechat-upgrade)

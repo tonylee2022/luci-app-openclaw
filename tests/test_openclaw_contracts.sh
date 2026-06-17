@@ -89,7 +89,7 @@ if grep -q 'system_check:' root/usr/share/rpcd/ucode/luci.openclaw; then fail "w
 grep -Eq '\^\(start\|stop\|restart\|enable\|disable\|restart_gateway\)\$' root/usr/share/rpcd/ucode/luci.openclaw || fail "service action allowlist missing"
 grep -Fq "grep -aq '^__ARCHIVE_BELOW__$'" root/usr/libexec/openclaw-rpc.sh || fail "downloaded run installer marker validation missing"
 grep -Fq "oc_safe_openclaw_root" root/usr/libexec/openclaw-rpc.sh || fail "uninstall safety check missing"
-grep -q "@tencent-weixin/openclaw-weixin@latest" root/usr/libexec/openclaw-rpc.sh || fail "wechat install must use the official Weixin plugin package"
+grep -q "@tencent-weixin/openclaw-weixin@" root/usr/libexec/openclaw-rpc.sh || fail "wechat install must use the official Weixin plugin package"
 grep -q "Local login saved auth" root/usr/libexec/openclaw-rpc.sh || fail "successful Weixin local auth must be recognized"
 grep -q "Local login saved auth" root/usr/share/rpcd/ucode/luci.openclaw || fail "Weixin login status must recognize saved local auth"
 grep -q '/etc/init.d/openclaw stop >/dev/null 2>&1 || true; /etc/init.d/openclaw start' root/usr/libexec/openclaw-rpc.sh || fail "successful Weixin login must safely restart the procd service"
