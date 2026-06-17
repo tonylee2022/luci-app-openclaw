@@ -52,9 +52,10 @@ OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 
 | 项目 | 要求 |
 |------|------|
+| 固件 | OpenWrt **23.05+** 及其衍生版（LEDE / ImmortalWrt / iStoreOS 等；需 ucode 支持，即 21.02+） |
 | 架构 | x86_64 或 aarch64 (ARM64) |
 | C 库 | musl（自动检测；离线包仅支持 musl） |
-| 依赖 | luci-base、rpcd-mod-ucode、curl、openssl-util、tar、script-utils、ttyd、qrencode |
+| 依赖 | luci-base、rpcd-mod-ucode、curl、openssl-util、tar、script-utils、ttyd、qrencode、libstdcpp |
 | 存储 | **2GB 以上可用空间** |
 | 内存 | 推荐 1GB 及以上 |
 
@@ -147,7 +148,7 @@ openclaw-env setup
 
 ## 🔒 安全模型
 
-- OpenClaw 强制以 `openclaw` 系统用户运行：以 root 运行会因其临时目录安全校验（要求目录属主等于当前 uid）被拒，且会在家目录留下 root 属主文件。
+- OpenClaw 强制以 `openclaw` 系统用户运行：以 root 运行会因其临时目录安全校验（要求目录属主等于当前 uid）被拒，且会在 home 目录留下 root 属主文件。
 - `/usr/bin/openclaw` 与 `openclaw-shell` 在被 root 调用时**自动 `su` 降权**到 `openclaw` 用户；配置终端（ttyd）也以 `openclaw` 身份运行。
 - 插件的启用、禁用、白名单、拒绝列表等策略完全由 OpenClaw 官方机制与用户配置管理，本项目不创建、补全、迁移或清理这些策略。
 

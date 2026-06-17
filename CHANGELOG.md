@@ -9,7 +9,7 @@
 - 不支持旧目录布局迁移；检测到旧目录或未知文件时停止安装。
 - 修正 LuCI、服务、CLI、配置终端、微信插件和构建脚本的目录及环境变量。
 - 补齐标准 OpenWrt 包中的交互配置组件。
-- Node.js ARM64 musl 构建仅生成当前支持版本。
+- ARM64/x64 musl 的 Node.js 运行时统一从 nodejs.org/unofficial-builds 下载，不再自托管自建。
 - LuCI 完整迁移为 JavaScript View、`menu.d`、rpcd ucode 和 ACL，不再依赖 `luci-compat`。
 - 状态、安装、服务、升级、备份及微信操作统一通过 `luci.openclaw` ubus 对象调用。
 - rpcd 接口统一返回 `{ ok, message, data }`，读写方法分别授权；恢复指定备份失败时不回退到其他文件。

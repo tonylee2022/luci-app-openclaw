@@ -62,6 +62,7 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_BIN) ./root/usr/libexec/openclaw-workspace.sh $(1)/usr/libexec/openclaw-workspace.sh
 	$(INSTALL_BIN) ./root/usr/libexec/openclaw-backup.sh $(1)/usr/libexec/openclaw-backup.sh
 	$(INSTALL_BIN) ./root/usr/libexec/openclaw-rpc.sh $(1)/usr/libexec/openclaw-rpc.sh
+	$(INSTALL_BIN) ./root/usr/libexec/openclaw-wizard.sh $(1)/usr/libexec/openclaw-wizard.sh
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/openclaw
 	$(INSTALL_DATA) ./htdocs/luci-static/resources/openclaw/* $(1)/www/luci-static/resources/openclaw/
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/openclaw
