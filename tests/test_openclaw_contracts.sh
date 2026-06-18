@@ -94,6 +94,7 @@ done
 [ ! -e luasrc/model/cbi/openclaw/basic.lua ] || fail "legacy CBI model must be removed"
 if find luasrc -type f 2>/dev/null | grep -q .; then fail "legacy luasrc files must be removed"; fi
 grep -Fq "return { 'luci.openclaw': methods };" root/usr/share/rpcd/ucode/luci.openclaw || fail "ubus object export missing"
+grep -Fq 'node: base + ' root/usr/share/rpcd/ucode/luci.openclaw || fail "ucode paths() must place node under base (not root) to match shell-side NODE_BASE"
 for method in status system_info install_path_probe update_check setup_log upgrade_log backup_list backup_verify gateway_token wechat_status wechat_install_log wechat_login_status wechat_update_check service_action setup uninstall upgrade backup_create backup_restore backup_delete wechat_install wechat_login wechat_logout wechat_upgrade wechat_uninstall; do
 	grep -q "${method}:" root/usr/share/rpcd/ucode/luci.openclaw || fail "missing rpc method: $method"
 done

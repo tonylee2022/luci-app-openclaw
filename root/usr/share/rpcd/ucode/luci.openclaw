@@ -69,7 +69,7 @@ function paths(input) {
 	let root = base + '/openclaw';
 	// 备份目录默认在安装根目录之外(同级), 卸载环境不会删除; 可经 UCI backup_path 覆盖。
 	let backup_dir = normalize_backup_dir(uci_get('backup_path'), root) || (base + '/openclaw-backups');
-	return { base, root, node: root + '/node', global: root + '/.npm-global', state: root + '/.openclaw', cache: root + '/.npm', tmp: root + '/.tmp', config: root + '/.openclaw/openclaw.json', backup_dir };
+	return { base, root, node: base + '/node', global: root + '/.npm-global', state: root + '/.openclaw', cache: root + '/.npm', tmp: root + '/.tmp', config: root + '/.openclaw/openclaw.json', backup_dir };
 }
 
 function task_status(prefix, log_path) {
