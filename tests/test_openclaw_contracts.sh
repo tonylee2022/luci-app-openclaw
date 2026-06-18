@@ -9,7 +9,16 @@ fail() {
 grep -Fq ') </dev/null >/dev/null 2>&1 &' root/usr/libexec/openclaw-rpc.sh || fail "background task shell must detach from rpcd stdio"
 grep -Fq 'rm -f "${prefix}.pid"' root/usr/libexec/openclaw-rpc.sh || fail "completed and stale task PID files must be removed"
 
-grep -q "OC_TESTED_VERSION=\"2026.6.6\"" root/usr/bin/openclaw-env || fail "tested OpenClaw version not pinned"
+# 从 VERSION.json 读取期望版本号（单一真相来源）
+[ -f VERSION.json ] || fail "VERSION.json must exist as the canonical version source"
+_OC_VER=$(grep '"oc_tested_version"' VERSION.json | sed 's/.*"oc_tested_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+_NODE_VER=$(grep '"node_version"' VERSION.json | sed 's/.*"node_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+_NODE_MIN_VER=$(grep '"node_min_version"' VERSION.json | sed 's/.*"node_min_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+[ -n "$_OC_VER" ] || fail "VERSION.json must contain oc_tested_version"
+[ -n "$_NODE_VER" ] || fail "VERSION.json must contain node_version"
+[ -n "$_NODE_MIN_VER" ] || fail "VERSION.json must contain node_min_version"
+
+grep -q "OC_TESTED_VERSION=\"${_OC_VER}\"" root/usr/bin/openclaw-env || fail "tested OpenClaw version not pinned (expected ${_OC_VER} per VERSION.json)"
 grep -q 'prefix="OC_VERSION=$(oc_quote "$version")' root/usr/libexec/openclaw-rpc.sh || fail "RPC setup must pass stable/latest through unchanged"
 if grep -q 'OC_VERSION=$(oc_quote "$ver")' root/usr/libexec/openclaw-rpc.sh; then
 	fail "RPC setup must not pass a concrete version to the stable/latest installer interface"
@@ -25,9 +34,9 @@ if grep -R -n -E --exclude='*.min.js' \
 	| grep -v 'openclaw-weixin' | grep -q .; then
 	fail "project must not modify OpenClaw plugin enablement or security policy (except the user-driven openclaw-weixin channel)"
 fi
-grep -q "NODE_VERSION_V2=\"22.22.3\"" root/usr/bin/openclaw-env || fail "default Node.js version not pinned"
-grep -q 'OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-22.19.0}"' root/usr/bin/openclaw-env || fail "minimum Node.js version not pinned"
-grep -q 'OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-22.19.0}"' root/etc/init.d/openclaw || fail "service minimum Node.js version not aligned"
+grep -q "NODE_VERSION_V2=\"${_NODE_VER}\"" root/usr/bin/openclaw-env || fail "default Node.js version not pinned (expected ${_NODE_VER} per VERSION.json)"
+grep -q "OC_NODE_MIN_VERSION=\"\${OC_NODE_MIN_VERSION:-${_NODE_MIN_VER}}\"" root/usr/bin/openclaw-env || fail "minimum Node.js version not pinned (expected ${_NODE_MIN_VER} per VERSION.json)"
+grep -q "OC_NODE_MIN_VERSION=\"\${OC_NODE_MIN_VERSION:-${_NODE_MIN_VER}}\"" root/etc/init.d/openclaw || fail "service minimum Node.js version not aligned (expected ${_NODE_MIN_VER} per VERSION.json)"
 grep -q "oc_assert_node_min_version" root/usr/bin/openclaw-env || fail "Node.js minimum version check missing"
 grep -A5 '# Node.js' root/usr/bin/openclaw-env | grep -q 'assert_node_runtime' || fail "environment check must validate Node.js version"
 if grep -q 'NODE_VERSION_V1\|v1_tarball' root/usr/bin/openclaw-env; then
@@ -63,10 +72,13 @@ grep -Fq "NPM_CONFIG_CACHE='\$OC_NPM_CACHE'" root/usr/bin/openclaw-shell || fail
 grep -Fq "TMPDIR='\$OC_TMP'" root/usr/bin/openclaw-shell || fail "temporary shell must inject tmp dir"
 grep -q 'configured_path="${OPENCLAW_INSTALL_PATH:-' root/usr/bin/openclaw-shell || fail "temporary shell must support a custom install path"
 grep -q 'exec /usr/bin/zsh -f' root/usr/bin/openclaw-shell || fail "temporary shell must use isolated zsh"
-[ ! -e root/etc/profile.d/openclaw.sh ] || fail "obsolete profile script must be removed"
-if grep -R -q 'profile.d/openclaw.sh' README.md CHANGELOG.md Makefile scripts root htdocs .github; then
-	fail "obsolete profile script must not be referenced"
+[ ! -e root/etc/profile.d/openclaw.sh ] || fail "profile.d script must be generated at runtime, not shipped in the package"
+# 允许安装脚本 (openclaw-env / openclaw-rpc.sh) 在运行时生成 profile.d；
+# 禁止在文档、构建脚本、配置文件、前端代码中硬编码引用。
+if grep -R -q 'profile.d/openclaw.sh' README.md CHANGELOG.md Makefile scripts root/etc root/usr/share htdocs .github; then
+	fail "profile.d/openclaw.sh must not be referenced in docs, config, or build files"
 fi
+grep -q 'write_profile_d' root/usr/bin/openclaw-env || fail "openclaw-env must define write_profile_d to configure npm prefix for login shells"
 if grep -q 'export HOME=' README.md; then
 	fail "documentation must not recommend changing the parent shell HOME"
 fi

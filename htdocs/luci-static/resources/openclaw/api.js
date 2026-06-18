@@ -13,10 +13,11 @@ function call(method, params) {
 
 return baseclass.extend({
 	status: call('status'),
-	systemInfo: call('system_info', [ 'install_path' ]),
 	installPathProbe: call('install_path_probe', [ 'install_path' ]),
 	installTargets: call('install_targets'),
 	updateCheck: call('update_check'),
+	envUpgradeCheck: call('env_upgrade_check'),
+	envNpmCheck: call('env_npm_check'),
 	setupLog: call('setup_log'),
 	uninstallLog: call('uninstall_log'),
 	upgradeLog: call('upgrade_log'),
@@ -46,9 +47,7 @@ return baseclass.extend({
 	doctorLint: call('doctor_lint'),
 	doctorFix: call('doctor_fix'),
 	doctorFixLog: call('doctor_fix_log'),
-	health: call('health'),
 	channelsList: call('channels_list'),
-	channelsStatus: call('channels_status'),
 	logsTail: call('logs_tail', [ 'lines' ]),
 	configSummary: call('config_summary'),
 	modelSet: call('model_set', [ 'model' ]),

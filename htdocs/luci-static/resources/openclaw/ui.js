@@ -1,8 +1,9 @@
 'use strict';
 'require baseclass';
+'require ui';
 
 // OpenClaw 统一操作交互 (以「仅重启网关」为模板): 内联状态条 + 操作运行器。
-// 各视图保留各自的 button(); 这里只提供状态条与操作运行器, 在按钮 handler 中调用。
+// button/closeButton 已统一收口至此; 状态条与操作运行器在按钮 handler 中调用。
 return baseclass.extend({
 	// 跟随当前 LuCI 主题(明/暗)给 <html> 加/去 oc-dark 类, 使插件自带的明暗样式跟着主题切换,
 	// 而非只认 OS 的 prefers-color-scheme。检测: 采样 body 文字颜色亮度(暗色主题文字浅、亮色文字深),
@@ -122,5 +123,34 @@ return baseclass.extend({
 		}).catch(function(err) {
 			if (!closed) self.setStatus(el, 'error', String((err && err.message) || err || _('操作失败')));
 		});
+	},
+
+	button: function(label, css, handler) {
+		var btn = E('button', { 'type': 'button', 'class': 'cbi-button ' + css }, label);
+		btn.addEventListener('click', function(ev) {
+			ev.preventDefault();
+			ev.stopPropagation();
+			if (btn.disabled) return;
+			btn.disabled = true;
+			btn.classList.add('oc-btn-loading');
+			Promise.resolve().then(function() { return handler(ev); }).catch(function(err) {
+				console.error('[openclaw]', err);
+			}).finally(function() {
+				btn.disabled = false;
+				btn.classList.remove('oc-btn-loading');
+			});
+		});
+		return btn;
+	},
+
+	closeButton: function(label, beforeClose) {
+		var btn = E('button', { 'type': 'button', 'class': 'cbi-button' }, label);
+		btn.addEventListener('click', function(ev) {
+			ev.preventDefault();
+			ev.stopPropagation();
+			if (beforeClose) beforeClose();
+			ui.hideModal();
+		});
+		return btn;
 	}
 });

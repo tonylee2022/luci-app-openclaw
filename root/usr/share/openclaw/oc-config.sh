@@ -290,6 +290,7 @@ register_and_set_model() {
 }
 
 # ── 注册自定义提供商 (需要 baseUrl 的 OpenAI 兼容提供商) ──
+# FALLBACK ONLY: 仅在 Node.js 不可用时运行，以下逻辑与 oc-config-interactive.js 保持一致。
 # 用法: register_custom_provider <provider_name> <base_url> <api_key> <model_id> [model_display_name] [context_window] [max_tokens]
 # 例: register_custom_provider dashscope https://dashscope.aliyuncs.com/compatible-mode/v1 sk-xxx qwen-max "Qwen Max"
 # 例: register_custom_provider bailian https://coding.dashscope.aliyuncs.com/v1 sk-sp-xxx qwen3.5-plus "qwen3.5-plus" 1000000 65536
@@ -551,6 +552,7 @@ show_current_config() {
 
 # ══════════════════════════════════════════════════════════════
 # 配置 AI 模型
+# FALLBACK ONLY: 仅在 Node.js 不可用时运行，以下逻辑与 oc-config-interactive.js#handleModelConfig 保持一致。
 # ══════════════════════════════════════════════════════════════
 configure_model() {
 	echo ""
@@ -2324,6 +2326,8 @@ backup_restore_menu() {
 # ══════════════════════════════════════════════════════════════════════════
 
 # 检测是否支持交互模式 (需要 Node.js + TTY 终端)
+# TODO: bash 菜单（main_menu、configure_model 等）与 oc-config-interactive.js 存在双重实现。
+#       长期目标：将 bash 回退路径收敛为最小可用子集，或提取共享配置 lib 消除重复。
 can_use_interactive() {
 	[ -x "$NODE_BIN" ] || return 1
 	[ -f "$OC_INTERACTIVE" ] || return 1
@@ -2367,6 +2371,7 @@ launch_interactive_model_config() {
 	return $rc
 }
 
+# FALLBACK ONLY: 以下传统菜单仅在 can_use_interactive() 返回 1 时执行，对应 oc-config-interactive.js#showMainMenu。
 main_menu() {
 	# 直接启动交互模式 (如果支持)
 	if can_use_interactive && [ "${OC_FORCE_TRADITIONAL:-0}" != "1" ]; then

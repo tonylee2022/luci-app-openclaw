@@ -194,7 +194,7 @@ case "${1:-}" in
 		load_paths
 		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
 		# 以 openclaw 身份升级 OpenClaw 到最新版(写入 .npm-global), 完成后 procd 重启使新版本生效。
-		cmd="su -s /bin/sh openclaw -c $(oc_quote "$(oc_cli_env) $NODE_BASE/bin/npm install -g openclaw@latest"); rc=\$?; /etc/init.d/openclaw restart; exit \$rc"
+		cmd="su -s /bin/sh openclaw -c $(oc_quote "$(oc_cli_env) $NODE_BASE/bin/npm install -g openclaw@latest"); rc=\$?; /etc/init.d/openclaw restart; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
 		start_task /tmp/openclaw-env-upgrade "$cmd"
 		;;
 	env-upgrade-npm)
@@ -209,7 +209,7 @@ case "${1:-}" in
 		echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Node 版本号格式无效 (如 22.22.3)"
 		load_paths
 		# openclaw-env node <ver> 下载/解压到 NODE_BASE(root 运行), 完成后 chown 给 openclaw + 重启网关。
-		cmd="OC_INSTALL_PATH=$(oc_quote "$OPENCLAW_INSTALL_PATH") /usr/bin/openclaw-env node $(oc_quote "$ver"); rc=\$?; chown -R openclaw:openclaw $(oc_quote "$NODE_BASE") 2>/dev/null; /etc/init.d/openclaw restart; exit \$rc"
+		cmd="OC_INSTALL_PATH=$(oc_quote "$OPENCLAW_INSTALL_PATH") /usr/bin/openclaw-env node $(oc_quote "$ver"); rc=\$?; chown -R openclaw:openclaw $(oc_quote "$NODE_BASE") 2>/dev/null; /etc/init.d/openclaw restart; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
 		start_task /tmp/openclaw-env-upgrade "$cmd"
 		;;
 	uninstall)
@@ -238,6 +238,7 @@ case "${1:-}" in
 		[ ! -d "/overlay/upper$OC_ROOT" ] || rm -rf "/overlay/upper$OC_ROOT"
 		rm -f /tmp/openclaw-setup.* /tmp/openclaw-plugin-upgrade.* /tmp/openclaw-wechat-* /var/run/openclaw*.pid
 		sed -i '/^openclaw:/d' /etc/passwd /etc/shadow /etc/group 2>/dev/null || true
+		rm -f /etc/profile.d/openclaw.sh
 		echo "OpenClaw 运行环境已卸载。"
 		;;
 	upgrade)

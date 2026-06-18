@@ -224,7 +224,9 @@ function update_check() {
 		}
 	} catch (e) {}
 	let latest = replace(`${release?.tag_name || ''}`, /^v/, '');
-	return reply(!!latest, latest ? '' : '无法获取最新版本', { plugin_current: current, plugin_latest: latest, plugin_has_update: !!latest && current != latest, release_notes: release?.body || '' });
+	let body = release?.body || '';
+	if (length(body) > 10000) body = substr(body, 0, 10000) + '\n...(内容过长，已截断)';
+	return reply(!!latest, latest ? '' : '无法获取最新版本', { plugin_current: current, plugin_latest: latest, plugin_has_update: !!latest && current != latest, release_notes: body });
 }
 
 function backup_list() {
@@ -258,6 +260,28 @@ function wechat_status() {
 		if (type(value) == 'array') for (let id in value) if (type(id) == 'string') push(accounts, { id, name: id });
 	} catch (e) {}
 	return reply(true, '', { plugin_installed: !!manifest, plugin_version: version, logged_in: length(accounts) > 0, accounts, install_path: p.root });
+}
+
+function env_upgrade_check() {
+	let p = paths();
+	if (!p) return reply(false, '安装路径无效');
+	let current = package_version(p.root);
+	if (!current) return reply(false, 'OpenClaw 未安装');
+	if (!access(p.node + '/bin/npm')) return reply(false, 'npm 不可用');
+	let latest = trim(run(shellquote(p.node + '/bin/npm') + ' view openclaw version --no-update-notifier 2>/dev/null') || '');
+	if (!latest) return reply(false, '无法查询 npm 版本（请检查网络）');
+	return reply(true, '', { current, latest, has_update: latest != current });
+}
+
+function env_npm_check() {
+	let p = paths();
+	if (!p) return reply(false, '安装路径无效');
+	if (!access(p.node + '/bin/npm')) return reply(false, 'npm 不可用');
+	let current = trim(run(shellquote(p.node + '/bin/npm') + ' --version 2>/dev/null') || '');
+	if (!current) return reply(false, 'npm 未安装');
+	let latest = trim(run(shellquote(p.node + '/bin/npm') + ' view npm version --no-update-notifier 2>/dev/null') || '');
+	if (!latest) return reply(false, '无法查询 npm 版本（请检查网络）');
+	return reply(true, '', { current, latest, has_update: latest != current });
 }
 
 function wechat_update_check() {
@@ -355,6 +379,8 @@ const methods = {
 	install_path_probe: { args: { install_path: '/opt' }, call: install_path_probe },
 	install_targets: { call: install_targets },
 	update_check: { call: update_check },
+	env_upgrade_check: { call: env_upgrade_check },
+	env_npm_check: { call: env_npm_check },
 	setup_log: { call: () => reply(true, '', task_status('/tmp/openclaw-setup')) },
 	uninstall_log: { call: () => reply(true, '', task_status('/tmp/openclaw-uninstall')) },
 	upgrade_log: { call: () => reply(true, '', task_status('/tmp/openclaw-plugin-upgrade')) },

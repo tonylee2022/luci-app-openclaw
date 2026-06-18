@@ -6,7 +6,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openclaw
-PKG_VERSION:=1.0.3
+PKG_VERSION:=1.0.4
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=tonylee2022 <tonylee2022@users.noreply.github.com>
@@ -98,6 +98,7 @@ endef
 define Package/$(PKG_NAME)/postrm
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
+	rm -f /tmp/luci-openclaw-* /tmp/luci-openclaw-update-cache.* 2>/dev/null
 	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
 	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
 }

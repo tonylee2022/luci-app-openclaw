@@ -6,35 +6,6 @@
 'require openclaw.api as api';
 'require openclaw.ui as ocui';
 
-function button(label, css, handler) {
-	var btn = E('button', { 'type': 'button', 'class': 'cbi-button ' + css }, label);
-	btn.addEventListener('click', function(ev) {
-		ev.preventDefault();
-		ev.stopPropagation();
-		if (btn.disabled) return;
-		btn.disabled = true;
-		btn.classList.add('oc-btn-loading');
-		Promise.resolve().then(function() { return handler(ev); }).catch(function(err) {
-			console.error('[openclaw]', err);
-		}).finally(function() {
-			btn.disabled = false;
-			btn.classList.remove('oc-btn-loading');
-		});
-	});
-	return btn;
-}
-
-function closeButton(label, beforeClose) {
-	var btn = E('button', { 'type': 'button', 'class': 'cbi-button' }, label);
-	btn.addEventListener('click', function(ev) {
-		ev.preventDefault();
-		ev.stopPropagation();
-		if (beforeClose) beforeClose();
-		ui.hideModal();
-	});
-	return btn;
-}
-
 return view.extend({
 	load: function() {
 		return Promise.all([ api.status(), api.backupList(), api.setupLog(), api.uninstallLog() ]);
@@ -144,7 +115,7 @@ return view.extend({
 		var checkTimer = null;
 		// 当前选定的基路径: 下拉非「手动」时取下拉值, 否则取手动输入框
 		var currentBase = function() { return mountSel.value === '__manual__' ? path.value : mountSel.value; };
-		var install = button(_('开始安装'), 'cbi-button-positive', L.bind(function() {
+		var install = ocui.button(_('开始安装'), 'cbi-button-positive', L.bind(function() {
 			if (!checkedPath || checkedPath !== currentBase()) {
 				progress.style.display = '';
 				progress.className = 'oc-task-state oc-task-error';
@@ -228,7 +199,7 @@ return view.extend({
 			E('div', { 'class': 'oc-form-row' }, [ E('label', {}, _('自定义路径')), path ]),
 			capacity,
 			progress,
-			E('div', { 'class': 'right' }, [ closeButton(_('关闭')), install ])
+			E('div', { 'class': 'right' }, [ ocui.closeButton(_('关闭')), install ])
 		]);
 		// 探测挂载点填充下拉, 默认选可用空间最大的(满足≥2GB)
 		api.installTargets().then(function(result) {
@@ -417,21 +388,41 @@ return view.extend({
 				success: _('%s完成。').format(label),
 				submit: submitFn,
 				pollLog: function() { return api.envUpgradeLog(); },
-				onLog: function(d) { log.style.display = ''; ocui.setLog(log, d.log || _('等待输出...')); }
+				onLog: function(d) { log.style.display = ''; var text = (d.log || _('等待输出...')).split('\n').filter(function(l) { return !/packages? (are|is) looking for funding/.test(l) && !/[Rr]un `npm fund`/.test(l); }).join('\n'); ocui.setLog(log, text); }
 			});
 		};
 		ui.showModal(_('环境升级'), [
 			E('p', { 'class': 'oc-muted' }, _('升级运行环境组件。升级 OpenClaw / Node 会自动重启网关使其生效；升级 Node 请填写目标版本号（如 22.22.3）。')),
 			E('div', { 'class': 'oc-actions' }, [
-				button(_('升级 OpenClaw 最新版'), 'cbi-button-positive', function() { return run(_('升级 OpenClaw'), function() { return api.envUpgradeOpenclaw(); }); }),
-				button(_('升级 npm 最新版'), 'cbi-button-action', function() { return run(_('升级 npm'), function() { return api.envUpgradeNpm(); }); })
+				ocui.button(_('升级 OpenClaw 最新版'), 'cbi-button-positive', function() {
+					ocui.setStatus(status, 'running', _('正在检查版本...'));
+					return api.envUpgradeCheck().then(function(r) {
+						if (!r.ok) { ocui.setStatus(status, 'error', r.message || _('版本检查失败')); return; }
+						var d = r.data || {};
+						if (!d.has_update) { ocui.setStatus(status, 'success', _('当前已是最新版本（%s）').format(d.current)); ocui.hideStatusLater(status); return; }
+						status.style.display = 'none';
+						if (!confirm(_('发现新版本 %s（当前 %s），确认升级？').format(d.latest, d.current))) return;
+						return run(_('升级 OpenClaw'), function() { return api.envUpgradeOpenclaw(); });
+					}).catch(function(e) { ocui.setStatus(status, 'error', String(e && e.message || e || _('版本检查失败'))); });
+				}),
+				ocui.button(_('升级 npm 最新版'), 'cbi-button-action', function() {
+					ocui.setStatus(status, 'running', _('正在检查版本...'));
+					return api.envNpmCheck().then(function(r) {
+						if (!r.ok) { ocui.setStatus(status, 'error', r.message || _('版本检查失败')); return; }
+						var d = r.data || {};
+						if (!d.has_update) { ocui.setStatus(status, 'success', _('当前已是最新版本（%s）').format(d.current)); ocui.hideStatusLater(status); return; }
+						status.style.display = 'none';
+						if (!confirm(_('发现新版本 %s（当前 %s），确认升级？').format(d.latest, d.current))) return;
+						return run(_('升级 npm'), function() { return api.envUpgradeNpm(); });
+					}).catch(function(e) { ocui.setStatus(status, 'error', String(e && e.message || e || _('版本检查失败'))); });
+				})
 			]),
 			E('div', { 'class': 'oc-field', 'style': 'margin-top:.5rem;align-items:center' }, [
 				E('span', {}, _('Node 版本')),
-				E('span', { 'class': 'oc-value' }, [ nodeVer, ' ', button(_('升级 Node'), 'cbi-button-action', function() { return run(_('升级 Node'), function() { return api.envUpgradeNode(nodeVer.value); }); }) ])
+				E('span', { 'class': 'oc-value' }, [ nodeVer, ' ', ocui.button(_('升级 Node'), 'cbi-button-action', function() { return run(_('升级 Node'), function() { return api.envUpgradeNode(nodeVer.value); }); }) ])
 			]),
 			status, log,
-			E('div', { 'class': 'right' }, [ closeButton(_('关闭')) ])
+			E('div', { 'class': 'right' }, [ ocui.closeButton(_('关闭')) ])
 		]);
 	},
 
@@ -446,24 +437,24 @@ return view.extend({
 					E('div', { 'class': 'oc-hint' }, _('备份保存目录（位于安装目录之外，卸载环境不会删除）：') + ' ' + (info.backup_dir || '-')),
 					E('div', { 'class': 'oc-actions', style: 'margin-top:6px' }, [
 						pathInput,
-						button(_('保存路径'), 'cbi-button-action', function() { var v = (pathInput.value || '').replace(/^\s+|\s+$/g, ''); return ocui.runOp(bkStatus, { running: _('正在更新备份路径...'), success: _('备份路径已更新。'), submit: function() { return api.backupPathSet(v); }, onDone: refresh }); }),
-						info.backup_custom ? button(_('恢复默认'), '', function() { return ocui.runOp(bkStatus, { running: _('正在恢复默认路径...'), success: _('已恢复默认备份路径。'), submit: function() { return api.backupPathSet(''); }, onDone: refresh }); }) : E('span')
+						ocui.button(_('保存路径'), 'cbi-button-action', function() { var v = (pathInput.value || '').replace(/^\s+|\s+$/g, ''); return ocui.runOp(bkStatus, { running: _('正在更新备份路径...'), success: _('备份路径已更新。'), submit: function() { return api.backupPathSet(v); }, onDone: refresh }); }),
+						info.backup_custom ? ocui.button(_('恢复默认'), '', function() { return ocui.runOp(bkStatus, { running: _('正在恢复默认路径...'), success: _('已恢复默认备份路径。'), submit: function() { return api.backupPathSet(''); }, onDone: refresh }); }) : E('span')
 					])
 				]);
 				var rows = (result.data.backups || []).map(L.bind(function(item) {
 					return E('tr', {}, [ E('td', {}, item.backup_type === 'config' ? _('仅配置') : _('完整')), E('td', {}, item.time || item.filename), E('td', {}, item.size_str), E('td', { 'class': 'oc-table-actions' }, [
-						button(_('验证'), '', function() { return ocui.runOp(bkStatus, { running: _('正在验证备份...'), success: _('备份验证通过。'), submit: function() { return api.backupVerify(item.filename); } }); }),
-						button(_('恢复'), 'cbi-button-action', function() { if (!confirm(_('恢复会覆盖当前状态并重启服务，确定继续？'))) return; return ocui.runOp(bkStatus, { running: _('正在恢复备份...'), success: _('备份已恢复，服务重启中。'), submit: function() { return api.backupRestore(item.filename); }, onDone: refresh }); }),
-						button(_('删除'), 'cbi-button-negative', function() { if (!confirm(_('确定删除此备份？'))) return; return ocui.runOp(bkStatus, { running: _('正在删除备份...'), success: _('备份已删除。'), submit: function() { return api.backupDelete(item.filename); }, onDone: refresh }); })
+						ocui.button(_('验证'), '', function() { return ocui.runOp(bkStatus, { running: _('正在验证备份...'), success: _('备份验证通过。'), submit: function() { return api.backupVerify(item.filename); } }); }),
+						ocui.button(_('恢复'), 'cbi-button-action', function() { if (!confirm(_('恢复会覆盖当前状态并重启服务，确定继续？'))) return; return ocui.runOp(bkStatus, { running: _('正在恢复备份...'), success: _('备份已恢复，服务重启中。'), submit: function() { return api.backupRestore(item.filename); }, onDone: refresh }); }),
+						ocui.button(_('删除'), 'cbi-button-negative', function() { if (!confirm(_('确定删除此备份？'))) return; return ocui.runOp(bkStatus, { running: _('正在删除备份...'), success: _('备份已删除。'), submit: function() { return api.backupDelete(item.filename); }, onDone: refresh }); })
 					]) ]);
 				}, this));
 				dom.content(body, [ E('div', { 'class': 'oc-actions' }, [
-					button(_('创建配置备份'), 'cbi-button-positive', function() { return ocui.runOp(bkStatus, { running: _('正在创建配置备份...'), success: _('配置备份已创建。'), submit: function() { return api.backupCreate(true); }, onDone: refresh }); }),
-					button(_('创建完整备份'), 'cbi-button-action', function() { return ocui.runOp(bkStatus, { running: _('正在创建完整备份...'), success: _('完整备份已创建。'), submit: function() { return api.backupCreate(false); }, onDone: refresh }); })
+					ocui.button(_('创建配置备份'), 'cbi-button-positive', function() { return ocui.runOp(bkStatus, { running: _('正在创建配置备份...'), success: _('配置备份已创建。'), submit: function() { return api.backupCreate(true); }, onDone: refresh }); }),
+					ocui.button(_('创建完整备份'), 'cbi-button-action', function() { return ocui.runOp(bkStatus, { running: _('正在创建完整备份...'), success: _('完整备份已创建。'), submit: function() { return api.backupCreate(false); }, onDone: refresh }); })
 				]), bkStatus, pathRow, E('table', { 'class': 'oc-table' }, [ E('tr', {}, [ E('th', {}, _('类型')), E('th', {}, _('时间/文件')), E('th', {}, _('大小')), E('th', {}, _('操作')) ]) ].concat(rows)) ]);
 			}, this));
 		}, this);
-		ui.showModal(_('备份与恢复'), [ body, E('div', { 'class': 'right' }, [ closeButton(_('关闭')) ]) ]);
+		ui.showModal(_('备份与恢复'), [ body, E('div', { 'class': 'right' }, [ ocui.closeButton(_('关闭')) ]) ]);
 		refresh();
 	},
 
@@ -479,7 +470,7 @@ return view.extend({
 			{ label: '', fields: [ ['node', _('Node.js')], ['openclaw', _('OpenClaw 版本')], ['plugin', _('插件版本')], ['path', _('安装路径')], ['disk', _('剩余空间')] ] }
 		];
 		// 开机自启切换按钮: 移到快捷操作栏; 标签随状态在 updateStatus 更新
-		this.autostartBtn = button(_('切换开机自启'), 'cbi-button-action', L.bind(this.toggleAutostart, this));
+		this.autostartBtn = ocui.button(_('切换开机自启'), 'cbi-button-action', L.bind(this.toggleAutostart, this));
 		var statusItems = [];
 		statusGroups.forEach(function(group) {
 			if (group.label)
@@ -490,21 +481,21 @@ return view.extend({
 		});
 		// 操作按钮包装: 点击即在信息栏提示「XX命令已提交」
 		var act = function(label, css, handler) {
-			return button(label, css, function(ev) {
+			return ocui.button(label, css, function(ev) {
 				ocui.setStatus(self.actionStatus, 'running', _('「%s」命令已提交').format(label));
 				return handler(ev);
 			});
 		};
 		var actions = E('div', { 'class': 'oc-actions' }, [
-			button(_('安装运行环境'), 'cbi-button-positive', L.bind(this.showSetup, this)),
+			ocui.button(_('安装运行环境'), 'cbi-button-positive', L.bind(this.showSetup, this)),
 			act(_('启动'), 'cbi-button-action', L.bind(this.serviceAction, this, 'start')),
 			act(_('重启'), 'cbi-button-action', L.bind(this.serviceAction, this, 'restart')),
 			act(_('仅重启网关'), 'cbi-button-action', L.bind(this.serviceAction, this, 'restart_gateway')),
 			act(_('停止'), 'oc-btn-amber', L.bind(this.serviceAction, this, 'stop')),
 			this.autostartBtn,
 			act(_('检测升级'), 'cbi-button-action', L.bind(this.checkUpgrade, this)),
-			button(_('环境升级'), 'cbi-button-action', L.bind(this.showEnvUpgrade, this)),
-			button(_('备份/恢复'), 'cbi-button-action', L.bind(this.showBackups, this)),
+			ocui.button(_('环境升级'), 'cbi-button-action', L.bind(this.showEnvUpgrade, this)),
+			ocui.button(_('备份/恢复'), 'cbi-button-action', L.bind(this.showBackups, this)),
 			act(_('卸载环境'), 'cbi-button-negative', L.bind(this.uninstall, this))
 		]);
 		this.actionStatus = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });

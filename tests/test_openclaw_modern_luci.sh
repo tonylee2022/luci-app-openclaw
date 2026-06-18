@@ -24,8 +24,9 @@ grep -q 'oc-capacity-grid' htdocs/luci-static/resources/view/openclaw/overview.j
 grep -q 'api.upgradeLog()' htdocs/luci-static/resources/view/openclaw/overview.js || fail "upgrade task must use the persistent task panel"
 grep -q "'type': 'button'" htdocs/luci-static/resources/view/openclaw/overview.js || fail "overview buttons must not submit forms"
 grep -q "'type': 'button'" htdocs/luci-static/resources/view/openclaw/advanced.js || fail "channel/config buttons must not submit forms"
-grep -q 'function closeButton' htdocs/luci-static/resources/view/openclaw/overview.js || fail "synchronous modal close helper missing"
-grep -q 'ev.preventDefault()' htdocs/luci-static/resources/view/openclaw/overview.js || fail "modal close must prevent default submission"
+grep -q 'closeButton:' htdocs/luci-static/resources/openclaw/ui.js || fail "synchronous modal close helper must be defined in shared ui.js"
+grep -q 'ev.preventDefault()' htdocs/luci-static/resources/openclaw/ui.js || fail "modal close must prevent default submission"
+grep -q 'ocui.closeButton' htdocs/luci-static/resources/view/openclaw/overview.js || fail "overview must use shared closeButton from ocui"
 grep -q 'api.setupLog().then' htdocs/luci-static/resources/view/openclaw/overview.js || fail "setup submission recovery check missing"
 grep -q 'showAcceptedTask' htdocs/luci-static/resources/view/openclaw/overview.js || fail "accepted setup must use the persistent task panel"
 if grep -q "button(_('关闭')" htdocs/luci-static/resources/view/openclaw/overview.js; then

@@ -6,36 +6,6 @@
 'require openclaw.api as api';
 'require openclaw.ui as ocui';
 
-// 带 spinner + 防重复点击的按钮 (与 overview.js 一致)
-function button(label, css, handler) {
-	var btn = E('button', { 'type': 'button', 'class': 'cbi-button ' + css }, label);
-	btn.addEventListener('click', function(ev) {
-		ev.preventDefault();
-		ev.stopPropagation();
-		if (btn.disabled) return;
-		btn.disabled = true;
-		btn.classList.add('oc-btn-loading');
-		Promise.resolve().then(function() { return handler(ev); }).catch(function(err) {
-			console.error('[openclaw]', err);
-		}).finally(function() {
-			btn.disabled = false;
-			btn.classList.remove('oc-btn-loading');
-		});
-	});
-	return btn;
-}
-
-function closeButton(label, beforeClose) {
-	var btn = E('button', { 'type': 'button', 'class': 'cbi-button' }, label);
-	btn.addEventListener('click', function(ev) {
-		ev.preventDefault();
-		ev.stopPropagation();
-		if (beforeClose) beforeClose();
-		ui.hideModal();
-	});
-	return btn;
-}
-
 function severityClass(sev) {
 	return sev === 'error' ? 'oc-error' : sev === 'warning' ? 'oc-warn' : 'oc-info';
 }
@@ -63,8 +33,8 @@ return view.extend({
 				E('p', { 'class': 'oc-muted' }, _('已在下方打开官方配置向导终端：↑↓ 移动、空格/Tab 选中、回车确认。配置完成后点下方「完成并重启网关」生效。')),
 				E('iframe', { 'class': 'oc-iframe', src: url, allow: 'clipboard-read; clipboard-write', allowfullscreen: 'true' }),
 				E('div', { 'class': 'oc-actions', 'style': 'margin-top:.6rem' }, [
-					button(_('重启网关'), 'cbi-button-positive', L.bind(this.finishWizard, this, container)),
-					button(_('关闭'), '', L.bind(function() { api.wizardStop(); container.style.display = 'none'; }, this))
+					ocui.button(_('重启网关'), 'cbi-button-positive', L.bind(this.finishWizard, this, container)),
+					ocui.button(_('关闭'), '', L.bind(function() { api.wizardStop(); container.style.display = 'none'; }, this))
 				])
 			]));
 			window.setTimeout(function() { container.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
@@ -129,8 +99,8 @@ return view.extend({
 				E('p', { 'class': 'oc-muted' }, _('已打开 openclaw-shell（以 openclaw 用户运行，环境已配好）。可直接敲 CLI 命令配置/交互，例如：openclaw configure、openclaw channels add --channel telegram --token <token>、openclaw models、openclaw doctor 等。配置类命令改动后，点下方「重启网关」使其生效。完成后点「关闭」结束终端。')),
 				E('iframe', { 'class': 'oc-iframe', src: url, allow: 'clipboard-read; clipboard-write', allowfullscreen: 'true' }),
 				E('div', { 'class': 'oc-actions', 'style': 'margin-top:.6rem' }, [
-					button(_('重启网关'), 'cbi-button-action', L.bind(function() { return this.restartGateway(shStatus); }, this)),
-					button(_('关闭'), '', L.bind(function() { api.wizardStop(); container.style.display = 'none'; }, this))
+					ocui.button(_('重启网关'), 'cbi-button-action', L.bind(function() { return this.restartGateway(shStatus); }, this)),
+					ocui.button(_('关闭'), '', L.bind(function() { api.wizardStop(); container.style.display = 'none'; }, this))
 				]),
 				shStatus
 			]));
@@ -148,8 +118,8 @@ return view.extend({
 				E('div', { 'class': 'oc-card-body' }, [
 					E('p', { 'class': 'oc-muted' }, _('在嵌入终端里运行 OpenClaw 官方完整配置向导（工作区、模型、网关、渠道、技能等全部分段），用选项交互完成首次或全面配置。')),
 					E('div', { 'class': 'oc-actions' }, [
-						button(_('官方配置向导'), 'cbi-button-positive', L.bind(function() { return this.launchWizard(this.fullWizard, 'full'); }, this)),
-						button(_('openclaw-shell（命令行）'), 'cbi-button-action', L.bind(function() { return this.launchShell(this.shellTerm); }, this))
+						ocui.button(_('官方配置向导'), 'cbi-button-positive', L.bind(function() { return this.launchWizard(this.fullWizard, 'full'); }, this)),
+						ocui.button(_('openclaw-shell（命令行）'), 'cbi-button-action', L.bind(function() { return this.launchShell(this.shellTerm); }, this))
 					]),
 					E('p', { 'class': 'oc-muted', 'style': 'margin-top:.6rem' }, _('向导交互不顺时，可改用 openclaw-shell 直接敲 CLI 命令配置（更可靠）。'))
 				])
@@ -170,8 +140,8 @@ return view.extend({
 				E('div', { 'class': 'oc-card-title' }, _('健康检查与修复')),
 				E('div', { 'class': 'oc-card-body' }, [
 					E('div', { 'class': 'oc-actions' }, [
-						button(_('运行健康检查'), 'cbi-button-action', L.bind(this.runLint, this)),
-						button(_('一键修复 (doctor --fix)'), 'cbi-button-positive', L.bind(this.runFix, this))
+						ocui.button(_('运行健康检查'), 'cbi-button-action', L.bind(this.runLint, this)),
+						ocui.button(_('一键修复 (doctor --fix)'), 'cbi-button-positive', L.bind(this.runFix, this))
 					]),
 					this.healthStatus,
 					E('div', { 'class': 'oc-task-wrap' }, [ this.fixState, this.fixLog ]),
@@ -204,6 +174,13 @@ return view.extend({
 		dom.content(this.findingsBox, [ summary ].concat(rows));
 	},
 
+	resetHealthTab: function() {
+		dom.content(this.findingsBox, E('p', { 'class': 'oc-muted' }, _('点击「运行健康检查」开始诊断。')));
+		if (this.healthStatus) this.healthStatus.style.display = 'none';
+		if (this.fixLog) this.fixLog.style.display = 'none';
+		if (this.fixState) this.fixState.style.display = 'none';
+	},
+
 	runLint: function() {
 		var self = this;
 		dom.content(this.findingsBox, E('p', { 'class': 'oc-muted' }, _('正在运行健康检查，请稍候...')));
@@ -214,6 +191,9 @@ return view.extend({
 				return api.doctorLint().then(function(result) {
 					if (result.ok) self.renderFindings(result);
 					else dom.content(self.findingsBox, E('p', { 'class': 'oc-badge oc-error' }, result.message || _('健康检查失败')));
+					var b = E('button', { 'type': 'button', 'class': 'cbi-button', 'style': 'margin-top:.5rem' }, _('关闭'));
+					b.addEventListener('click', L.bind(self.resetHealthTab, self));
+					self.findingsBox.appendChild(b);
 					return result;
 				});
 			}
@@ -222,12 +202,16 @@ return view.extend({
 
 	runFix: function() {
 		var self = this;
+		function dismissFix() {
+			self.fixLog.style.display = 'none';
+			self.fixState.style.display = 'none';
+		}
 		return ocui.runOp(this.healthStatus, {
 			running: _('修复任务正在运行，请稍候...'),
 			success: _('修复完成。'),
 			submit: function() { return api.doctorFix(); },
 			cancel: function() { return api.taskCancel('openclaw-doctor-fix'); },
-			onClose: function() { self.fixLog.style.display = 'none'; self.fixState.style.display = 'none'; },
+			onClose: dismissFix,
 			pollLog: function() { return api.doctorFixLog(); },
 			onLog: function(d) {
 				self.fixState.style.display = '';
@@ -240,6 +224,11 @@ return view.extend({
 					self.fixState.className = 'oc-task-state oc-task-running';
 					self.fixState.textContent = _('修复任务正在运行，请稍候...');
 				}
+			},
+			onDone: function() {
+				var b = E('button', { 'type': 'button', 'class': 'cbi-button', 'style': 'margin-left:.6rem' }, _('关闭'));
+				b.addEventListener('click', dismissFix);
+				self.fixState.appendChild(b);
 			}
 		});
 	},
@@ -254,9 +243,9 @@ return view.extend({
 				E('div', { 'class': 'oc-card-body' }, [
 					this.providerBox,
 					E('div', { 'class': 'oc-actions' }, [
-						button(_('配置模型/提供商'), 'cbi-button-positive', L.bind(function() { return this.launchWizard(this.providerWizard, 'model'); }, this)),
-						button(_('设置活跃模型'), 'cbi-button-action', L.bind(this.showSetActiveModel, this)),
-						button(_('刷新'), '', L.bind(this.refreshProviders, this))
+						ocui.button(_('配置模型/提供商'), 'cbi-button-positive', L.bind(function() { return this.launchWizard(this.providerWizard, 'model'); }, this)),
+						ocui.button(_('设置活跃模型'), 'cbi-button-action', L.bind(this.showSetActiveModel, this)),
+						ocui.button(_('刷新'), '', L.bind(this.refreshProviders, this))
 					])
 				])
 			]),
@@ -301,7 +290,7 @@ return view.extend({
 			if (!models.length) {
 				ui.showModal(_('设置活跃模型'), [
 					E('p', { 'class': 'oc-muted' }, _('没有可用模型：需要先在「配置模型/提供商」里配置模型并完成提供商授权。')),
-					E('div', { 'class': 'right' }, [ closeButton(_('关闭')) ])
+					E('div', { 'class': 'right' }, [ ocui.closeButton(_('关闭')) ])
 				]);
 				return;
 			}
@@ -327,8 +316,8 @@ return view.extend({
 				E('div', { 'class': 'oc-field' }, [ E('span', {}, _('活跃模型')), sel ]),
 				status,
 				E('div', { 'class': 'right' }, [
-					closeButton(_('关闭')),
-					button(_('保存'), 'cbi-button-positive', doSet)
+					ocui.closeButton(_('关闭')),
+					ocui.button(_('保存'), 'cbi-button-positive', doSet)
 				])
 			]);
 		}, this));
@@ -356,8 +345,8 @@ return view.extend({
 				E('div', { 'class': 'oc-card-body' }, [
 					this.channelBox,
 					E('div', { 'class': 'oc-actions' }, [
-						button(_('配置消息渠道（向导）'), 'cbi-button-positive', L.bind(function() { return this.launchWizard(this.channelWizard, 'channels'); }, this)),
-						button(_('刷新'), '', L.bind(this.refreshChannels, this))
+						ocui.button(_('配置消息渠道（向导）'), 'cbi-button-positive', L.bind(function() { return this.launchWizard(this.channelWizard, 'channels'); }, this)),
+						ocui.button(_('刷新'), '', L.bind(this.refreshChannels, this))
 					]),
 					E('p', { 'class': 'oc-muted', 'style': 'margin-top:.6rem' }, _('说明：官方向导配置微信渠道时只会安装 openclaw-weixin 插件，不会进入扫码登录。安装完成后，请到下方「微信渠道」卡片点击「扫码登录」完成账号登录。'))
 				])
@@ -372,11 +361,11 @@ return view.extend({
 					E('div', { 'class': 'oc-section-label' }, _('已登录账号')),
 					this.wxAccounts,
 					E('div', { 'class': 'oc-actions', 'style': 'margin-top:.6rem' }, [
-						button(_('安装插件'), 'cbi-button-positive', L.bind(function() {
+						ocui.button(_('安装插件'), 'cbi-button-positive', L.bind(function() {
 							return this.runWechatInstall(function() { return api.wechatInstall(); }, _('正在安装微信插件...'), _('插件已安装，请点「扫码登录」完成登录。'));
 						}, this)),
-						button(_('扫码登录'), 'cbi-button-action', L.bind(this.showWechatLogin, this)),
-						button(_('检测升级'), 'cbi-button-action', L.bind(function() {
+						ocui.button(_('扫码登录'), 'cbi-button-action', L.bind(this.showWechatLogin, this)),
+						ocui.button(_('检测升级'), 'cbi-button-action', L.bind(function() {
 							var self = this;
 							return api.wechatUpdateCheck().then(function(r) {
 								if (!r.ok) { ocui.setStatus(self.wxStatus, 'error', r.message || _('检测失败')); ocui.hideStatusLater(self.wxStatus); return; }
@@ -385,11 +374,11 @@ return view.extend({
 								return self.runWechatInstall(function() { return api.wechatUpgrade(); }, _('正在升级微信插件...'), _('微信插件升级完成。'));
 							});
 						}, this)),
-						button(_('卸载插件'), 'cbi-button-negative', L.bind(function() {
+						ocui.button(_('卸载插件'), 'cbi-button-negative', L.bind(function() {
 							if (!confirm(_('确定卸载微信插件？'))) return;
 							return this.runWechatInstall(function() { return api.wechatUninstall(); }, _('正在卸载微信插件...'), _('微信插件已卸载。'));
 						}, this)),
-						button(_('刷新'), '', L.bind(this.refreshWechat, this))
+						ocui.button(_('刷新'), '', L.bind(this.refreshWechat, this))
 					]),
 					this.wxStatus,
 					this.wxLog
@@ -402,15 +391,15 @@ return view.extend({
 					E('p', { 'class': 'oc-muted' }, _('填入 BotFather 提供的 Bot Token，保存后通过官方 CLI 添加并自动重启网关生效（无需进向导）。')),
 					E('div', { 'class': 'oc-field', 'style': 'align-items:center' }, [ E('span', {}, _('Bot Token')), this.tgToken ]),
 					E('div', { 'class': 'oc-actions', 'style': 'margin-top:.6rem' }, [
-						button(_('保存并启用'), 'cbi-button-positive', L.bind(this.saveTelegram, this)),
-						button(_('刷新'), '', L.bind(this.refreshChannels, this))
+						ocui.button(_('保存并启用'), 'cbi-button-positive', L.bind(this.saveTelegram, this)),
+						ocui.button(_('刷新'), '', L.bind(this.refreshChannels, this))
 					]),
 					E('div', { 'class': 'oc-section-label' }, _('配对（审批私信发起者）')),
 					E('p', { 'class': 'oc-muted' }, _('保存 token 后，用 Telegram 给你的 Bot 发一条私信，Bot 会回一个配对码；把配对码填到这里点「审批配对」，即可允许该用户使用。')),
 					E('div', { 'class': 'oc-field', 'style': 'align-items:center' }, [ E('span', {}, _('配对码')), this.tgCode ]),
 					E('div', { 'class': 'oc-actions', 'style': 'margin-top:.4rem' }, [
-						button(_('审批配对'), 'cbi-button-positive', L.bind(this.pairTelegram, this)),
-						button(_('查看待配对'), '', L.bind(this.listTelegramPairing, this))
+						ocui.button(_('审批配对'), 'cbi-button-positive', L.bind(this.pairTelegram, this)),
+						ocui.button(_('查看待配对'), '', L.bind(this.listTelegramPairing, this))
 					]),
 					this.tgStatus,
 					this.tgLog
@@ -463,6 +452,7 @@ return view.extend({
 			ocui.setLog(self.tgLog, reqs.map(function(x) {
 				var c = x.code || x.pairingCode || '';
 				var who = x.sender || x.from || x.senderId || x.user || '';
+				if (!c && !who) console.warn('[openclaw] telegram pairing: unexpected response shape', x);
 				return (c ? c : JSON.stringify(x)) + (who ? '  ←  ' + who : '');
 			}).join('\n'));
 			ocui.setStatus(self.tgStatus, 'success', _('共 %s 条待配对，复制配对码到上方填入审批。').format(reqs.length));
@@ -512,7 +502,7 @@ return view.extend({
 			dom.content(this.wxAccounts, (d.accounts || []).length ? d.accounts.map(L.bind(function(account) {
 				return E('div', { 'class': 'oc-field' }, [
 					E('span', {}, account.name || account.id),
-					button(_('退出'), 'cbi-button-negative', L.bind(function() {
+					ocui.button(_('退出'), 'cbi-button-negative', L.bind(function() {
 						if (!confirm(_('确定退出此微信账号？'))) return;
 						return ocui.runOp(this.wxStatus, { running: _('正在退出账号...'), success: _('账号已退出。'), submit: function() { return api.wechatLogout(account.id); }, onDone: L.bind(this.refreshWechat, this) });
 					}, this))
@@ -548,7 +538,7 @@ return view.extend({
 		return api.wechatLogin().then(L.bind(function(result) {
 			if (!result.ok) { ocui.setStatus(this.wxStatus, 'error', result.message || _('登录启动失败')); return; }
 			ui.showModal(_('微信扫码登录'), [ qrEl, urlEl, E('div', { 'class': 'right' }, [
-				closeButton(_('关闭'), function() { poll.remove(fn); api.wechatLoginCancel(); })
+				ocui.closeButton(_('关闭'), function() { poll.remove(fn); api.wechatLoginCancel(); })
 			]) ]);
 			poll.add(fn, 2);
 			fn();
@@ -596,8 +586,8 @@ return view.extend({
 				E('div', { 'class': 'oc-card-body' }, [
 					E('div', { 'class': 'oc-actions', 'style': 'align-items:center' }, [
 						E('span', {}, _('行数')), this.logLines,
-						button(_('加载日志'), 'cbi-button-action', L.bind(this.refreshLogs, this)),
-						button(_('清空'), '', L.bind(function() {
+						ocui.button(_('加载日志'), 'cbi-button-action', L.bind(this.refreshLogs, this)),
+						ocui.button(_('清空'), '', L.bind(function() {
 							if (this._logPoll) poll.remove(this._logPoll);
 							this.logAuto.checked = false;
 							this.logBox.textContent = _('点击「加载日志」获取最新日志。');
@@ -639,6 +629,7 @@ return view.extend({
 				if (this.logAuto) this.logAuto.checked = false;
 				if (this.logBox) this.logBox.textContent = _('点击「加载日志」获取最新日志。');
 			}
+			if (this._activeTab === 'health') this.resetHealthTab();
 		}
 		this._activeTab = name;
 		for (var i = 0; i < tabs.length; i++) {

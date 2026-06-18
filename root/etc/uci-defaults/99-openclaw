@@ -25,15 +25,15 @@ if ! id openclaw >/dev/null 2>&1; then
 	while grep -q "^[^:]*:x:${OC_GID}:" /etc/group 2>/dev/null; do
 		OC_GID=$((OC_GID + 1))
 	done
-	# OpenWrt 方式：直接写入 /etc/passwd 和 /etc/shadow
+	# OpenWrt 方式：直接写入 /etc/passwd 和 /etc/shadow（flock 防止并发安装竞态）
 	if ! grep -q '^openclaw:' /etc/passwd 2>/dev/null; then
-		echo "openclaw:x:${OC_UID}:${OC_GID}:openclaw:${OC_INSTALL_PATH}:/bin/false" >> /etc/passwd
+		flock /etc/passwd -c "echo \"openclaw:x:${OC_UID}:${OC_GID}:openclaw:${OC_INSTALL_PATH}:/bin/false\" >> /etc/passwd"
 	fi
 	if ! grep -q '^openclaw:' /etc/shadow 2>/dev/null; then
-		echo 'openclaw:x:0:0:99999:7:::' >> /etc/shadow
+		flock /etc/shadow -c "echo 'openclaw:x:0:0:99999:7:::' >> /etc/shadow"
 	fi
 	if ! grep -q '^openclaw:' /etc/group 2>/dev/null; then
-		echo "openclaw:x:${OC_GID}:" >> /etc/group
+		flock /etc/group  -c "echo \"openclaw:x:${OC_GID}:\" >> /etc/group"
 	fi
 fi
 

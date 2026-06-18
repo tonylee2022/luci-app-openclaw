@@ -5,7 +5,7 @@
 			"uci": [ "openclaw" ],
 			"ubus": {
 				"service": [ "list" ],
-				"luci.openclaw": [ "status", "system_info", "update_check", "setup_log", "uninstall_log", "upgrade_log", "backup_list", "backup_verify", "wechat_status", "wechat_install_log", "wechat_login_status", "wechat_update_check", "doctor_lint", "doctor_fix_log", "health", "channels_list", "channels_status", "logs_tail", "config_summary", "qr_encode", "env_upgrade_log", "telegram_add_log", "telegram_pairing_list", "wizard_status" ]
+				"luci.openclaw": [ "status", "system_info", "update_check", "env_upgrade_check", "env_npm_check", "setup_log", "uninstall_log", "upgrade_log", "backup_list", "backup_verify", "wechat_status", "wechat_install_log", "wechat_login_status", "wechat_update_check", "doctor_lint", "doctor_fix_log", "health", "channels_list", "channels_status", "logs_tail", "config_summary", "qr_encode", "env_upgrade_log", "telegram_add_log", "telegram_pairing_list", "wizard_status" ]
 			}
 		},
 		"write": {

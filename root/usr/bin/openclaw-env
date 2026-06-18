@@ -131,9 +131,9 @@ ensure_openclaw_user() {
 		oc_gid=$((oc_gid + 1))
 	done
 
-	echo "openclaw:x:${oc_uid}:${oc_gid}:openclaw:${OC_HOME}:/bin/false" >> /etc/passwd
-	echo 'openclaw:x:0:0:99999:7:::' >> /etc/shadow
-	echo "openclaw:x:${oc_gid}:" >> /etc/group
+	flock /etc/passwd -c "echo \"openclaw:x:${oc_uid}:${oc_gid}:openclaw:${OC_HOME}:/bin/false\" >> /etc/passwd"
+	flock /etc/shadow -c "echo 'openclaw:x:0:0:99999:7:::' >> /etc/shadow"
+	flock /etc/group  -c "echo \"openclaw:x:${oc_gid}:\" >> /etc/group"
 	log_info "已创建 openclaw 系统用户 (uid=${oc_uid}, gid=${oc_gid})"
 }
 
@@ -461,6 +461,21 @@ link_node_tools() {
 			ln -sf "${NODE_BASE}/bin/$b" "/usr/bin/$b" 2>/dev/null && log_info "已链接 /usr/bin/$b -> ${NODE_BASE}/bin/$b"
 		fi
 	done
+	write_profile_d
+}
+
+# 写入 /etc/profile.d/openclaw.sh，让登录 shell 的 npm prefix 和 cache
+# 指向 /opt/（外部存储），避免占用内部 flash。
+# openclaw 自身进程通过 oc_cli_env() 显式覆盖这两个变量，互不干扰。
+write_profile_d() {
+	mkdir -p /etc/profile.d
+	cat > /etc/profile.d/openclaw.sh << 'EOF'
+[ -x /usr/bin/npm ] || return 0
+export NPM_CONFIG_PREFIX=/opt/.npm-global
+export NPM_CONFIG_CACHE=/opt/.npm
+case ":$PATH:" in *":/opt/.npm-global/bin:"*) ;; *) export PATH="/opt/.npm-global/bin:$PATH" ;; esac
+EOF
+	log_info "已写入 /etc/profile.d/openclaw.sh (prefix=/opt/.npm-global)"
 }
 
 install_openclaw() {

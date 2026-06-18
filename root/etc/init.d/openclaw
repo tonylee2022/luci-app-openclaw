@@ -187,11 +187,6 @@ if [ -z "$token" ]; then
 	logger -t openclaw "Token 生成: 新 token"
 fi
 
-# 如果仍然没有 token，生成一个新的
-if [ -z "$token" ]; then
-	token=$(head -c 24 /dev/urandom | hexdump -e '24/1 "%02x"' 2>/dev/null || openssl rand -hex 24 2>/dev/null || dd if=/dev/urandom bs=24 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n' | head -c 48)
-fi
-
 # 确保 token 写回 UCI
 local uci_token
 uci_token=$(uci -q get openclaw.main.token || echo "")
@@ -526,20 +521,7 @@ _ensure_port_free "$port"
 	# 运行时不再依赖 uci/oc_load_paths 解析, 不受 procd 受限环境影响。网关及其派生子进程均继承正确环境。
 	procd_set_param command /bin/sh -c \
 	"export HOME='$OC_HOME' OPENCLAW_HOME='$OC_HOME' OPENCLAW_STATE_DIR='$OC_STATE_DIR' OPENCLAW_CONFIG_PATH='$CONFIG_FILE' NPM_CONFIG_PREFIX='$OC_GLOBAL' NPM_CONFIG_CACHE='$OC_NPM_CACHE' TMPDIR='$OC_TMP' NODE_ICU_DATA='${NODE_BASE}/share/icu' PATH='${NODE_BASE}/bin:${OC_GLOBAL}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'; exec '$NODE_BIN' '$oc_entry' gateway run --port '$port' --bind '$gw_bind'"
-	# 保留 env 作为兜底 (若某些 procd 版本支持 env+user 则双保险)。
-	procd_set_param env \
-	HOME="$OC_HOME" \
-	OPENCLAW_HOME="$OC_HOME" \
-	OPENCLAW_STATE_DIR="$OC_STATE_DIR" \
-	OPENCLAW_CONFIG_PATH="$CONFIG_FILE" \
-	NPM_CONFIG_PREFIX="$OC_GLOBAL" \
-	NPM_CONFIG_CACHE="$OC_NPM_CACHE" \
-	TMPDIR="$OC_TMP" \
-	NODE_ICU_DATA="${NODE_BASE}/share/icu" \
-	NODE_BASE="$NODE_BASE" \
-	OC_GLOBAL="$OC_GLOBAL" \
-	OC_DATA="$OC_DATA" \
-	PATH="${NODE_BASE}/bin:${OC_GLOBAL}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+	# procd env+user 共存时 env 无效，故不在此设 env。
 procd_set_param user openclaw
 procd_set_param respawn 3600 10 5
 procd_set_param stdout 1
