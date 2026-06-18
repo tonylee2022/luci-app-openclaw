@@ -86,7 +86,7 @@ $OC_TOOLS_BLOCK_START
 ## 7. 部署环境硬约束（由 luci-app-openclaw 注入，禁止手动编辑此区块）
 
 本实例由 luci-app-openclaw 部署，Gateway 进程由 OpenWrt procd 以 root 身份管理。
-`openclaw` 用户**没有权限**执行 init 脚本或控制服务生命周期，不要尝试。
+\`openclaw\` 用户**没有权限**执行 init 脚本或控制服务生命周期，不要尝试。
 
 需要重启服务或 Gateway 时：告知**用户**通过 LuCI 界面操作，或以 root 身份 SSH 执行。
 

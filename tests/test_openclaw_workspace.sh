@@ -21,10 +21,9 @@ NODE_BIN=""
 mkdir -p "$OC_STATE_DIR" "$OC_TMP"
 
 oc_sync_workspace_tools
-TOOLS_FILE="$OC_STATE_DIR/workspace/TOOLS.md"
-[ -f "$TOOLS_FILE" ] || fail "default TOOLS.md was not created"
-grep -Fq '/etc/init.d/openclaw restart_gateway' "$TOOLS_FILE" || fail "gateway restart guidance missing"
-grep -Fq 'openclaw gateway health' "$TOOLS_FILE" || fail "query command guidance missing"
+TOOLS_FILE="$OC_STATE_DIR/workspace/AGENTS.md"
+[ -f "$TOOLS_FILE" ] || fail "default AGENTS.md was not created"
+grep -Fq 'luci-app-openclaw' "$TOOLS_FILE" || fail "luci-app-openclaw attribution missing"
 grep -Fq "$OC_STATE_DIR" "$TOOLS_FILE" || fail "runtime state path missing"
 
 {
@@ -43,7 +42,7 @@ echo 'external content' > "$EXTERNAL_FILE"
 rm -f "$TOOLS_FILE"
 ln -s "$EXTERNAL_FILE" "$TOOLS_FILE"
 oc_sync_workspace_tools
-[ "$(cat "$EXTERNAL_FILE")" = 'external content' ] || fail "TOOLS.md symlink target was modified"
+[ "$(cat "$EXTERNAL_FILE")" = 'external content' ] || fail "AGENTS.md symlink target was modified"
 
 MOCK_NODE="$TEST_ROOT/mock-node"
 cat > "$MOCK_NODE" <<'EOF'
@@ -57,7 +56,7 @@ NODE_BIN="$MOCK_NODE"
 MOCK_WORKSPACE="$OC_STATE_DIR/custom-workspace"
 export MOCK_WORKSPACE
 oc_sync_workspace_tools
-[ -f "$MOCK_WORKSPACE/TOOLS.md" ] || fail "custom workspace inside state dir was not updated"
+[ -f "$MOCK_WORKSPACE/AGENTS.md" ] || fail "custom workspace inside state dir was not updated"
 
 MOCK_WORKSPACE="$OC_STATE_DIR/workspace/../../escaped-workspace"
 export MOCK_WORKSPACE
