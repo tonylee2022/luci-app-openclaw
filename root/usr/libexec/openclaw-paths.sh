@@ -61,7 +61,7 @@ oc_load_paths() {
 	else
 		OC_ROOT="${OPENCLAW_INSTALL_PATH}/openclaw"
 	fi
-	NODE_BASE="${OC_ROOT}/node"
+	NODE_BASE="${OPENCLAW_INSTALL_PATH}/node"
 	OC_HOME="${OC_ROOT}"
 	OC_GLOBAL="${OC_ROOT}/.npm-global"
 	# OC_DATA 保留为内部兼容别名；新布局中 HOME 就是运行根目录。

@@ -42,7 +42,7 @@ if command -v oc_load_paths >/dev/null 2>&1 && oc_load_paths "$OC_CONFIGURED_PAT
 else
 	OC_BASE_PATH="${OC_CONFIGURED_PATH%/}"
 	OC_INSTALL_PATH="${OC_BASE_PATH}/openclaw"
-	NODE_BASE="${NODE_BASE:-${OC_INSTALL_PATH}/node}"
+	NODE_BASE="${NODE_BASE:-${OC_BASE_PATH}/node}"
 	OC_HOME="${OC_HOME:-${OC_INSTALL_PATH}}"
 	OC_GLOBAL="${OC_GLOBAL:-${OC_INSTALL_PATH}/.npm-global}"
 	OC_DATA="${OC_DATA:-${OC_HOME}}"
@@ -51,7 +51,7 @@ else
 	OC_TMP="${OC_TMP:-${OC_HOME}/.tmp}"
 	CONFIG_FILE="${OC_STATE_DIR}/openclaw.json"
 fi
-NODE_BASE="${NODE_BASE:-${OC_INSTALL_PATH}/node}"
+NODE_BASE="${NODE_BASE:-${OC_BASE_PATH}/node}"
 OC_HOME="${OC_HOME:-${OC_INSTALL_PATH}}"
 OC_GLOBAL="${OC_GLOBAL:-${OC_INSTALL_PATH}/.npm-global}"
 OC_DATA="${OC_DATA:-${OC_HOME}}"

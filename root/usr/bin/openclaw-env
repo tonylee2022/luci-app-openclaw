@@ -44,7 +44,7 @@ if command -v oc_load_paths >/dev/null 2>&1; then
 else
 	OC_BASE_PATH="${OC_CONFIGURED_PATH%/}"
 	OC_INSTALL_PATH="${OC_BASE_PATH}/openclaw"
-	NODE_BASE="${OC_INSTALL_PATH}/node"
+	NODE_BASE="${OC_BASE_PATH}/node"
 	OC_HOME="${OC_INSTALL_PATH}"
 	OC_GLOBAL="${OC_INSTALL_PATH}/.npm-global"
 	OC_DATA="${OC_HOME}"

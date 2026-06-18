@@ -11,6 +11,7 @@ fail() {
 oc_load_paths "/mnt/data/openclaw"
 [ "$OPENCLAW_INSTALL_PATH" = "/mnt/data" ] || fail "strip trailing openclaw"
 [ "$OC_ROOT" = "/mnt/data/openclaw" ] || fail "derive root"
+[ "$NODE_BASE" = "/mnt/data/node" ] || fail "node must be at base path, not inside openclaw dir"
 [ "$OC_HOME" = "/mnt/data/openclaw" ] || fail "derive home"
 [ "$OC_GLOBAL" = "/mnt/data/openclaw/.npm-global" ] || fail "derive npm prefix"
 [ "$OC_STATE_DIR" = "/mnt/data/openclaw/.openclaw" ] || fail "derive state dir"
