@@ -59,7 +59,7 @@ return view.extend({
 			var ok = data.exit_code === 0;
 			this.taskState.className = 'oc-task-state ' + (ok ? 'oc-task-success' : 'oc-task-error');
 			if (ok && title === _('安装运行环境'))
-				this.taskState.textContent = _('安装完成！请刷新页面后点击「启动」按钮启动服务。');
+				this.taskState.textContent = _('安装完成！服务已自动启用，请刷新页面查看状态。');
 			else
 				this.taskState.textContent = ok ? _('任务已完成。') : _('任务失败，退出码：%s').format(data.exit_code);
 			this.taskClose.style.display = '';
@@ -106,19 +106,24 @@ return view.extend({
 	showSetup: function() {
 		var stableLabel = this._stableVersion ? _('稳定版 (%s)').format(this._stableVersion) : _('稳定版');
 		var version = E('select', { 'class': 'cbi-input-select' }, [ E('option', { value: 'stable' }, stableLabel), E('option', { value: 'latest' }, _('最新版 (latest)')) ]);
-		// Node.js 版本: 固定推荐版 + 自定义输入
-		var NODE_24_LATEST = '24.17.0';
+		// Node.js 版本: 稳定版(默认) / 最新版 / 自定义输入
 		var nodeVerSel = E('select', { 'class': 'cbi-input-select oc-input', style: 'width:auto' }, [
-			E('option', { value: NODE_24_LATEST }, 'Node ' + NODE_24_LATEST + _('（推荐）')),
+			E('option', { value: '22.22.3' }, 'Node 22.22.3'),
+			E('option', { value: '24.17.0' }, 'Node 24.17.0'),
 			E('option', { value: '__custom__' }, _('自定义版本…'))
 		]);
 		var nodeVerCustom = E('input', {
 			'class': 'cbi-input-text oc-input',
 			placeholder: 'x.y.z',
-			style: 'display:none;width:100px;margin-left:6px'
+			style: 'display:none;width:96px;margin-left:6px'
 		});
+		var nodeVerHint = E('span', {
+			style: 'display:none;color:var(--secondary-text-color,#888);font-size:.85em;margin-left:4px'
+		}, _('格式：x.y.z'));
 		nodeVerSel.addEventListener('change', function() {
-			nodeVerCustom.style.display = (nodeVerSel.value === '__custom__') ? '' : 'none';
+			var custom = nodeVerSel.value === '__custom__';
+			nodeVerCustom.style.display = custom ? '' : 'none';
+			nodeVerHint.style.display = custom ? '' : 'none';
 		});
 		var getNodeVer = function() {
 			return nodeVerSel.value === '__custom__' ? nodeVerCustom.value.trim() : nodeVerSel.value;
@@ -221,7 +226,7 @@ return view.extend({
 			E('div', { 'class': 'oc-form-row' }, [ E('label', {}, _('版本')), version ]),
 			E('div', { 'class': 'oc-form-row' }, [
 				E('label', {}, _('Node.js 版本')),
-				E('div', { style: 'display:flex;align-items:center;gap:4px' }, [ nodeVerSel, nodeVerCustom ])
+				E('div', { style: 'display:flex;align-items:center;flex-wrap:wrap;gap:4px' }, [ nodeVerSel, nodeVerCustom, nodeVerHint ])
 			]),
 			E('div', { 'class': 'oc-form-row' }, [ E('label', {}, _('安装位置')), mountSel ]),
 			E('div', { 'class': 'oc-form-row' }, [ E('label', {}, _('自定义路径')), path ]),
@@ -253,18 +258,50 @@ return view.extend({
 	},
 
 	uninstall: function() {
-		if (!confirm(_('将删除 OpenClaw 运行环境和数据，确定继续？')))
-			return;
-		return ocui.runOp(this.actionStatus, {
-			running: _('「卸载环境」命令已提交'),
-			success: _('运行环境已卸载。'),
-			submit: function() { return api.uninstall(); },
-			cancel: function() { return api.taskCancel('openclaw-uninstall'); },
-			onClose: L.bind(function() { if (this.taskPanel) this.taskPanel.style.display = 'none'; }, this),
-			pollLog: function() { return api.uninstallLog(); },
-			onLog: L.bind(function(d) { this.updateTaskPanel(_('卸载运行环境'), { ok: true, data: d }); }, this),
-			onDone: L.bind(function() { this.updateStatus(); }, this)
-		});
+		var self = this;
+		var cbOpenclaw = E('input', { type: 'checkbox', checked: true });
+		var cbNode = E('input', { type: 'checkbox' });
+		ui.showModal(_('卸载运行环境'), [
+			E('p', {}, _('请选择要卸载的组件：')),
+			E('div', { style: 'display:flex;flex-direction:column;gap:10px;margin:10px 0 4px' }, [
+				E('label', { style: 'display:flex;align-items:center;gap:8px;cursor:pointer' }, [
+					cbOpenclaw,
+					E('span', {}, _('OpenClaw 运行环境及数据'))
+				]),
+				E('label', { style: 'display:flex;align-items:center;gap:8px;cursor:pointer' }, [
+					cbNode,
+					E('span', {}, _('Node.js 运行时'))
+				])
+			]),
+			E('p', { style: 'color:var(--secondary-text-color,#888);font-size:.85em' },
+				_('Node.js 可供其他用途使用，不勾选则保留。')),
+			E('div', { 'class': 'right', style: 'margin-top:12px' }, [
+				E('button', { 'class': 'btn', click: function() { ui.hideModal(); } }, _('取消')),
+				' ',
+				E('button', {
+					'class': 'cbi-button-negative btn',
+					click: function() {
+						if (!cbOpenclaw.checked) { ui.hideModal(); return; }
+						var removeNode = cbNode.checked;
+						ui.hideModal();
+						return ocui.runOp(self.actionStatus, {
+							running: _('「卸载环境」命令已提交'),
+							success: _('运行环境已卸载。'),
+							submit: function() { return api.uninstall(removeNode); },
+							cancel: function() { return api.taskCancel('openclaw-uninstall'); },
+							onClose: L.bind(function() {
+								if (this.taskPanel) this.taskPanel.style.display = 'none';
+							}, self),
+							pollLog: function() { return api.uninstallLog(); },
+							onLog: L.bind(function(d) {
+								self.updateTaskPanel(_('卸载运行环境'), { ok: true, data: d });
+							}, self),
+							onDone: L.bind(function() { self.updateStatus(); }, self)
+						});
+					}
+				}, _('确认卸载'))
+			])
+		]);
 	},
 
 	checkUpgrade: function() {

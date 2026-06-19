@@ -31,7 +31,7 @@ return baseclass.extend({
 	serviceAction: call('service_action', [ 'action' ]),
 	autostartSet: call('autostart_set', [ 'enabled' ]),
 	setup: call('setup', [ 'version', 'install_path', 'node_version' ]),
-	uninstall: call('uninstall'),
+	uninstall: call('uninstall', [ 'also_remove_node' ]),
 	upgrade: call('upgrade', [ 'version' ]),
 	envUpgradeOpenclaw: call('env_upgrade_openclaw'),
 	envUpgradeNpm: call('env_upgrade_npm'),

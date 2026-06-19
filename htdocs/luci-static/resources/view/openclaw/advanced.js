@@ -504,25 +504,34 @@ return view.extend({
 					E('span', {}, account.name || account.id),
 					ocui.button(_('退出'), 'cbi-button-negative', L.bind(function() {
 						if (!confirm(_('确定退出此微信账号？'))) return;
-						return ocui.runOp(this.wxStatus, { running: _('正在退出账号...'), success: _('账号已退出。'), submit: function() { return api.wechatLogout(account.id); }, onDone: L.bind(this.refreshWechat, this) });
+						return ocui.runOp(this.wxStatus, { running: _('正在退出账号...'), success: _('账号已退出。'), submit: function() { return api.wechatLogout(account.id); }, onDone: L.bind(function() { this.refreshWechat(); this.refreshChannels(); }, this) });
 					}, this))
 				]);
 			}, this)) : [ E('p', { 'class': 'oc-muted' }, _('暂无已登录账号')) ]);
 		}, this));
 	},
 
-	// 从登录输出里提取字符二维码块(去 ANSI; 只留块字符行), 没有则返回去 ANSI 的全文。
+	// 从登录输出里提取字符二维码块(去 ANSI; 只留块字符行)，只返回最后一个块（避免 QR 刷新后积累多个）。
 	extractWechatQr: function(s) {
 		s = (s || '').replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
-		var lines = s.split('\n'), qr = [];
-		for (var i = 0; i < lines.length; i++)
-			if (/^[▀-▟\s]+$/.test(lines[i]) && lines[i].replace(/\s/g, '').length > 8) qr.push(lines[i]);
-		return qr.length ? qr.join('\n') : s;
+		var lines = s.split('\n'), cur = [], groups = [];
+		for (var i = 0; i < lines.length; i++) {
+			if (/^[▀-▟\s]+$/.test(lines[i]) && lines[i].replace(/\s/g, '').length > 8) {
+				cur.push(lines[i]);
+			} else if (cur.length) {
+				groups.push(cur.join('\n'));
+				cur = [];
+			}
+		}
+		if (cur.length) groups.push(cur.join('\n'));
+		return groups.length ? groups[groups.length - 1] : s;
 	},
 
 	showWechatLogin: function() {
+		var self = this;
 		var qrEl = E('pre', { 'class': 'oc-qr' }, _('正在启动登录，请稍候...'));
 		var urlEl = E('p', { 'style': 'display:none; font-size:.85em; margin:.6rem 0 0; word-break:break-all' });
+		var logEl = E('pre', { 'style': 'margin-top:.5rem; max-height:80px; overflow-y:auto; font-size:.8em; white-space:pre-wrap; border-top:1px solid var(--cbi-border-color,#ddd); padding-top:.4rem; color:var(--cbi-muted-fg,#666)' }, _('正在启动...'));
 		var fn = L.bind(function() {
 			return api.wechatLoginStatus().then(L.bind(function(result) {
 				var d = result.data || {};
@@ -532,12 +541,22 @@ return view.extend({
 					urlEl.style.display = '';
 					dom.content(urlEl, [ _('无法扫码？点击访问：'), E('a', { href: d.qrcode_url, target: '_blank', rel: 'noopener' }, d.qrcode_url) ]);
 				}
+				var rawLog = this.cleanWechatLog(d.log || '');
+				var lines = rawLog.split('\n');
+				var lastQrEnd = -1;
+				for (var i = lines.length - 1; i >= 0; i--) {
+					if (/^[▀-▟\s]+$/.test(lines[i]) && lines[i].replace(/\s/g, '').length > 8) { lastQrEnd = i; break; }
+				}
+				var logText = lastQrEnd >= 0
+					? lines.slice(lastQrEnd + 1).filter(function(l) { return !/^https?:\/\//.test(l.trim()); }).join('\n').trim()
+					: lines.filter(function(l) { return !(/^[▀-▟\s]+$/.test(l) && l.replace(/\s/g, '').length > 8); }).join('\n').trim();
+				if (logText) { logEl.textContent = logText; logEl.scrollTop = logEl.scrollHeight; }
 				if (d.state === 'success' || d.state === 'failed') { poll.remove(fn); this.refreshWechat(); }
 			}, this));
 		}, this);
 		return api.wechatLogin().then(L.bind(function(result) {
-			if (!result.ok) { ocui.setStatus(this.wxStatus, 'error', result.message || _('登录启动失败')); return; }
-			ui.showModal(_('微信扫码登录'), [ qrEl, urlEl, E('div', { 'class': 'right' }, [
+			if (!result.ok) { ocui.setStatus(self.wxStatus, 'error', result.message || _('登录启动失败')); return; }
+			ui.showModal(_('微信扫码登录'), [ qrEl, urlEl, logEl, E('div', { 'class': 'right' }, [
 				ocui.closeButton(_('关闭'), function() { poll.remove(fn); api.wechatLoginCancel(); })
 			]) ]);
 			poll.add(fn, 2);
@@ -556,9 +575,25 @@ return view.extend({
 			}
 			var rows = names.map(function(name) {
 				var c = chat[name] || {};
-				var accounts = (c.accounts || []).length;
-				var stateBadge = E('span', { 'class': 'oc-badge oc-ok' }, accounts ? _('已登录 %s 个').format(accounts) : _('已配置'));
-				return E('tr', {}, [ E('td', {}, name), E('td', {}, stateBadge), E('td', {}, c.origin || '-') ]);
+				var accts = c.accounts || [];
+				// token 型 bot(如 Telegram)的账号带 tokenSource/tokenStatus, 仅代表 bot 已配置并连接,
+				// 不等于已有配对用户; 微信账号是真实登录会话, 无 tokenStatus 字段。
+				var isBot = accts.some(function(a) { return a && typeof a === 'object' && (a.tokenSource || a.tokenStatus); });
+				// 状态分两段: 配置态(出现在此即已配置) + 登录/连接态。
+				var configBadge = E('span', { 'class': 'oc-badge oc-info' }, _('已配置'));
+				var loginBadge;
+				if (!accts.length) {
+					loginBadge = E('span', { 'class': 'oc-badge oc-warn' }, _('未登录'));
+				} else if (isBot) {
+					var connected = accts.some(function(a) { return a && a.connected; });
+					loginBadge = connected
+						? E('span', { 'class': 'oc-badge oc-ok' }, _('Bot 在线'))
+						: E('span', { 'class': 'oc-badge oc-warn' }, _('Bot 离线'));
+				} else {
+					loginBadge = E('span', { 'class': 'oc-badge oc-ok' }, _('已登录 %s 个').format(accts.length));
+				}
+				var stateCell = E('span', { 'style': 'display:inline-flex;gap:.4rem;flex-wrap:wrap' }, [ configBadge, loginBadge ]);
+				return E('tr', {}, [ E('td', {}, name), E('td', {}, stateCell), E('td', {}, c.origin || '-') ]);
 			});
 			dom.content(this.channelBox, E('table', { 'class': 'oc-table' }, [
 				E('tr', {}, [ E('th', {}, _('渠道')), E('th', {}, _('状态')), E('th', {}, _('来源')) ])

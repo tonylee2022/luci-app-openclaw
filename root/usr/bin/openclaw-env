@@ -489,7 +489,7 @@ install_openclaw() {
 		log_info "默认稳定版: v${OC_TESTED_VERSION}"
 	elif [ "$OC_VERSION" = "latest" ]; then
 		oc_pkg="openclaw@latest"
-		log_info "安装 npm latest 稳定标签版本"
+		log_info "安装最新正式版 (npm latest)"
 	else
 		log_error "不支持的版本选择: ${OC_VERSION}"
 		log_error "仅支持 stable 或 latest；不会安装 beta、rc、next 等测试版本。"

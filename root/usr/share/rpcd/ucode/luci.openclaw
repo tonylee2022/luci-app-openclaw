@@ -298,6 +298,27 @@ function cli_json(action) {
 	catch (e) { return reply(false, '解析输出失败', { raw: out }); }
 }
 
+// channels list 的 accounts 是配置层面的账号槽位, 登出后仍保留;
+// 真实已登录账号要看 channels status 的 channelAccounts。这里合并运行态覆盖配置态。
+function channels_list() {
+	let listOut = run('/usr/libexec/openclaw-rpc.sh cli-channels-list');
+	if (!length(listOut)) return reply(false, '命令无输出 (网关可能未运行或 OpenClaw 未安装)', {});
+	let data;
+	try { data = json(listOut); }
+	catch (e) { return reply(false, '解析输出失败', { raw: listOut }); }
+	let statusOut = run('/usr/libexec/openclaw-rpc.sh cli-channels-status');
+	if (length(statusOut)) {
+		try {
+			let active = json(statusOut)?.channelAccounts || {};
+			for (let name in (data?.chat || {})) {
+				if (type(active[name]) == 'array')
+					data.chat[name].accounts = active[name];
+			}
+		} catch (e) {}
+	}
+	return reply(true, '', data);
+}
+
 function logs_tail(request) {
 	let lines = int(request?.args?.lines ?? 200);
 	if (lines < 1 || lines > 2000) lines = 200;
@@ -404,7 +425,7 @@ const methods = {
 		if (length(nv) && !match(nv, /^[0-9]+\.[0-9]+\.[0-9]+$/)) return reply(false, 'Node.js 版本号格式无效');
 		return run_action('setup', [r.args.version, normalize_base(r.args.install_path), nv]);
 	} },
-	uninstall: { call: () => run_action('uninstall') },
+	uninstall: { args: { also_remove_node: false }, call: (r) => run_action('uninstall', [r.args.also_remove_node === true ? '1' : '0']) },
 	upgrade: { args: { version: '' }, call: (r) => match(r.args.version, /^[0-9]+\.[0-9]+\.[0-9]+$/) ? run_action('upgrade', [r.args.version]) : reply(false, '版本号格式无效') },
 	backup_create: { args: { only_config: true }, call: (r) => run_action('backup-create', [r.args.only_config === false ? '0' : '1']) },
 	backup_restore: { args: { file: '' }, call: (r) => match(r.args.file, /^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$/) ? run_action('backup-restore', [r.args.file]) : reply(false, '备份文件名无效') },
@@ -416,7 +437,7 @@ const methods = {
 	doctor_fix: { call: () => run_action('cli-doctor-fix') },
 	doctor_fix_log: { call: () => reply(true, '', task_status('/tmp/openclaw-doctor-fix')) },
 	health: { call: () => cli_json('cli-health') },
-	channels_list: { call: () => cli_json('cli-channels-list') },
+	channels_list: { call: channels_list },
 	channels_status: { call: () => cli_json('cli-channels-status') },
 	logs_tail: { args: { lines: 200 }, call: logs_tail },
 	config_summary: { call: config_summary },

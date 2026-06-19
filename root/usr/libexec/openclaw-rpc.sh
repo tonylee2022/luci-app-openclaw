@@ -190,6 +190,9 @@ case "${1:-}" in
 			""|[0-9]*.[0-9]*.[0-9]*) ;;
 			*) fail "Node.js 版本号格式无效" ;;
 		esac
+		if ! uci -q get openclaw.main >/dev/null 2>&1; then
+			printf "config openclaw 'main'\n\toption enabled '0'\n\toption port '18789'\n\toption bind 'lan'\n\toption token ''\n\toption pty_port '18793'\n\toption install_path '/opt'\n" > /etc/config/openclaw
+		fi
 		uci set openclaw.main.install_path="$base"
 		uci commit openclaw
 		node_prefix=""
@@ -220,9 +223,12 @@ case "${1:-}" in
 		start_task /tmp/openclaw-env-upgrade "$cmd"
 		;;
 	uninstall)
-		start_task /tmp/openclaw-uninstall "/usr/libexec/openclaw-rpc.sh uninstall-task"
+		remove_node="${2:-0}"
+		case "$remove_node" in 0|1) ;; *) remove_node=0 ;; esac
+		start_task /tmp/openclaw-uninstall "/usr/libexec/openclaw-rpc.sh uninstall-task $(oc_quote "$remove_node")"
 		;;
 	uninstall-task)
+		remove_node="${2:-0}"
 		load_paths
 		oc_safe_openclaw_root "$OC_ROOT" || fail "安装路径未通过安全校验"
 		echo "正在停止 OpenClaw 服务..."
@@ -232,18 +238,27 @@ case "${1:-}" in
 		uci commit openclaw 2>/dev/null || true
 		rm -f /etc/config/openclaw
 		echo "正在删除运行环境: $OC_ROOT"
-		# 删除指向本安装目录的 node 工具软链 (仅删指向 $OC_ROOT 的, 不动系统 node)
+		# OC_ROOT 下的软链始终删除；NODE_BASE 下的仅在 remove_node=1 时删除
 		for b in node npm npx pnpm corepack; do
 			if [ -L "/usr/bin/$b" ]; then
-				case "$(readlink "/usr/bin/$b" 2>/dev/null)" in
+				_target=$(readlink "/usr/bin/$b" 2>/dev/null)
+				case "$_target" in
 					"$OC_ROOT"/*) rm -f "/usr/bin/$b" ;;
+					"$NODE_BASE"/*) [ "$remove_node" = "1" ] && rm -f "/usr/bin/$b" ;;
 				esac
 			fi
 		done
 		umount "$OC_ROOT" 2>/dev/null || true
 		rm -rf "$OC_ROOT"
 		[ ! -d "/overlay/upper$OC_ROOT" ] || rm -rf "/overlay/upper$OC_ROOT"
-		rm -f /tmp/openclaw-setup.* /tmp/openclaw-plugin-upgrade.* /tmp/openclaw-wechat-* /var/run/openclaw*.pid
+		if [ "$remove_node" = "1" ]; then
+			echo "正在删除 Node.js 运行时: $NODE_BASE"
+			rm -rf "$NODE_BASE"
+			[ ! -d "/overlay/upper$NODE_BASE" ] || rm -rf "/overlay/upper$NODE_BASE"
+		else
+			echo "Node.js 运行时已保留: $NODE_BASE"
+		fi
+		rm -f /tmp/openclaw-setup.* /tmp/openclaw-plugin-upgrade.* /tmp/openclaw-wechat-* /var/run/openclaw*.pid /tmp/luci-openclaw-status.*
 		sed -i '/^openclaw:/d' /etc/passwd /etc/shadow /etc/group 2>/dev/null || true
 		rm -f /etc/profile.d/openclaw.sh
 		echo "OpenClaw 运行环境已卸载。"
@@ -464,7 +479,7 @@ if(!accounts.includes(id))process.exit(2);
 for(const suffix of [".json",".sync.json",".context-tokens.json"])try{fs.unlinkSync(path.join(wx,"accounts",id+suffix));}catch(e){if(e.code!=="ENOENT")throw e;}
 try{fs.unlinkSync(path.join(state,"credentials","openclaw-weixin-"+id+"-allowFrom.json"));}catch(e){if(e.code!=="ENOENT")throw e;}
 fs.writeFileSync(index,JSON.stringify(accounts.filter(x=>x!==id),null,2)+"\n");'
-		/etc/init.d/openclaw restart >/dev/null 2>&1 &
+		/etc/init.d/openclaw restart >/dev/null 2>&1
 		;;
 	telegram-add)
 		tok="${2:-}"
