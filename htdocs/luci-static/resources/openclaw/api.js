@@ -30,7 +30,7 @@ return baseclass.extend({
 	wechatUpdateCheck: call('wechat_update_check'),
 	serviceAction: call('service_action', [ 'action' ]),
 	autostartSet: call('autostart_set', [ 'enabled' ]),
-	setup: call('setup', [ 'version', 'install_path' ]),
+	setup: call('setup', [ 'version', 'install_path', 'node_version' ]),
 	uninstall: call('uninstall'),
 	upgrade: call('upgrade', [ 'version' ]),
 	envUpgradeOpenclaw: call('env_upgrade_openclaw'),

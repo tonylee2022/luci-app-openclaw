@@ -106,6 +106,23 @@ return view.extend({
 	showSetup: function() {
 		var stableLabel = this._stableVersion ? _('稳定版 (%s)').format(this._stableVersion) : _('稳定版');
 		var version = E('select', { 'class': 'cbi-input-select' }, [ E('option', { value: 'stable' }, stableLabel), E('option', { value: 'latest' }, _('最新版 (latest)')) ]);
+		// Node.js 版本: 固定推荐版 + 自定义输入
+		var NODE_24_LATEST = '24.17.0';
+		var nodeVerSel = E('select', { 'class': 'cbi-input-select oc-input', style: 'width:auto' }, [
+			E('option', { value: NODE_24_LATEST }, 'Node ' + NODE_24_LATEST + _('（推荐）')),
+			E('option', { value: '__custom__' }, _('自定义版本…'))
+		]);
+		var nodeVerCustom = E('input', {
+			'class': 'cbi-input-text oc-input',
+			placeholder: 'x.y.z',
+			style: 'display:none;width:100px;margin-left:6px'
+		});
+		nodeVerSel.addEventListener('change', function() {
+			nodeVerCustom.style.display = (nodeVerSel.value === '__custom__') ? '' : 'none';
+		});
+		var getNodeVer = function() {
+			return nodeVerSel.value === '__custom__' ? nodeVerCustom.value.trim() : nodeVerSel.value;
+		};
 		// 挂载点下拉(由 install_targets 填充) + 手动输入(默认隐藏)
 		var mountSel = E('select', { 'class': 'cbi-input-select oc-input' }, [ E('option', { value: '' }, _('正在探测挂载点...')) ]);
 		var path = E('input', { 'class': 'cbi-input-text oc-input', value: '/opt', 'style': 'display:none' });
@@ -122,6 +139,13 @@ return view.extend({
 				progress.textContent = _('安装路径已变化，请等待容量检查完成。');
 				return;
 			}
+			var nv = getNodeVer();
+			if (nodeVerSel.value === '__custom__' && !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(nv)) {
+				progress.style.display = '';
+				progress.className = 'oc-task-state oc-task-error';
+				progress.textContent = _('Node.js 版本格式无效，请输入 x.y.z 格式（如 24.17.0）。');
+				return;
+			}
 			install.disabled = true;
 			version.disabled = true;
 			path.disabled = true;
@@ -129,7 +153,7 @@ return view.extend({
 			progress.className = 'oc-task-state oc-task-running';
 			progress.textContent = _('正在启动后台安装任务...');
 			var submittedAt = Math.floor(Date.now() / 1000);
-			return api.setup(version.value, checkedPath).then(L.bind(function(result) {
+			return api.setup(version.value, checkedPath, nv).then(L.bind(function(result) {
 				if (!result.ok)
 					throw new Error(result.message || _('无法启动安装任务'));
 				this.showAcceptedTask(_('安装运行环境'), _('安装任务已提交，等待输出...'));
@@ -195,6 +219,10 @@ return view.extend({
 		ui.showModal(_('安装运行环境'), [
 			E('p', {}, _('安装程序会在所选挂载点下创建 openclaw 目录。请选择有足够空间（≥2GB）的磁盘挂载点。')),
 			E('div', { 'class': 'oc-form-row' }, [ E('label', {}, _('版本')), version ]),
+			E('div', { 'class': 'oc-form-row' }, [
+				E('label', {}, _('Node.js 版本')),
+				E('div', { style: 'display:flex;align-items:center;gap:4px' }, [ nodeVerSel, nodeVerCustom ])
+			]),
 			E('div', { 'class': 'oc-form-row' }, [ E('label', {}, _('安装位置')), mountSel ]),
 			E('div', { 'class': 'oc-form-row' }, [ E('label', {}, _('自定义路径')), path ]),
 			capacity,

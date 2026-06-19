@@ -13,7 +13,7 @@ set -e
 
 # ── Node.js 版本策略 ──
 # 默认运行时版本，用于 OpenClaw v2026.6.6+
-NODE_VERSION_V2="22.22.3"
+NODE_VERSION_V2="24.17.0"
 # 可通过 NODE_VERSION 环境变量覆盖，但仍必须满足最低版本要求。
 NODE_VERSION="${NODE_VERSION:-${NODE_VERSION_V2}}"
 # 经过验证的 OpenClaw 稳定版本 (更新此值需同步测试)

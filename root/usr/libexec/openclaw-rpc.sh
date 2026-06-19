@@ -182,12 +182,19 @@ case "${1:-}" in
 	setup)
 		version="${2:-}"
 		base="${3:-}"
+		node_ver="${4:-}"
 		case "$version" in stable|latest) ;; *) fail "安装版本无效" ;; esac
 		oc_normalize_install_path "$base" >/dev/null || fail "安装路径无效"
 		base=$(oc_normalize_install_path "$base")
+		case "$node_ver" in
+			""|[0-9]*.[0-9]*.[0-9]*) ;;
+			*) fail "Node.js 版本号格式无效" ;;
+		esac
 		uci set openclaw.main.install_path="$base"
 		uci commit openclaw
-		prefix="OC_VERSION=$(oc_quote "$version") OC_INSTALL_PATH=$(oc_quote "$base")"
+		node_prefix=""
+		[ -n "$node_ver" ] && node_prefix=" NODE_VERSION=$(oc_quote "$node_ver")"
+		prefix="OC_VERSION=$(oc_quote "$version") OC_INSTALL_PATH=$(oc_quote "$base")${node_prefix}"
 		start_task /tmp/openclaw-setup "$prefix /usr/bin/openclaw-env setup; rc=\$?; if [ \$rc -eq 0 ]; then uci set openclaw.main.enabled=1; uci commit openclaw; /etc/init.d/openclaw enable; /etc/init.d/openclaw start; fi; exit \$rc"
 		;;
 	env-upgrade-openclaw)

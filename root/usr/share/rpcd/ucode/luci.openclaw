@@ -398,7 +398,12 @@ const methods = {
 	wechat_update_check: { call: wechat_update_check },
 	service_action: { args: { action: '' }, call: (r) => match(r.args.action, /^(start|stop|restart|enable|disable|restart_gateway)$/) ? run_action('service', [r.args.action]) : reply(false, '服务操作无效') },
 	autostart_set: { args: { enabled: '' }, call: (r) => match(r.args.enabled, /^[01]$/) ? run_action('autostart', [r.args.enabled]) : reply(false, '参数无效') },
-	setup: { args: { version: '', install_path: '/opt' }, call: (r) => match(r.args.version, /^(stable|latest)$/) && normalize_base(r.args.install_path) ? run_action('setup', [r.args.version, normalize_base(r.args.install_path)]) : reply(false, '安装参数无效') },
+	setup: { args: { version: '', install_path: '/opt', node_version: '' }, call: (r) => {
+		if (!match(r.args.version, /^(stable|latest)$/) || !normalize_base(r.args.install_path)) return reply(false, '安装参数无效');
+		let nv = trim(`${r.args.node_version ?? ''}`);
+		if (length(nv) && !match(nv, /^[0-9]+\.[0-9]+\.[0-9]+$/)) return reply(false, 'Node.js 版本号格式无效');
+		return run_action('setup', [r.args.version, normalize_base(r.args.install_path), nv]);
+	} },
 	uninstall: { call: () => run_action('uninstall') },
 	upgrade: { args: { version: '' }, call: (r) => match(r.args.version, /^[0-9]+\.[0-9]+\.[0-9]+$/) ? run_action('upgrade', [r.args.version]) : reply(false, '版本号格式无效') },
 	backup_create: { args: { only_config: true }, call: (r) => run_action('backup-create', [r.args.only_config === false ? '0' : '1']) },
