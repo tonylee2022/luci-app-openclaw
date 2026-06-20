@@ -492,7 +492,7 @@ return view.extend({
 					approved[code] = true; // 先占位防重复批准
 					pushLog(_('捕获配对请求 %s（%s），正在自动批准…').format(code, who || _('未知')));
 					api.telegramPair(code).then(function(pr) {
-						if (pr && pr.ok) { pushLog(_('✅ 已授权 %s').format(who || code)); self.refreshChannels(); }
+						if (pr && pr.ok) { pushLog(_('✅ 已授权 %s，配对助手已停止。').format(who || code)); self.refreshChannels(); stop(_('配对完成，助手已停止。')); }
 						else { delete approved[code]; pushLog(_('❌ 批准失败 %s：%s').format(code, (pr && pr.message) || _('未知错误'))); }
 					}).catch(function(e) { delete approved[code]; pushLog(_('❌ 批准出错 %s：%s').format(code, String(e && e.message || e))); });
 				});

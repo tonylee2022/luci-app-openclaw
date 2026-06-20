@@ -310,10 +310,20 @@ function env_upgrade_check() {
 	if (!p) return reply(false, '安装路径无效');
 	let current = package_version(p.root);
 	if (!current) return reply(false, 'OpenClaw 未安装');
-	if (!access(p.node + '/bin/npm')) return reply(false, 'npm 不可用');
-	let latest = trim(run(shellquote(p.node + '/bin/npm') + ' view openclaw version --no-update-notifier 2>/dev/null') || '');
-	if (!latest) return reply(false, '无法查询 npm 版本（请检查网络）');
-	return reply(true, '', { current, latest, has_update: latest != current });
+	// 综合判断: 核心(官方 update dry-run 的 target vs current) + 插件(plugins update --all --dry-run)。
+	// 这样核心已最新但插件/依赖有更新时也能升, 与官方 openclaw update 的覆盖一致。
+	let latest = current, core_update = false, queried = false;
+	try {
+		let j = json(run('/usr/bin/openclaw update --dry-run --yes --json 2>/dev/null'));
+		if (j?.targetVersion) { queried = true; latest = `${j.targetVersion}`; core_update = `${j.currentVersion}` != latest; }
+	} catch (e) {}
+	if (!queried) return reply(false, '无法查询更新（请检查网络）');
+	let plugin_update = false;
+	for (let line in split(run('/usr/bin/openclaw plugins update --all --dry-run 2>/dev/null') || '', '\n')) {
+		line = trim(line);
+		if (length(line) && !match(line, /up[ -]?to[ -]?date|已是最新/i)) plugin_update = true;
+	}
+	return reply(true, '', { current, latest, has_update: core_update || plugin_update, core_update, plugin_update });
 }
 
 function env_npm_check() {

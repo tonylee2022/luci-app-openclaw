@@ -22,7 +22,7 @@ return view.extend({
 				pty: d.pty_running ? _('监听端口 %s').format(d.pty_port) : _('未监听'),
 				model: d.active_model || _('未配置'), channels: d.channels || _('未配置'), pid: d.pid || '-',
 				memory: d.memory_kb ? (d.memory_kb / 1024).toFixed(1) + ' MB' : '-', node: d.node_version || _('未安装'),
-				openclaw: d.oc_version || _('未安装'), plugin: d.plugin_version || '-', path: d.install_path || '-', node_path: d.node_path || '-', disk: d.disk_free || '-'
+				openclaw: d.oc_version || _('未安装'), plugin: d.plugin_version || '-', path: d.oc_version ? (d.install_path || '-') : '-', node_path: d.node_version ? (d.node_path || '-') : '-', disk: d.disk_free || '-'
 			};
 			Object.keys(values).forEach(function(key) { var el = document.getElementById('oc-' + key); if (el) el.textContent = values[key]; });
 			this._enabled = d.enabled;
@@ -514,13 +514,16 @@ return view.extend({
 					return api.envUpgradeCheck().then(function(r) {
 						if (!r.ok) { ocui.setStatus(status, 'error', r.message || _('版本检查失败')); return; }
 						var d = r.data || {};
-						if (!d.has_update) { ocui.setStatus(status, 'success', _('当前已是最新版本（%s）').format(d.current)); ocui.hideStatusLater(status); return; }
-						// 发现新版本: 内联展示并提供「立即升级」按钮, 不弹窗
+						if (!d.has_update) { ocui.setStatus(status, 'success', _('当前已是最新（核心与插件，%s）').format(d.current)); ocui.hideStatusLater(status); return; }
+						// 发现可用更新(核心或插件): 内联展示并提供「立即升级」按钮, 不弹窗
+						var msg = d.core_update
+							? _('发现 OpenClaw 新版本 %s（当前 %s）。').format(d.latest, d.current)
+							: _('OpenClaw 核心已最新（%s），发现插件/依赖更新可用。').format(d.current);
 						window.clearTimeout(status._ocHideTimer);
 						status.className = 'oc-action-status oc-task-running';
 						status.style.display = '';
 						dom.content(status, [
-							E('span', {}, _('发现新版本 %s（当前 %s）。').format(d.latest, d.current)), ' ',
+							E('span', {}, msg), ' ',
 							ocui.button(_('立即升级'), 'cbi-button-action', function() { return run(_('升级 OpenClaw'), function() { return api.envUpgradeOpenclaw(); }); })
 						]);
 					}).catch(function(e) { ocui.setStatus(status, 'error', String(e && e.message || e || _('版本检查失败'))); });

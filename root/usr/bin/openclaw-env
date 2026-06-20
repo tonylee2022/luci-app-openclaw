@@ -350,15 +350,14 @@ download_node() {
 		exit 1
 	fi
 
-	# 解压
-	echo "  正在解压到 ${NODE_BASE}..."
-	# OverlayFS 兼容: rm -rf 后可能因 whiteout 导致 mkdir 失败
-	# 先尝试常规方式，失败则通过 overlay upper 层操作
-	rm -rf "$NODE_BASE" 2>/dev/null
-	if [ -d /overlay/upper ]; then
-		rm -rf "/overlay/upper${NODE_BASE}" 2>/dev/null
-	fi
-	ensure_mkdir "$NODE_BASE"
+	# 解压: 先解到暂存目录(${NODE_BASE}.new), 校验通过后再替换现有 NODE_BASE。
+	# 避免下载包损坏/解压失败时旧 node 已被删而新 node 没装上 → node 丢失、网关起不来。
+	local staging="${NODE_BASE}.new"
+	local staging_bin="${staging}/bin/node"
+	echo "  正在解压到暂存目录 ${staging}..."
+	rm -rf "$staging" 2>/dev/null
+	[ -d /overlay/upper ] && rm -rf "/overlay/upper${staging}" 2>/dev/null
+	ensure_mkdir "$staging"
 	# BusyBox tar 不内置 xz 自动解压，且遇到 xz 文件时会打印 "invalid tar magic"
 	# 却仍返回 0 (假成功)，因此不能依赖返回码判断。此处用内容检测:
 	# 若 tar 无法列出归档内容，则先用独立的 xz/xzcat 解压成普通 tar 再处理。
@@ -373,19 +372,19 @@ download_node() {
 			xz -dc "$tmp_file" > "$decompressed" 2>/dev/null
 		else
 			log_error "tar 无法识别 xz 归档且系统缺少 xz/xzcat，无法解压"
-			rm -f "$tmp_file"
+			rm -rf "$staging"; rm -f "$tmp_file"
 			exit 1
 		fi
 		if [ ! -s "$decompressed" ] || [ -z "$(tar tf "$decompressed" 2>/dev/null | head -1)" ]; then
 			log_error "xz 解压失败，Node.js 包可能损坏"
-			rm -f "$tmp_file" "$decompressed"
+			rm -rf "$staging"; rm -f "$tmp_file" "$decompressed"
 			exit 1
 		fi
 		tar_input="$decompressed"
 	fi
 	# 兼容 BusyBox tar (不支持 --strip-components) 和 GNU tar
 	# 方法: 先解压到临时目录，再移动顶层子目录内容到目标目录
-	if tar --strip-components=1 -xf "$tar_input" -C "$NODE_BASE" 2>/dev/null && [ -x "$NODE_BIN" ]; then
+	if tar --strip-components=1 -xf "$tar_input" -C "$staging" 2>/dev/null && [ -x "$staging_bin" ]; then
 		: # GNU tar 成功
 	else
 		# BusyBox tar 回退: 解压到临时目录后手动移动
@@ -397,16 +396,30 @@ download_node() {
 		local top_dir
 		top_dir=$(ls "$tmp_extract" 2>/dev/null | head -1)
 		if [ -n "$top_dir" ] && [ -d "$tmp_extract/$top_dir" ]; then
-			cp -a "$tmp_extract/$top_dir/." "$NODE_BASE/"
+			cp -a "$tmp_extract/$top_dir/." "$staging/"
 		else
 			log_error "解压后未找到顶层目录，安装失败"
-			rm -rf "$tmp_extract"
+			rm -rf "$tmp_extract" "$staging"
 			rm -f "$tmp_file" "$decompressed"
 			exit 1
 		fi
 		rm -rf "$tmp_extract"
 	fi
 	rm -f "$tmp_file" "$decompressed"
+
+	# 暂存校验: 新 node 可执行且能报版本; 不通过则保留现有 node, 清理暂存。
+	if [ ! -x "$staging_bin" ] || ! "$staging_bin" --version >/dev/null 2>&1; then
+		log_error "新 Node.js 校验失败，已保留现有版本"
+		rm -rf "$staging"
+		exit 1
+	fi
+	# 校验通过, 替换现有 NODE_BASE(同盘 mv 极快, 无 node 的窗口仅毫秒级)。
+	rm -rf "$NODE_BASE" 2>/dev/null
+	[ -d /overlay/upper ] && rm -rf "/overlay/upper${NODE_BASE}" 2>/dev/null
+	if ! mv "$staging" "$NODE_BASE" 2>/dev/null; then
+		ensure_mkdir "$NODE_BASE"
+		cp -a "$staging/." "$NODE_BASE/" && rm -rf "$staging"
+	fi
 
 	# 验证
 	if [ -x "$NODE_BIN" ]; then

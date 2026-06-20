@@ -203,8 +203,11 @@ case "${1:-}" in
 	env-upgrade-openclaw)
 		load_paths
 		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
-		# 以 openclaw 身份升级 OpenClaw 到最新版(写入 .npm-global), 完成后 procd 重启使新版本生效。
-		cmd="su -s /bin/sh openclaw -c $(oc_quote "$(oc_cli_env) $NODE_BASE/bin/npm install -g openclaw@latest"); rc=\$?; /etc/init.d/openclaw restart; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
+		# 走官方 openclaw update 编排(核心 + 插件 update sync + doctor), 与官方升级一致。
+		# 官方在 systemd 上会"停网关→更新→重启"; 在 procd 上 openclaw update 不认得我们的服务(既不停也不重启),
+		# 故由我们对齐: 先 procd 停网关, 再 update(--no-restart 跳过其自带服务管理), 完成后 procd 起网关。
+		# /usr/bin/openclaw 包装器自动降权到 openclaw 并配好环境。
+		cmd="/etc/init.d/openclaw stop; /usr/bin/openclaw update --yes --no-restart; rc=\$?; /etc/init.d/openclaw start; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
 		start_task /tmp/openclaw-env-upgrade "$cmd"
 		;;
 	env-upgrade-npm)
@@ -218,8 +221,9 @@ case "${1:-}" in
 		ver="${2:-}"
 		echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Node 版本号格式无效 (如 22.22.3)"
 		load_paths
-		# openclaw-env node <ver> 下载/解压到 NODE_BASE(root 运行), 完成后 chown 给 openclaw + 重启网关。
-		cmd="OC_INSTALL_PATH=$(oc_quote "$OPENCLAW_INSTALL_PATH") /usr/bin/openclaw-env node $(oc_quote "$ver"); rc=\$?; chown -R openclaw:openclaw $(oc_quote "$NODE_BASE") 2>/dev/null; /etc/init.d/openclaw restart; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
+		# openclaw-env node <ver> 暂存→校验→替换(失败保留现有 node)。仅成功(rc=0)才 chown + 重启网关;
+		# 失败则不重启, 网关继续跑在现有 node 上, 不会把安装搞坏。
+		cmd="OC_INSTALL_PATH=$(oc_quote "$OPENCLAW_INSTALL_PATH") /usr/bin/openclaw-env node $(oc_quote "$ver"); rc=\$?; if [ \$rc -eq 0 ]; then chown -R openclaw:openclaw $(oc_quote "$NODE_BASE") 2>/dev/null; /etc/init.d/openclaw restart; fi; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
 		start_task /tmp/openclaw-env-upgrade "$cmd"
 		;;
 	uninstall)

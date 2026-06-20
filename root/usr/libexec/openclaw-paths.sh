@@ -154,10 +154,13 @@ oc_safe_openclaw_root() {
 		*/openclaw) ;;
 		*) return 1 ;;
 	esac
-	case "$root" in
-		/openclaw|/opt/openclaw|/mnt/*/openclaw|/media/*/openclaw|/srv/*/openclaw|/overlay/upper/opt/openclaw)
-			return 0
-			;;
-	esac
-	return 1
+	# 与安装路径校验保持一致(凡可安装即可卸载): base(去掉 /openclaw) 必须通过
+	# oc_normalize_install_path —— 拒绝 / 及 /proc /sys /dev /tmp /var /etc /usr /bin
+	# /sbin /lib /rom /overlay 等系统目录与危险字符; 规范化后须还原回同一 root, 防形变绕过。
+	local base norm
+	base="${root%/openclaw}"
+	[ -n "$base" ] || base="/"
+	norm=$(oc_normalize_install_path "$base") || return 1
+	[ "$norm/openclaw" = "$root" ] || return 1
+	return 0
 }
