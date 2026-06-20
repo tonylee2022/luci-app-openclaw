@@ -6,7 +6,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openclaw
-PKG_VERSION:=1.0.9
+PKG_VERSION:=1.1.0
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=tonylee2022 <tonylee2022@users.noreply.github.com>
@@ -90,7 +90,7 @@ define Package/$(PKG_NAME)/postinst
 	rm -f /usr/lib/lua/luci/controller/openclaw.lua
 	rm -rf /usr/lib/lua/luci/model/cbi/openclaw /usr/lib/lua/luci/view/openclaw /usr/lib/lua/openclaw
 	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
-	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
 	exit 0
 }
 endef
@@ -100,7 +100,7 @@ define Package/$(PKG_NAME)/postrm
 [ -n "$${IPKG_INSTROOT}" ] || {
 	rm -f /tmp/luci-openclaw-* /tmp/luci-openclaw-update-cache.* 2>/dev/null
 	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
-	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
 }
 endef
 

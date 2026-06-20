@@ -163,9 +163,9 @@ cat > "$CTRL_DIR/postinst" << 'EOF'
 	PTY_PID=$(pgrep -f 'web-pty.js' 2>/dev/null | head -1)
 	[ -n "$PTY_PID" ] && kill "$PTY_PID" 2>/dev/null || true
 
-	# rpcd 的 ucode 模块常驻内存，新版后端需重启 rpcd 才能生效。
-	# 经 LuCI「检测升级」路径安装时，重启由前端在安装完成后提示用户确认；
-	# 手动 opkg install 时，请自行执行: /etc/init.d/rpcd restart
+	# rpcd 的 ucode 模块常驻内存，新版后端需重载 rpcd 才能生效。
+	# 经 LuCI「检测升级」路径安装时，重载由前端在安装完成后自动触发（reload 保留登录会话，不强制重登录）；
+	# 手动 opkg install 时，请自行执行: /etc/init.d/rpcd reload
 	exit 0
 }
 EOF
@@ -186,7 +186,7 @@ cat > "$CTRL_DIR/postrm" << 'EOF'
 #!/bin/sh
 [ -n "${IPKG_INSTROOT}" ] || {
 	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
-	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
 	# 清理备份文件 (仅在完全卸载时)
 	if [ "$1" = "0" ]; then
 		rm -f /etc/config/openclaw.user.bak /etc/config/openclaw.pre-upgrade.bak 2>/dev/null

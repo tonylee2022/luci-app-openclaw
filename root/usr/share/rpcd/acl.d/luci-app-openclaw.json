@@ -5,14 +5,14 @@
 			"uci": [ "openclaw" ],
 			"ubus": {
 				"service": [ "list" ],
-				"luci.openclaw": [ "status", "system_info", "update_check", "env_upgrade_check", "env_npm_check", "setup_log", "uninstall_log", "upgrade_log", "backup_list", "backup_verify", "wechat_status", "wechat_install_log", "wechat_login_status", "wechat_update_check", "doctor_lint", "doctor_fix_log", "health", "channels_list", "channels_status", "logs_tail", "config_summary", "qr_encode", "env_upgrade_log", "telegram_add_log", "telegram_pairing_list", "wizard_status" ]
+				"luci.openclaw": [ "status", "system_info", "update_check", "env_upgrade_check", "env_npm_check", "setup_log", "uninstall_log", "upgrade_log", "backup_list", "backup_verify", "wechat_status", "telegram_status", "dm_scope", "wechat_install_log", "wechat_login_status", "wechat_update_check", "doctor_lint", "doctor_fix_log", "health", "channels_list", "channels_status", "logs_tail", "config_summary", "qr_encode", "env_upgrade_log", "telegram_add_log", "telegram_pairing_list", "wizard_status" ]
 			}
 		},
 		"write": {
 			"uci": [ "openclaw" ],
 			"ubus": {
 				"service": [ "list", "set", "delete" ],
-				"luci.openclaw": [ "gateway_token", "install_path_probe", "install_targets", "service_action", "autostart_set", "setup", "uninstall", "upgrade", "backup_create", "backup_restore", "backup_delete", "backup_path_set", "wechat_install", "wechat_login", "wechat_logout", "wechat_upgrade", "wechat_uninstall", "wechat_login_cancel", "telegram_add", "telegram_pair", "doctor_fix", "model_set", "task_cancel", "env_upgrade_openclaw", "env_upgrade_npm", "env_upgrade_node", "wizard_start", "wizard_stop", "rpcd_restart" ]
+				"luci.openclaw": [ "gateway_token", "install_path_probe", "install_targets", "service_action", "autostart_set", "setup", "uninstall", "upgrade", "backup_create", "backup_restore", "backup_delete", "backup_path_set", "wechat_install", "wechat_login", "wechat_logout", "wechat_upgrade", "wechat_uninstall", "wechat_login_cancel", "telegram_add", "telegram_pair", "dm_scope_set", "doctor_fix", "model_set", "task_cancel", "env_upgrade_openclaw", "env_upgrade_npm", "env_upgrade_node", "wizard_start", "wizard_stop", "rpcd_restart" ]
 			}
 		}
 	}

@@ -143,6 +143,41 @@ return baseclass.extend({
 		return btn;
 	},
 
+	// 主题化确认框: 替代原生 confirm()。用独立 overlay(不占用 LuCI 单例 modalDiv), 故可叠加在已打开的模态(如备份列表)之上。
+	// 返回 Promise<boolean>。opts: { title, confirmLabel, cancelLabel, danger }
+	confirm: function(message, opts) {
+		opts = opts || {};
+		return new Promise(function(resolve) {
+			var settled = false, overlay;
+			function done(v) {
+				if (settled) return;
+				settled = true;
+				document.removeEventListener('keydown', onKey, true);
+				if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+				resolve(v);
+			}
+			function onKey(ev) {
+				if (ev.key === 'Escape') { ev.stopPropagation(); done(false); }
+				else if (ev.key === 'Enter') { ev.stopPropagation(); done(true); }
+			}
+			var okBtn = E('button', { 'type': 'button', 'class': 'cbi-button ' + (opts.danger ? 'cbi-button-negative' : 'cbi-button-action') }, opts.confirmLabel || _('确定'));
+			okBtn.addEventListener('click', function() { done(true); });
+			var cancelBtn = E('button', { 'type': 'button', 'class': 'cbi-button' }, opts.cancelLabel || _('取消'));
+			cancelBtn.addEventListener('click', function() { done(false); });
+			overlay = E('div', { 'class': 'oc-confirm-overlay' }, [
+				E('div', { 'class': 'oc-confirm-box' }, [
+					opts.title ? E('h4', { 'class': 'oc-confirm-title' }, opts.title) : '',
+					E('p', { 'class': 'oc-confirm-msg' }, message),
+					E('div', { 'class': 'right oc-confirm-actions' }, [ cancelBtn, ' ', okBtn ])
+				])
+			]);
+			overlay.addEventListener('click', function(ev) { if (ev.target === overlay) done(false); });
+			document.body.appendChild(overlay);
+			document.addEventListener('keydown', onKey, true);
+			okBtn.focus();
+		});
+	},
+
 	closeButton: function(label, beforeClose) {
 		var btn = E('button', { 'type': 'button', 'class': 'cbi-button' }, label);
 		btn.addEventListener('click', function(ev) {

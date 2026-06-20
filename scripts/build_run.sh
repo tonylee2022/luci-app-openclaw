@@ -207,8 +207,8 @@ rm -f /tmp/luci-indexcache.*.json 2>/dev/null
 # 重启 Web PTY 服务 (使其加载新文件); procd 实例 kill 后自动 respawn
 PTY_PID=$(pgrep -f 'web-pty.js' 2>/dev/null | head -1)
 [ -n "$PTY_PID" ] && kill "$PTY_PID" 2>/dev/null
-# rpcd 的 ucode 模块常驻内存, 新版后端需重启 rpcd 才能生效。
-# 重启由 LuCI 前端在安装成功后提示用户确认, 不在此处执行。
+# rpcd 的 ucode 模块常驻内存, 新版后端需重载 rpcd 才能生效。
+# 重载(reload, 保留登录会话)由 LuCI 前端在安装成功后自动触发, 不在此处执行。
 
 echo ""
 echo "✅ 安装完成！"

@@ -124,7 +124,6 @@ grep -q 'OPENCLAW_OPERATION_LOCK:-/var/lock/openclaw-operation.lock' root/usr/li
 grep -q 'oc_prepare_backup_restore' root/usr/libexec/openclaw-rpc.sh || fail "safe staged backup restore missing"
 if grep -q 'tar -xzf .* -C /' root/usr/libexec/openclaw-rpc.sh; then fail "backup restore must not extract directly to root"; fi
 grep -q 'poll.add(L.bind(this.updateStatus, this), 10)' htdocs/luci-static/resources/view/openclaw/overview.js || fail "status polling must use the reduced frequency"
-grep -q 'luci-openclaw-update-cache' root/usr/share/rpcd/ucode/luci.openclaw || fail "update check cache missing"
 grep -q 'luci-openclaw-status' root/usr/share/rpcd/ucode/luci.openclaw || fail "static status cache missing"
 read_acl=$(sed -n '/"read"/,/"write"/p' root/usr/share/rpcd/acl.d/luci-app-openclaw.json)
 write_acl=$(sed -n '/"write"/,$p' root/usr/share/rpcd/acl.d/luci-app-openclaw.json)

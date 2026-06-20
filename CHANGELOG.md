@@ -1,5 +1,11 @@
 ﻿# 更新记录
 
+## [1.1.0]
+
+- 插件升级改用 `rpcd reload`（SIGHUP）取代 `rpcd restart`：rpcd 原地 re-exec 加载新后端模块，同时 freeze/thaw 保留登录会话，**不再强制重新登录**。
+- 升级完成后前端轮询后端恢复并**自动刷新页面**取回新前端（uhttpd 走 ETag 重校验，无需硬刷新），全程无弹窗。
+- 打包/卸载钩子（build_ipk.sh postrm、Makefile postinst/postrm）的 rpcd 重启同步改为 reload。
+
 ## [1.0.3]
 
 - 状态徽标新增「停止中」（黄色）过渡色，重启/停止流程徽标正确跟随后端实际状态。

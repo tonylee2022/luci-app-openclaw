@@ -146,7 +146,7 @@ function status() {
 	let stable_version = stable_m ? stable_m[1] : '';
 	return reply(true, '', {
 		enabled: `${uci_get('enabled') || '0'}`,
-		port, pty_port, install_path: p.root, gateway_running: gateway,
+		port, pty_port, install_path: p.root, node_path: p.node, gateway_running: gateway,
 		gateway_starting: !gateway && gateway_instance.running == true,
 		gateway_failed: !gateway && gateway_instance.exit_code != null && gateway_instance.exit_code != 0,
 		gateway_exit_code: gateway_instance.exit_code ?? '', pty_running: pty, pid,
@@ -210,19 +210,9 @@ function install_path_probe(request) {
 
 function update_check() {
 	let current = trim(readfile('/usr/share/openclaw/VERSION') || '');
-	let cache_file = '/tmp/luci-openclaw-update-cache.json';
-	let cache_time = +trim(readfile('/tmp/luci-openclaw-update-cache.time') || '0');
-	let raw = time() - cache_time < 600 ? (readfile(cache_file) || '') : '';
+	let raw = run("curl -sf --connect-timeout 5 --max-time 10 https://api.github.com/repos/tonylee2022/luci-app-openclaw/releases/latest");
 	let release = {};
-	if (!length(raw))
-		raw = run("curl -sf --connect-timeout 5 --max-time 10 https://api.github.com/repos/tonylee2022/luci-app-openclaw/releases/latest");
-	try {
-		release = json(raw);
-		if (release?.tag_name) {
-			writefile(cache_file, raw);
-			writefile('/tmp/luci-openclaw-update-cache.time', '' + time());
-		}
-	} catch (e) {}
+	try { release = json(raw); } catch (e) {}
 	let latest = replace(`${release?.tag_name || ''}`, /^v/, '');
 	let body = release?.body || '';
 	if (length(body) > 10000) body = substr(body, 0, 10000) + '\n...(内容过长，已截断)';
@@ -262,6 +252,59 @@ function wechat_status() {
 	return reply(true, '', { plugin_installed: !!manifest, plugin_version: version, logged_in: length(accounts) > 0, accounts, install_path: p.root });
 }
 
+// Telegram 渠道状态: 是否已存 token + 机器人显示名/用户名(getMe, 按 bot_id 缓存) + 已配对(授权)用户 ID。
+// 不返回 token 明文; getMe 失败且无缓存时以 bot 数字 ID(token 前缀)兜底。
+function telegram_status(request) {
+	let force = request?.args?.force == '1'; // 「刷新」按钮强制绕过 getMe 缓存重拉。
+	let p = paths();
+	if (!p) return reply(false, '安装路径无效');
+	let cfg = {};
+	try { cfg = json(readfile(p.config)); } catch (e) {}
+	let tg = cfg?.channels?.telegram || {};
+	let token = `${tg.botToken || ''}`;
+	let bot_id = '';
+	let m = match(token, /^([0-9]+):/);
+	if (m) bot_id = m[1];
+	let bot_name = '', bot_username = '';
+	if (length(token)) {
+		let cache = {};
+		if (!force) try { cache = json(readfile('/tmp/luci-openclaw-tg-bot.json')) || {}; } catch (e) {}
+		if (cache.bot_id == bot_id && length(`${cache.username || ''}`)) {
+			bot_name = `${cache.name || ''}`; bot_username = `${cache.username || ''}`;
+		} else {
+			let out = run('curl -s --connect-timeout 6 --max-time 10 ' + shellquote('https://api.telegram.org/bot' + token + '/getMe'));
+			try {
+				let r = json(out);
+				if (r?.ok) {
+					bot_name = `${r.result?.first_name || ''}`;
+					bot_username = `${r.result?.username || ''}`;
+					writefile('/tmp/luci-openclaw-tg-bot.json', sprintf('%J', { bot_id, name: bot_name, username: bot_username }));
+				}
+			} catch (e) {}
+		}
+	}
+	// 已配对用户 ID: credentials/telegram-*-allowFrom.json 的 allowFrom 列表(支持多账号)。
+	let paired = [];
+	for (let f in split(trim(run('ls ' + shellquote(p.state + '/credentials') + '/telegram-*-allowFrom.json 2>/dev/null') || ''), '\n')) {
+		f = trim(f);
+		if (!length(f)) continue;
+		try {
+			let af = json(readfile(f));
+			if (type(af?.allowFrom) == 'array') for (let x in af.allowFrom) push(paired, `${x}`);
+		} catch (e) {}
+	}
+	return reply(true, '', { configured: length(token) > 0, enabled: tg.enabled == true, bot_id, bot_name, bot_username, paired_ids: paired });
+}
+
+// 渠道会话隔离: 读全局 session.dmScope。未显式设置时官方默认 "main"(所有私信共用一个会话, 即跨渠道共享)。
+function dm_scope() {
+	let out = trim(run('/usr/bin/openclaw config get session.dmScope --json 2>&1') || '');
+	let scope = 'main';
+	let mm = match(out, /\b(per-account-channel-peer|per-channel-peer|per-peer|main)\b/);
+	if (mm) scope = mm[1];
+	return reply(true, '', { scope });
+}
+
 function env_upgrade_check() {
 	let p = paths();
 	if (!p) return reply(false, '安装路径无效');
@@ -285,9 +328,19 @@ function env_npm_check() {
 }
 
 function wechat_update_check() {
-	let state = wechat_status().data, p = paths();
-	let latest = access(p.node + '/bin/npm') ? run(shellquote(p.node + '/bin/npm') + ' view @tencent-weixin/openclaw-weixin version') : '';
-	return reply(!!latest, latest ? '' : '无法查询 npm 版本', { current_version: state.plugin_version || '', latest_version: latest, has_upgrade: !!latest && state.plugin_version != latest });
+	let state = wechat_status().data;
+	let current = state.plugin_version || '';
+	if (!state.plugin_installed) return reply(false, '微信插件未安装');
+	// 走 OpenClaw 官方逻辑(plugins update --dry-run)解析可更新版本, 与「升级」实际行为同源,
+	// 不取 npm raw latest(OpenClaw 经 ClawHub/兼容解析, 可能不等于 npm 的 latest)。
+	let out = trim(run("/usr/bin/openclaw plugins update openclaw-weixin --dry-run 2>&1") || '');
+	if (!length(out)) return reply(false, '无法查询插件版本（请检查网络）');
+	let up_to_date = match(out, /up[ -]?to[ -]?date|already|最新/i) != null;
+	// 取最后一个"插件版本号"(形如 2.4.x)作为目标版本; 排除宿主版本(2026.x)避免误匹配 banner。
+	let target = '';
+	for (let v in (match(out, /[0-9]+\.[0-9]+\.[0-9]+/g) || [])) if (!match(v[0], /^2026\./)) target = v[0];
+	let has_upgrade = !up_to_date && length(target) && target != current;
+	return reply(true, '', { current_version: current, latest_version: (has_upgrade ? target : (length(target) ? target : current)), has_upgrade });
 }
 
 // ── OpenClaw CLI 诊断/查询 (供配置管理页) ──
@@ -414,6 +467,9 @@ const methods = {
 	backup_verify: { args: { file: '' }, call: (r) => run_action('backup-verify', [r.args.file || '']) },
 	gateway_token: { call: gateway_token },
 	wechat_status: { call: wechat_status },
+	telegram_status: { args: { force: '' }, call: telegram_status },
+	dm_scope: { call: dm_scope },
+	dm_scope_set: { args: { scope: '' }, call: (r) => match(r.args.scope, /^(main|per-peer|per-channel-peer|per-account-channel-peer)$/) ? run_action('dm-scope-set', [ r.args.scope ]) : reply(false, '会话作用域无效') },
 	wechat_install_log: { call: () => reply(true, '', task_status('/tmp/openclaw-wechat-install')) },
 	wechat_login_status: { call: () => { let data = task_status('/tmp/openclaw-wechat-login', '/tmp/openclaw-wechat-qrcode.txt'); data.qrcode = data.log; data.qrcode_url = match(data.log, /https?:\/\/[A-Za-z0-9._~:\/?#@!$&'()*+,;=%-]+/g)?.[-1]?.[0] || ''; data.logged_in = match(data.log, /(登录成功|成功登录|Login success|Logged in|Local login saved auth)/) != null; if (data.logged_in) data.state = 'success'; else if (data.running && data.qrcode_url) data.state = 'qrcode'; else if (data.running) data.state = 'starting'; return reply(true, '', data); } },
 	wechat_update_check: { call: wechat_update_check },
@@ -460,7 +516,9 @@ const methods = {
 	telegram_pairing_list: { call: () => cli_json('telegram-pairing-list') },
 	wechat_upgrade: { call: () => run_action('wechat-upgrade') },
 	wechat_uninstall: { call: () => run_action('wechat-uninstall') },
-	rpcd_restart: { call: () => { system('(sleep 1; /etc/init.d/rpcd restart) &'); return reply(true, ''); } }
+	// rpcd 收到 SIGHUP 会 exec_self 原地重新执行: 加载磁盘上新的 ucode 模块, 同时 freeze/thaw 保留登录会话,
+	// 不强制重新登录(对比 restart 整进程重启会清空内存会话)。延迟 1s 确保本 RPC 响应先于 reload 送达前端。
+	rpcd_restart: { call: () => { system('(sleep 1; /etc/init.d/rpcd reload) &'); return reply(true, ''); } }
 };
 
 return { 'luci.openclaw': methods };

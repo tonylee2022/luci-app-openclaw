@@ -119,3 +119,10 @@
    补上过渡后关闭按钮即可正常工作。 */
 .alert-message { opacity: 1; transition: opacity .25s ease; }
 .alert-message.fade-out { opacity: 0; }
+/* 主题化确认框(ocui.confirm): 独立 overlay, z-index 高于 LuCI 模态以便叠加在其上 */
+.oc-confirm-overlay { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.45); padding: 1rem; }
+.oc-confirm-box { background: var(--background-color-high, #fff); color: inherit; border-radius: .5rem; box-shadow: 0 8px 32px rgba(0,0,0,.32); padding: 1.1rem 1.25rem; max-width: 28rem; width: 100%; }
+.oc-confirm-title { margin: 0 0 .5rem; font-size: 1.05rem; }
+.oc-confirm-msg { margin: 0; white-space: pre-line; line-height: 1.5; }
+.oc-confirm-actions { margin-top: 1.1rem; }
+.oc-dark .oc-confirm-box { background: #252525; border: 1px solid #3a3a3a; }

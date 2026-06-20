@@ -417,18 +417,16 @@ case "${1:-}" in
 		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
 		# 仅安装插件(不登录, 解耦)。停网关→装插件(openclaw 身份, /usr/bin/openclaw 自动降权)→起网关加载新插件。
 		# 登录请另走「扫码登录」(channels login 热重载, 不碰 OpenClaw 自带的网关重启)。
-		# 显式解析 npm 最新版后钉住安装: OpenClaw 的 plugins install @latest 会退化到旧版
-		# (实测 @latest→2.4.3, 而 npm latest=2.4.4), 与官方 cli 一致地取 npm 真正 latest。
-		ver=$(su -s /bin/sh openclaw -c "$(oc_cli_env) $NODE_BASE/bin/npm view @tencent-weixin/openclaw-weixin version 2>/dev/null" | tr -d '[:space:]')
-		echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || ver=latest
-		# --force: 已装旧版时替换为解析出的最新版(install 否则会因 "plugin already exists" 失败);
+		# 版本由 OpenClaw 官方逻辑(@latest)解析其认定的兼容版本, 不强取 npm raw latest。
+		# --force: 已装旧版时替换(install 否则会因 "plugin already exists" 失败);
 		# 登录态在 .openclaw/openclaw-weixin/ 单独保存, 不随插件代码替换而丢失。
-		cmd="/etc/init.d/openclaw stop; /usr/bin/openclaw plugins install --force '@tencent-weixin/openclaw-weixin@${ver}'; rc=\$?; /usr/bin/openclaw plugins enable openclaw-weixin >/dev/null 2>&1; /etc/init.d/openclaw start; exit \$rc"
+		cmd="/etc/init.d/openclaw stop; /usr/bin/openclaw plugins install --force '@tencent-weixin/openclaw-weixin@latest'; rc=\$?; /usr/bin/openclaw plugins enable openclaw-weixin >/dev/null 2>&1; /etc/init.d/openclaw start; exit \$rc"
 		start_task /tmp/openclaw-wechat-install "$cmd"
 		;;
 	wechat-upgrade)
 		load_paths
 		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		# 走 OpenClaw 官方更新逻辑, 由其解析兼容版本(不强取 npm raw latest); 与「检测升级」用的 --dry-run 同源。
 		cmd="/etc/init.d/openclaw stop; /usr/bin/openclaw plugins update openclaw-weixin; rc=\$?; /etc/init.d/openclaw start; exit \$rc"
 		start_task /tmp/openclaw-wechat-install "$cmd"
 		;;
@@ -495,10 +493,25 @@ fs.writeFileSync(index,JSON.stringify(accounts.filter(x=>x!==id),null,2)+"\n");'
 	telegram-pair)
 		code="${2:-}"
 		echo "$code" | grep -Eq '^[A-Za-z0-9]{4,16}$' || fail "配对码格式无效"
-		oc_cli_run "pairing approve --channel telegram $(oc_quote "$code")"
+		# --notify: 批准后在 Telegram 里通知发起者已获授权。
+		oc_cli_run "pairing approve --channel telegram $(oc_quote "$code") --notify"
 		;;
 	telegram-pairing-list)
 		oc_cli_run "pairing list --channel telegram --json"
+		;;
+	dm-scope-set)
+		val="${2:-}"
+		case "$val" in main|per-peer|per-channel-peer|per-account-channel-peer) ;; *) fail "会话作用域无效" ;; esac
+		# main = 回到无显式配置(null 删除该键); 其余写显式值。官方 config patch 校验写入(stdin)。
+		if [ "$val" = "main" ]; then
+			patch='{"session":{"dmScope":null}}'
+		else
+			patch=$(printf '{"session":{"dmScope":"%s"}}' "$val")
+		fi
+		printf '%s' "$patch" | oc_cli_run "config patch --stdin" || fail "写入配置失败"
+		rm -f /tmp/luci-openclaw-status.*
+		/etc/init.d/openclaw restart >/dev/null 2>&1 &
+		echo "会话隔离已设为 $val，网关重启中。"
 		;;
 	*) fail "未知 RPC 操作" ;;
 esac

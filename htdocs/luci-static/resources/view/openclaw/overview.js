@@ -22,7 +22,7 @@ return view.extend({
 				pty: d.pty_running ? _('监听端口 %s').format(d.pty_port) : _('未监听'),
 				model: d.active_model || _('未配置'), channels: d.channels || _('未配置'), pid: d.pid || '-',
 				memory: d.memory_kb ? (d.memory_kb / 1024).toFixed(1) + ' MB' : '-', node: d.node_version || _('未安装'),
-				openclaw: d.oc_version || _('未安装'), plugin: d.plugin_version || '-', path: d.install_path || '-', disk: d.disk_free || '-'
+				openclaw: d.oc_version || _('未安装'), plugin: d.plugin_version || '-', path: d.install_path || '-', node_path: d.node_path || '-', disk: d.disk_free || '-'
 			};
 			Object.keys(values).forEach(function(key) { var el = document.getElementById('oc-' + key); if (el) el.textContent = values[key]; });
 			this._enabled = d.enabled;
@@ -261,6 +261,30 @@ return view.extend({
 		var self = this;
 		var cbOpenclaw = E('input', { type: 'checkbox', checked: true });
 		var cbNode = E('input', { type: 'checkbox' });
+		// 只勾 Node.js(不卸 OpenClaw)不是卸载场景: 换 Node 版本应走「环境升级 → 更换 Node 版本」(就地整替换), 故此时禁用确认并给出引导。
+		var hint = E('p', { style: 'display:none;color:var(--secondary-text-color,#888);font-size:.85em;margin:.2rem 0 0' },
+			_('更换 Node 版本无需卸载——请用「环境升级 → 更换 Node 版本」直接指定版本。'));
+		var confirmBtn = E('button', { 'class': 'cbi-button-negative btn', click: function() {
+			if (!cbOpenclaw.checked) return;
+			var removeNode = cbNode.checked;
+			ui.hideModal();
+			return ocui.runOp(self.actionStatus, {
+				running: _('「卸载环境」命令已提交'),
+				success: _('运行环境已卸载。'),
+				submit: function() { return api.uninstall(removeNode); },
+				cancel: function() { return api.taskCancel('openclaw-uninstall'); },
+				onClose: L.bind(function() { if (this.taskPanel) this.taskPanel.style.display = 'none'; }, self),
+				pollLog: function() { return api.uninstallLog(); },
+				onLog: L.bind(function(d) { self.updateTaskPanel(_('卸载运行环境'), { ok: true, data: d }); }, self),
+				onDone: L.bind(function() { self.updateStatus(); }, self)
+			});
+		} }, _('确认卸载'));
+		var update = function() {
+			hint.style.display = (!cbOpenclaw.checked && cbNode.checked) ? '' : 'none';
+			confirmBtn.disabled = !cbOpenclaw.checked;
+		};
+		cbOpenclaw.addEventListener('change', update);
+		cbNode.addEventListener('change', update);
 		ui.showModal(_('卸载运行环境'), [
 			E('p', {}, _('请选择要卸载的组件：')),
 			E('div', { style: 'display:flex;flex-direction:column;gap:10px;margin:10px 0 4px' }, [
@@ -275,33 +299,14 @@ return view.extend({
 			]),
 			E('p', { style: 'color:var(--secondary-text-color,#888);font-size:.85em' },
 				_('Node.js 可供其他用途使用，不勾选则保留。')),
+			hint,
 			E('div', { 'class': 'right', style: 'margin-top:12px' }, [
 				E('button', { 'class': 'btn', click: function() { ui.hideModal(); } }, _('取消')),
 				' ',
-				E('button', {
-					'class': 'cbi-button-negative btn',
-					click: function() {
-						if (!cbOpenclaw.checked) { ui.hideModal(); return; }
-						var removeNode = cbNode.checked;
-						ui.hideModal();
-						return ocui.runOp(self.actionStatus, {
-							running: _('「卸载环境」命令已提交'),
-							success: _('运行环境已卸载。'),
-							submit: function() { return api.uninstall(removeNode); },
-							cancel: function() { return api.taskCancel('openclaw-uninstall'); },
-							onClose: L.bind(function() {
-								if (this.taskPanel) this.taskPanel.style.display = 'none';
-							}, self),
-							pollLog: function() { return api.uninstallLog(); },
-							onLog: L.bind(function(d) {
-								self.updateTaskPanel(_('卸载运行环境'), { ok: true, data: d });
-							}, self),
-							onDone: L.bind(function() { self.updateStatus(); }, self)
-						});
-					}
-				}, _('确认卸载'))
+				confirmBtn
 			])
 		]);
+		update();
 	},
 
 	checkUpgrade: function() {
@@ -316,26 +321,54 @@ return view.extend({
 				ocui.hideStatusLater(self.actionStatus);
 				return;
 			}
-			if (!confirm(_('发现新版本 %s（当前 %s），立即升级？').format(result.data.plugin_latest, result.data.plugin_current)))
-				return;
+			// 发现新版本: 不再弹窗, 在状态信息区内联展示并提供「立即升级」按钮
 			var version = result.data.plugin_latest;
-			return ocui.runOp(this.actionStatus, {
-				running: _('正在升级 LuCI 插件...'),
-				success: _('插件升级完成。'),
-				submit: function() { return api.upgrade(version); },
-				cancel: function() { return api.taskCancel('openclaw-plugin-upgrade'); },
-				onClose: L.bind(function() { if (this.taskPanel) this.taskPanel.style.display = 'none'; }, this),
-				pollLog: function() { return api.upgradeLog(); },
-				onLog: L.bind(function(d) { self.updateTaskPanel(_('升级 LuCI 插件'), { ok: true, data: d }); }, self),
-				onDone: function(ok) {
-					if (!ok) return;
-					if (!confirm(_('插件升级完成！\n\n后端服务（rpcd）需要重启才能加载新版本，重启后需要重新登录 LuCI。\n\n是否立即重启后端服务？')))
-						return;
-					ocui.setStatus(self.actionStatus, 'running', _('正在重启后端服务...'));
-					api.rpcdRestart();
-				}
-			});
+			window.clearTimeout(self.actionStatus._ocHideTimer);
+			self.actionStatus.className = 'oc-action-status oc-task-running';
+			self.actionStatus.style.display = '';
+			dom.content(self.actionStatus, [
+				E('span', {}, _('发现新版本 %s（当前 %s）。').format(version, result.data.plugin_current)),
+				' ',
+				ocui.button(_('立即升级'), 'cbi-button-action', function() { return self.runPluginUpgrade(version); })
+			]);
 		}, this));
+	},
+
+	runPluginUpgrade: function(version) {
+		var self = this;
+		return ocui.runOp(this.actionStatus, {
+			running: _('正在升级 LuCI 插件...'),
+			success: _('插件升级完成。'),
+			submit: function() { return api.upgrade(version); },
+			cancel: function() { return api.taskCancel('openclaw-plugin-upgrade'); },
+			onClose: L.bind(function() { if (this.taskPanel) this.taskPanel.style.display = 'none'; }, this),
+			pollLog: function() { return api.upgradeLog(); },
+			onLog: L.bind(function(d) { self.updateTaskPanel(_('升级 LuCI 插件'), { ok: true, data: d }); }, self),
+			onDone: function(ok) {
+				if (!ok) return;
+				// rpcd reload(SIGHUP) 加载新后端并保留登录会话, 不强制重登录; 等其 re-exec 完成后自动刷新页面取回新前端。
+				ocui.setStatus(self.actionStatus, 'running', _('升级完成，正在重载后端服务…'));
+				api.rpcdRestart();
+				var tries = 0;
+				var waitBack = function() {
+					api.status().then(function(r) {
+						if (r && r.ok) {
+							ocui.setStatus(self.actionStatus, 'success', _('升级完成，正在刷新页面…'));
+							window.location.reload();
+						} else if (++tries < 15) {
+							window.setTimeout(waitBack, 1000);
+						} else {
+							ocui.setStatus(self.actionStatus, 'success', _('升级完成，请手动刷新页面。'));
+						}
+					}).catch(function() {
+						if (++tries < 15) window.setTimeout(waitBack, 1000);
+						else ocui.setStatus(self.actionStatus, 'success', _('升级完成，请手动刷新页面。'));
+					});
+				};
+				// 覆盖 rpcd_restart 的 1s sleep + re-exec 时间, 避免轮询命中尚未 reload 的旧 rpcd 而过早刷新。
+				window.setTimeout(waitBack, 2500);
+			}
+		});
 	},
 
 	// 切换开机自启: 改 uci openclaw.main.enabled (init.d 总开关) + 同步 rc.d 软链; 不启停当前进程。
@@ -446,7 +479,24 @@ return view.extend({
 	showEnvUpgrade: function() {
 		var status = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
 		var log = E('pre', { 'class': 'oc-log', 'style': 'display:none' }, '');
-		var nodeVer = E('input', { 'class': 'cbi-input-text', 'value': '22.22.3', 'style': 'width:9rem' });
+		// 更换 Node 版本: 版本选择器(与安装对话框一致) + 自定义输入。底层 env-upgrade-node 会整删 NODE_BASE 再装所选版本(含降级)。
+		var nodeSel = E('select', { 'class': 'cbi-input-select', 'style': 'width:auto' }, [
+			E('option', { value: '22.22.3' }, 'Node 22.22.3'),
+			E('option', { value: '24.17.0' }, 'Node 24.17.0'),
+			E('option', { value: '__custom__' }, _('自定义版本…'))
+		]);
+		var nodeCustom = E('input', { 'class': 'cbi-input-text', placeholder: 'x.y.z', 'style': 'display:none;width:7rem;margin-left:6px' });
+		nodeSel.addEventListener('change', function() { nodeCustom.style.display = nodeSel.value === '__custom__' ? '' : 'none'; });
+		var getNodeVer = function() { return nodeSel.value === '__custom__' ? nodeCustom.value.trim() : nodeSel.value; };
+		// 默认选中当前已安装版本: 命中预置项则选中, 否则插入「(当前)」选项置顶并选中; 未安装则保持预置默认。
+		api.status().then(function(res) {
+			var nv = (((res && res.data) || {}).node_version || '').replace(/^v/, '');
+			if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(nv)) return;
+			for (var i = 0; i < nodeSel.options.length; i++)
+				if (nodeSel.options[i].value === nv) { nodeSel.value = nv; return; }
+			nodeSel.insertBefore(E('option', { value: nv }, 'Node ' + nv + _('（当前）')), nodeSel.firstChild);
+			nodeSel.value = nv;
+		}).catch(function() {});
 		var run = function(label, submitFn) {
 			return ocui.runOp(status, {
 				running: _('「%s」命令已提交').format(label),
@@ -457,7 +507,7 @@ return view.extend({
 			});
 		};
 		ui.showModal(_('环境升级'), [
-			E('p', { 'class': 'oc-muted' }, _('升级运行环境组件。升级 OpenClaw / Node 会自动重启网关使其生效；升级 Node 请填写目标版本号（如 22.22.3）。')),
+			E('p', { 'class': 'oc-muted' }, _('升级运行环境组件，变更后自动重启网关生效。「更换 Node 版本」会整体替换为所选版本（含降级），无需先卸载 Node。')),
 			E('div', { 'class': 'oc-actions' }, [
 				ocui.button(_('升级 OpenClaw 最新版'), 'cbi-button-positive', function() {
 					ocui.setStatus(status, 'running', _('正在检查版本...'));
@@ -465,9 +515,14 @@ return view.extend({
 						if (!r.ok) { ocui.setStatus(status, 'error', r.message || _('版本检查失败')); return; }
 						var d = r.data || {};
 						if (!d.has_update) { ocui.setStatus(status, 'success', _('当前已是最新版本（%s）').format(d.current)); ocui.hideStatusLater(status); return; }
-						status.style.display = 'none';
-						if (!confirm(_('发现新版本 %s（当前 %s），确认升级？').format(d.latest, d.current))) return;
-						return run(_('升级 OpenClaw'), function() { return api.envUpgradeOpenclaw(); });
+						// 发现新版本: 内联展示并提供「立即升级」按钮, 不弹窗
+						window.clearTimeout(status._ocHideTimer);
+						status.className = 'oc-action-status oc-task-running';
+						status.style.display = '';
+						dom.content(status, [
+							E('span', {}, _('发现新版本 %s（当前 %s）。').format(d.latest, d.current)), ' ',
+							ocui.button(_('立即升级'), 'cbi-button-action', function() { return run(_('升级 OpenClaw'), function() { return api.envUpgradeOpenclaw(); }); })
+						]);
 					}).catch(function(e) { ocui.setStatus(status, 'error', String(e && e.message || e || _('版本检查失败'))); });
 				}),
 				ocui.button(_('升级 npm 最新版'), 'cbi-button-action', function() {
@@ -476,15 +531,24 @@ return view.extend({
 						if (!r.ok) { ocui.setStatus(status, 'error', r.message || _('版本检查失败')); return; }
 						var d = r.data || {};
 						if (!d.has_update) { ocui.setStatus(status, 'success', _('当前已是最新版本（%s）').format(d.current)); ocui.hideStatusLater(status); return; }
-						status.style.display = 'none';
-						if (!confirm(_('发现新版本 %s（当前 %s），确认升级？').format(d.latest, d.current))) return;
-						return run(_('升级 npm'), function() { return api.envUpgradeNpm(); });
+						// 发现新版本: 内联展示并提供「立即升级」按钮, 不弹窗
+						window.clearTimeout(status._ocHideTimer);
+						status.className = 'oc-action-status oc-task-running';
+						status.style.display = '';
+						dom.content(status, [
+							E('span', {}, _('发现新版本 %s（当前 %s）。').format(d.latest, d.current)), ' ',
+							ocui.button(_('立即升级'), 'cbi-button-action', function() { return run(_('升级 npm'), function() { return api.envUpgradeNpm(); }); })
+						]);
 					}).catch(function(e) { ocui.setStatus(status, 'error', String(e && e.message || e || _('版本检查失败'))); });
 				})
 			]),
 			E('div', { 'class': 'oc-field', 'style': 'margin-top:.5rem;align-items:center' }, [
 				E('span', {}, _('Node 版本')),
-				E('span', { 'class': 'oc-value' }, [ nodeVer, ' ', ocui.button(_('升级 Node'), 'cbi-button-action', function() { return run(_('升级 Node'), function() { return api.envUpgradeNode(nodeVer.value); }); }) ])
+				E('span', { 'class': 'oc-value' }, [ nodeSel, nodeCustom, ' ', ocui.button(_('更换 Node 版本'), 'cbi-button-action', function() {
+					var v = getNodeVer();
+					if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(v)) { ocui.setStatus(status, 'error', _('Node 版本格式无效，请输入 x.y.z（如 24.17.0）。')); return; }
+					return run(_('更换 Node 版本'), function() { return api.envUpgradeNode(v); });
+				}) ])
 			]),
 			status, log,
 			E('div', { 'class': 'right' }, [ ocui.closeButton(_('关闭')) ])
@@ -509,8 +573,8 @@ return view.extend({
 				var rows = (result.data.backups || []).map(L.bind(function(item) {
 					return E('tr', {}, [ E('td', {}, item.backup_type === 'config' ? _('仅配置') : _('完整')), E('td', {}, item.time || item.filename), E('td', {}, item.size_str), E('td', { 'class': 'oc-table-actions' }, [
 						ocui.button(_('验证'), '', function() { return ocui.runOp(bkStatus, { running: _('正在验证备份...'), success: _('备份验证通过。'), submit: function() { return api.backupVerify(item.filename); } }); }),
-						ocui.button(_('恢复'), 'cbi-button-action', function() { if (!confirm(_('恢复会覆盖当前状态并重启服务，确定继续？'))) return; return ocui.runOp(bkStatus, { running: _('正在恢复备份...'), success: _('备份已恢复，服务重启中。'), submit: function() { return api.backupRestore(item.filename); }, onDone: refresh }); }),
-						ocui.button(_('删除'), 'cbi-button-negative', function() { if (!confirm(_('确定删除此备份？'))) return; return ocui.runOp(bkStatus, { running: _('正在删除备份...'), success: _('备份已删除。'), submit: function() { return api.backupDelete(item.filename); }, onDone: refresh }); })
+						ocui.button(_('恢复'), 'cbi-button-action', function() { return ocui.confirm(_('恢复会覆盖当前状态并重启服务，确定继续？'), { danger: true, confirmLabel: _('恢复') }).then(function(ok) { if (!ok) return; return ocui.runOp(bkStatus, { running: _('正在恢复备份...'), success: _('备份已恢复，服务重启中。'), submit: function() { return api.backupRestore(item.filename); }, onDone: refresh }); }); }),
+						ocui.button(_('删除'), 'cbi-button-negative', function() { return ocui.confirm(_('确定删除此备份？'), { danger: true, confirmLabel: _('删除') }).then(function(ok) { if (!ok) return; return ocui.runOp(bkStatus, { running: _('正在删除备份...'), success: _('备份已删除。'), submit: function() { return api.backupDelete(item.filename); }, onDone: refresh }); }); })
 					]) ]);
 				}, this));
 				dom.content(body, [ E('div', { 'class': 'oc-actions' }, [
@@ -532,7 +596,7 @@ return view.extend({
 		var statusGroups = [
 			{ label: _('服务'), fields: [ ['state', _('状态'), 'cbi-button oc-state-run oc-state-badge'], ['autostart', _('开机自启')], ['gateway', _('网关')], ['pty', _('配置终端')], ['model', _('活跃模型')], ['channels', _('消息渠道')] ] },
 			{ label: '', fields: [ ['pid', _('PID')], ['memory', _('内存')] ] },
-			{ label: '', fields: [ ['node', _('Node.js')], ['openclaw', _('OpenClaw 版本')], ['plugin', _('插件版本')], ['path', _('安装路径')], ['disk', _('剩余空间')] ] }
+			{ label: '', fields: [ ['node', _('Node.js')], ['openclaw', _('OpenClaw 版本')], ['plugin', _('插件版本')], ['path', _('安装路径')], ['node_path', _('Node.js 路径')], ['disk', _('剩余空间')] ] }
 		];
 		// 开机自启切换按钮: 移到快捷操作栏; 标签随状态在 updateStatus 更新
 		this.autostartBtn = ocui.button(_('切换开机自启'), 'cbi-button-action', L.bind(this.toggleAutostart, this));

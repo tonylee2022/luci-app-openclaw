@@ -337,16 +337,22 @@ return view.extend({
 		this.tgToken = E('input', { 'type': 'text', 'class': 'cbi-input-text', 'placeholder': '123456789:ABCdef...', 'style': 'flex:1;min-width:14rem' });
 		this.tgCode = E('input', { 'type': 'text', 'class': 'cbi-input-text', 'placeholder': '配对码（私信 Bot 获取）', 'style': 'flex:1;min-width:10rem' });
 		this.tgStatus = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
+		this.tgState = E('span', {}, _('加载中...'));
 		this.tgLog = E('pre', { 'class': 'oc-log', 'style': 'display:none' }, '');
+		this.dmScopeLabel = E('span', { 'class': 'oc-muted', 'style': 'font-size:.82em;font-weight:400' }, '');
 		this._wechatPoll = L.bind(this.refreshWechat, this);
 		return E('div', {}, [
 			E('div', { 'class': 'oc-card' }, [
-				E('div', { 'class': 'oc-card-title' }, _('消息渠道（官方）')),
+				E('div', { 'class': 'oc-card-title', 'style': 'display:flex;justify-content:space-between;align-items:center;gap:1rem' }, [
+					E('span', {}, _('消息渠道（官方）')),
+					this.dmScopeLabel
+				]),
 				E('div', { 'class': 'oc-card-body' }, [
 					this.channelBox,
 					E('div', { 'class': 'oc-actions' }, [
 						ocui.button(_('配置消息渠道（向导）'), 'cbi-button-positive', L.bind(function() { return this.launchWizard(this.channelWizard, 'channels'); }, this)),
-						ocui.button(_('刷新'), '', L.bind(this.refreshChannels, this))
+						ocui.button(_('渠道会话隔离'), 'cbi-button-action', L.bind(this.showDmScope, this)),
+						ocui.button(_('刷新'), '', L.bind(function() { return this.refreshChannels(true); }, this))
 					]),
 					E('p', { 'class': 'oc-muted', 'style': 'margin-top:.6rem' }, _('说明：官方向导配置微信渠道时只会安装 openclaw-weixin 插件，不会进入扫码登录。安装完成后，请到下方「微信渠道」卡片点击「扫码登录」完成账号登录。'))
 				])
@@ -370,13 +376,22 @@ return view.extend({
 							return api.wechatUpdateCheck().then(function(r) {
 								if (!r.ok) { ocui.setStatus(self.wxStatus, 'error', r.message || _('检测失败')); ocui.hideStatusLater(self.wxStatus); return; }
 								if (!r.data.has_upgrade) { ocui.setStatus(self.wxStatus, 'success', _('已是最新版本。')); ocui.hideStatusLater(self.wxStatus); return; }
-								if (!confirm(_('发现微信插件版本 %s，立即升级？').format(r.data.latest_version))) return;
-								return self.runWechatInstall(function() { return api.wechatUpgrade(); }, _('正在升级微信插件...'), _('微信插件升级完成。'));
+								// 发现新版本: 内联展示并提供「立即升级」按钮, 不弹窗
+								window.clearTimeout(self.wxStatus._ocHideTimer);
+								self.wxStatus.className = 'oc-action-status oc-task-running';
+								self.wxStatus.style.display = '';
+								dom.content(self.wxStatus, [
+									E('span', {}, _('发现微信插件新版本 %s。').format(r.data.latest_version)), ' ',
+									ocui.button(_('立即升级'), 'cbi-button-action', function() { return self.runWechatInstall(function() { return api.wechatUpgrade(); }, _('正在升级微信插件...'), _('微信插件升级完成。')); })
+								]);
 							});
 						}, this)),
 						ocui.button(_('卸载插件'), 'cbi-button-negative', L.bind(function() {
-							if (!confirm(_('确定卸载微信插件？'))) return;
-							return this.runWechatInstall(function() { return api.wechatUninstall(); }, _('正在卸载微信插件...'), _('微信插件已卸载。'));
+							var self = this;
+							return ocui.confirm(_('确定卸载微信插件？'), { danger: true, confirmLabel: _('卸载') }).then(function(ok) {
+								if (!ok) return;
+								return self.runWechatInstall(function() { return api.wechatUninstall(); }, _('正在卸载微信插件...'), _('微信插件已卸载。'));
+							});
 						}, this)),
 						ocui.button(_('刷新'), '', L.bind(this.refreshWechat, this))
 					]),
@@ -390,16 +405,17 @@ return view.extend({
 				E('div', { 'class': 'oc-card-body' }, [
 					E('p', { 'class': 'oc-muted' }, _('填入 BotFather 提供的 Bot Token，保存后通过官方 CLI 添加并自动重启网关生效（无需进向导）。')),
 					E('div', { 'class': 'oc-field', 'style': 'align-items:center' }, [ E('span', {}, _('Bot Token')), this.tgToken ]),
+						E('div', { 'class': 'oc-field', 'style': 'align-items:center' }, [ E('span', {}, _('渠道状态')), this.tgState ]),
 					E('div', { 'class': 'oc-actions', 'style': 'margin-top:.6rem' }, [
 						ocui.button(_('保存并启用'), 'cbi-button-positive', L.bind(this.saveTelegram, this)),
-						ocui.button(_('刷新'), '', L.bind(this.refreshChannels, this))
+						ocui.button(_('刷新'), '', L.bind(function() { return this.refreshChannels(true); }, this))
 					]),
 					E('div', { 'class': 'oc-section-label' }, _('配对（审批私信发起者）')),
-					E('p', { 'class': 'oc-muted' }, _('保存 token 后，用 Telegram 给你的 Bot 发一条私信，Bot 会回一个配对码；把配对码填到这里点「审批配对」，即可允许该用户使用。')),
-					E('div', { 'class': 'oc-field', 'style': 'align-items:center' }, [ E('span', {}, _('配对码')), this.tgCode ]),
+					E('p', { 'class': 'oc-muted' }, _('保存 token 后，点「配对助手」，再用 Telegram 给你的 Bot 发一条私信；助手会自动捕获配对请求并批准（无需手动复制配对码）。也可手动填配对码兜底。')),
+					E('div', { 'class': 'oc-field', 'style': 'align-items:center' }, [ E('span', {}, _('配对码（手动兜底）')), this.tgCode ]),
 					E('div', { 'class': 'oc-actions', 'style': 'margin-top:.4rem' }, [
-						ocui.button(_('审批配对'), 'cbi-button-positive', L.bind(this.pairTelegram, this)),
-						ocui.button(_('查看待配对'), '', L.bind(this.listTelegramPairing, this))
+						ocui.button(_('配对助手'), 'cbi-button-positive', L.bind(this.startPairingAssistant, this)),
+						ocui.button(_('手动审批'), '', L.bind(this.pairTelegram, this))
 					]),
 					this.tgStatus,
 					this.tgLog
@@ -442,22 +458,49 @@ return view.extend({
 		});
 	},
 
-	listTelegramPairing: function() {
+	// 配对助手: 轮询待配对请求, 自动抓取配对码并直接批准(无需手动点); 开启期间持续监听, 可手动停止。
+	// 自动批准仅在助手运行时生效, 停止/超时后不再批准, 以限定授权窗口。
+	startPairingAssistant: function() {
 		var self = this;
-		return api.telegramPairingList().then(function(r) {
-			if (!r.ok) { ocui.setStatus(self.tgStatus, 'error', r.message || _('读取待配对失败')); ocui.hideStatusLater(self.tgStatus); return; }
-			var reqs = ((r.data || {}).requests) || [];
-			if (!reqs.length) { ocui.setStatus(self.tgStatus, 'success', _('暂无待配对请求。请先用 Telegram 给 Bot 发条私信。')); ocui.hideStatusLater(self.tgStatus); return; }
-			self.tgLog.style.display = '';
-			ocui.setLog(self.tgLog, reqs.map(function(x) {
-				var c = x.code || x.pairingCode || '';
-				var who = x.sender || x.from || x.senderId || x.user || '';
-				if (!c && !who) console.warn('[openclaw] telegram pairing: unexpected response shape', x);
-				return (c ? c : JSON.stringify(x)) + (who ? '  ←  ' + who : '');
-			}).join('\n'));
-			ocui.setStatus(self.tgStatus, 'success', _('共 %s 条待配对，复制配对码到上方填入审批。').format(reqs.length));
+		if (this._pairFn) { poll.remove(this._pairFn); this._pairFn = null; }
+		var approved = {}, logLines = [], ticks = 0, MAX_TICKS = 100; // 100×3s ≈ 5 分钟后自动停止
+		this.tgLog.style.display = '';
+		ocui.setLog(this.tgLog, _('配对助手已启动，等待配对请求…\n请让对方用 Telegram 给你的 Bot 发送任意私信。'));
+		var pushLog = function(line) { logLines.push(line); ocui.setLog(self.tgLog, logLines.join('\n')); };
+		var stop = function(msg) {
+			if (self._pairFn) { poll.remove(self._pairFn); self._pairFn = null; }
+			ocui.setStatus(self.tgStatus, 'success', msg || _('配对助手已停止。'));
 			ocui.hideStatusLater(self.tgStatus);
-		}).catch(function(e) { ocui.setStatus(self.tgStatus, 'error', String(e && e.message || e)); });
+		};
+		var showRunning = function() {
+			window.clearTimeout(self.tgStatus._ocHideTimer);
+			self.tgStatus.className = 'oc-action-status oc-task-running';
+			self.tgStatus.style.display = '';
+			dom.content(self.tgStatus, [ E('span', {}, _('配对助手运行中：请让对方给 Bot 发私信…')), ' ', ocui.button(_('停止'), '', function() { stop(); }) ]);
+		};
+		showRunning();
+		var fn = function() {
+			if (++ticks > MAX_TICKS) { stop(_('配对助手已超时停止（约 5 分钟）。')); return; }
+			return api.telegramPairingList().then(function(r) {
+				if (!r.ok) return;
+				var reqs = ((r.data || {}).requests) || [];
+				reqs.forEach(function(x) {
+					var code = x.code || x.pairingCode || '';
+					var who = x.sender || x.from || x.senderId || x.user || x.username || '';
+					if (!code) { console.warn('[openclaw] telegram pairing: 无法识别配对码', x); return; }
+					if (approved[code]) return;
+					approved[code] = true; // 先占位防重复批准
+					pushLog(_('捕获配对请求 %s（%s），正在自动批准…').format(code, who || _('未知')));
+					api.telegramPair(code).then(function(pr) {
+						if (pr && pr.ok) { pushLog(_('✅ 已授权 %s').format(who || code)); self.refreshChannels(); }
+						else { delete approved[code]; pushLog(_('❌ 批准失败 %s：%s').format(code, (pr && pr.message) || _('未知错误'))); }
+					}).catch(function(e) { delete approved[code]; pushLog(_('❌ 批准出错 %s：%s').format(code, String(e && e.message || e))); });
+				});
+			}).catch(function() {});
+		};
+		this._pairFn = fn;
+		poll.add(fn, 3);
+		fn();
 	},
 
 	// 清洗安装日志: 去 ANSI 转义。
@@ -503,8 +546,11 @@ return view.extend({
 				return E('div', { 'class': 'oc-field' }, [
 					E('span', {}, account.name || account.id),
 					ocui.button(_('退出'), 'cbi-button-negative', L.bind(function() {
-						if (!confirm(_('确定退出此微信账号？'))) return;
-						return ocui.runOp(this.wxStatus, { running: _('正在退出账号...'), success: _('账号已退出。'), submit: function() { return api.wechatLogout(account.id); }, onDone: L.bind(function() { this.refreshWechat(); this.refreshChannels(); }, this) });
+						var self = this;
+						return ocui.confirm(_('确定退出此微信账号？'), { danger: true, confirmLabel: _('退出') }).then(function(ok) {
+							if (!ok) return;
+							return ocui.runOp(self.wxStatus, { running: _('正在退出账号...'), success: _('账号已退出。'), submit: function() { return api.wechatLogout(account.id); }, onDone: L.bind(function() { self.refreshWechat(); self.refreshChannels(); }, self) });
+						});
 					}, this))
 				]);
 			}, this)) : [ E('p', { 'class': 'oc-muted' }, _('暂无已登录账号')) ]);
@@ -564,10 +610,93 @@ return view.extend({
 		}, this));
 	},
 
-	refreshChannels: function() {
-		return api.channelsList().then(L.bind(function(result) {
+	// scope 值 → 友好名(用于标题栏当前配置展示)。
+	dmScopeName: function(scope) {
+		var M = { 'main': _('全部共享'), 'per-peer': _('按对端隔离'), 'per-channel-peer': _('按渠道隔离'), 'per-account-channel-peer': _('按账号+渠道隔离') };
+		return M[scope] || scope;
+	},
+
+	// 在「消息渠道（官方）」标题栏右侧只读展示当前会话隔离配置。
+	refreshDmScopeLabel: function() {
+		return api.dmScope().then(L.bind(function(r) {
+			if (!this.dmScopeLabel) return;
+			var scope = ((r.data || {}).scope) || 'main';
+			dom.content(this.dmScopeLabel, [ _('会话隔离：') + this.dmScopeName(scope) + ' ', E('code', { 'style': 'opacity:.6' }, scope) ]);
+		}, this)).catch(function() {});
+	},
+
+	// 渠道会话隔离: 弹窗四选(读当前值预选), 保存→写配置+重启网关, 取消→关闭。
+	showDmScope: function() {
+		var self = this;
+		var OPTS = [
+			{ v: 'main', label: _('全部共享（默认）'), desc: _('所有渠道、所有对端共用一个会话；选此项保存将清除该配置项，回到无显式配置。') },
+			{ v: 'per-peer', label: _('按对端隔离'), desc: _('同一对端跨渠道共享，不同对端各自独立。') },
+			{ v: 'per-channel-peer', label: _('按渠道隔离'), desc: _('同一对端在不同渠道各自独立会话，互不串记忆。') },
+			{ v: 'per-account-channel-peer', label: _('按账号+渠道隔离'), desc: _('多账号场景再加账号维度，隔离最强。') }
+		];
+		return api.dmScope().then(function(r) {
+			var cur = ((r.data || {}).scope) || 'main';
+			var radios = OPTS.map(function(o) {
+				var input = E('input', { 'type': 'radio', 'name': 'oc-dmscope', 'value': o.v, 'style': 'margin-top:.2rem' });
+				if (o.v === cur) input.checked = true;
+				return E('label', { 'style': 'display:flex;gap:.6rem;align-items:flex-start;cursor:pointer' }, [
+					input,
+					E('div', {}, [
+						E('div', {}, [ o.label, ' ', E('code', { 'style': 'opacity:.65;font-size:.85em' }, o.v) ]),
+						E('div', { 'class': 'oc-muted', 'style': 'font-size:.85em' }, o.desc)
+					])
+				]);
+			});
+			var getVal = function() {
+				for (var i = 0; i < radios.length; i++) { var inp = radios[i].firstChild; if (inp.checked) return inp.value; }
+				return cur;
+			};
+			var status = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
+			ui.showModal(_('渠道会话隔离'), [
+				E('p', { 'class': 'oc-muted' }, _('选择私信会话的隔离方式；保存后写入配置并重启网关生效。')),
+				E('div', { 'style': 'display:flex;flex-direction:column;gap:12px;margin:10px 0' }, radios),
+				status,
+				E('div', { 'class': 'right', 'style': 'margin-top:12px' }, [
+					ocui.closeButton(_('取消')),
+					' ',
+					ocui.button(_('保存'), 'cbi-button-positive', function() {
+						var val = getVal();
+						if (val === cur) { ui.hideModal(); return; }
+						return ocui.runOp(status, {
+							running: _('正在保存并重启网关...'),
+							success: _('已保存，网关重启中。'),
+							submit: function() { return api.dmScopeSet(val); },
+							onDone: function(ok) { if (ok) { self.refreshDmScopeLabel(); ui.hideModal(); } }
+						});
+					})
+				])
+			]);
+		});
+	},
+
+	refreshChannels: function(force) {
+		// 同时取渠道列表 + Telegram 身份状态(显示名/已配对); telegram_status 失败不影响其余渲染。
+		// force===true(「刷新」按钮)时绕过后端 getMe 缓存强制重拉。
+		return Promise.all([ api.channelsList(), api.telegramStatus(force === true ? '1' : '').catch(function() { return { ok: false, data: {} }; }) ]).then(L.bind(function(results) {
+			var result = results[0] || {};
+			var tg = (results[1] && results[1].data) || {};
 			var d = result.data || {};
 			var chat = d.chat || {};
+			// Telegram 机器人标识(显示名优先, 退用户名, 再退 bot 数字 ID)。
+			var tgLabel = tg.bot_name || (tg.bot_username ? ('@' + tg.bot_username) : (tg.bot_id ? _('Bot ID %s').format(tg.bot_id) : ''));
+			var tgIdLabel = tg.bot_username ? (tg.bot_name ? (tg.bot_name + ' (@' + tg.bot_username + ')') : ('@' + tg.bot_username)) : tgLabel;
+			var tgPaired = tg.paired_ids || [];
+			// 更新 Telegram 卡片「渠道状态」行(详情: 显示名+用户名 + 全列已配对 ID)。
+			if (this.tgState) {
+				if (!tg.configured) {
+					dom.content(this.tgState, E('span', { 'class': 'oc-badge oc-warn' }, _('未配置（请先保存 Bot Token）')));
+				} else {
+					var detail = [ E('span', { 'class': 'oc-badge oc-info' }, _('已配置')) ];
+					if (tgIdLabel) detail.push(E('span', { 'style': 'margin-left:.5rem' }, tgIdLabel));
+					detail.push(E('span', { 'style': 'margin-left:.5rem' }, tgPaired.length ? _('已配对用户：%s').format(tgPaired.join('、')) : _('未配对')));
+					dom.content(this.tgState, detail);
+				}
+			}
 			var names = Object.keys(chat);
 			if (!names.length) {
 				dom.content(this.channelBox, E('p', { 'class': 'oc-muted' }, result.ok ? _('尚未配置任何渠道，请用下方向导配置。') : (result.message || _('读取渠道失败'))));
@@ -576,23 +705,30 @@ return view.extend({
 			var rows = names.map(function(name) {
 				var c = chat[name] || {};
 				var accts = c.accounts || [];
-				// token 型 bot(如 Telegram)的账号带 tokenSource/tokenStatus, 仅代表 bot 已配置并连接,
-				// 不等于已有配对用户; 微信账号是真实登录会话, 无 tokenStatus 字段。
-				var isBot = accts.some(function(a) { return a && typeof a === 'object' && (a.tokenSource || a.tokenStatus); });
-				// 状态分两段: 配置态(出现在此即已配置) + 登录/连接态。
 				var configBadge = E('span', { 'class': 'oc-badge oc-info' }, _('已配置'));
-				var loginBadge;
-				if (!accts.length) {
-					loginBadge = E('span', { 'class': 'oc-badge oc-warn' }, _('未登录'));
-				} else if (isBot) {
-					var connected = accts.some(function(a) { return a && a.connected; });
-					loginBadge = connected
-						? E('span', { 'class': 'oc-badge oc-ok' }, _('Bot 在线'))
-						: E('span', { 'class': 'oc-badge oc-warn' }, _('Bot 离线'));
+				var second;
+				if (name === 'telegram') {
+					// 显示名 + 配对计数(详细 ID 在 Telegram 卡)。
+					second = [];
+					if (tgLabel) second.push(E('span', {}, tgLabel));
+					second.push(tgPaired.length
+						? E('span', { 'class': 'oc-badge oc-ok' }, _('已配对 %s').format(tgPaired.length))
+						: E('span', { 'class': 'oc-badge oc-warn' }, _('未配对')));
+				} else if (name === 'openclaw-weixin') {
+					// 机器人前缀(账号 id 去掉固定后缀 -im-bot) + 已登录绿标; 无账号则未登录, 均不显示计数。
+					var acc = (accts[0] && accts[0].accountId) || '';
+					var prefix = acc.replace(/-im-bot$/, '');
+					second = prefix
+						? [ E('span', {}, prefix), E('span', { 'class': 'oc-badge oc-ok' }, _('已登录')) ]
+						: [ E('span', { 'class': 'oc-badge oc-warn' }, _('未登录')) ];
 				} else {
-					loginBadge = E('span', { 'class': 'oc-badge oc-ok' }, _('已登录 %s 个').format(accts.length));
+					// 其它渠道维持原逻辑: 已登录 N / Bot 在线离线 / 未登录。
+					var isBot = accts.some(function(a) { return a && typeof a === 'object' && (a.tokenSource || a.tokenStatus); });
+					if (!accts.length) second = [ E('span', { 'class': 'oc-badge oc-warn' }, _('未登录')) ];
+					else if (isBot) { var connected = accts.some(function(a) { return a && a.connected; }); second = [ connected ? E('span', { 'class': 'oc-badge oc-ok' }, _('Bot 在线')) : E('span', { 'class': 'oc-badge oc-warn' }, _('Bot 离线')) ]; }
+					else second = [ E('span', { 'class': 'oc-badge oc-ok' }, _('已登录 %s 个').format(accts.length)) ];
 				}
-				var stateCell = E('span', { 'style': 'display:inline-flex;gap:.4rem;flex-wrap:wrap' }, [ configBadge, loginBadge ]);
+				var stateCell = E('span', { 'style': 'display:inline-flex;gap:.4rem;flex-wrap:wrap;align-items:center' }, [ configBadge ].concat(second));
 				return E('tr', {}, [ E('td', {}, name), E('td', {}, stateCell), E('td', {}, c.origin || '-') ]);
 			});
 			dom.content(this.channelBox, E('table', { 'class': 'oc-table' }, [
@@ -674,7 +810,7 @@ return view.extend({
 		}
 		if (name === 'provider' && !this._providerLoaded) { this._providerLoaded = true; this.refreshProviders(); }
 		if (name === 'channel') {
-			if (!this._channelLoaded) { this._channelLoaded = true; this.refreshChannels(); this.refreshWechat(); }
+			if (!this._channelLoaded) { this._channelLoaded = true; this.refreshChannels(); this.refreshWechat(); this.refreshDmScopeLabel(); }
 			if (this._wechatPoll) poll.add(this._wechatPoll, 10);
 		}
 		// 日志 tab 默认不加载, 等用户点「加载日志」(或开自动刷新)。
