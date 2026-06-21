@@ -242,9 +242,10 @@ case "${1:-}" in
 		echo "正在停止 OpenClaw 服务..."
 		/etc/init.d/openclaw stop >/dev/null 2>&1 || true
 		/etc/init.d/openclaw disable >/dev/null 2>&1 || true
-		uci delete openclaw.main 2>/dev/null || true
+		# 卸载环境只卸"运行时", 保留 /etc/config/openclaw(记住 install_path/port/bind 等便于重装),
+		# 仅关闭自启避免空跑。彻底清除配置请用「卸载插件」(opkg remove)。
+		uci set openclaw.main.enabled='0' 2>/dev/null || true
 		uci commit openclaw 2>/dev/null || true
-		rm -f /etc/config/openclaw /etc/config/openclaw-opkg /etc/config/openclaw*.bak
 		echo "正在删除运行环境: $OC_ROOT"
 		# OC_ROOT 下的软链始终删除；NODE_BASE 下的仅在 remove_node=1 时删除
 		for b in node npm npx pnpm corepack; do

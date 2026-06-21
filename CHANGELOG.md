@@ -1,5 +1,10 @@
 ﻿# 更新记录
 
+## [1.1.4]
+
+- **修复完全卸载未清理配置**：1.1.3 的卸载清理用了 dpkg 写法 `[ "$1" = "0" ]` 守卫，opkg 并不传该参数（实测 opkg 传 `PKG_UPGRADE=0`、参数 `remove`），导致 postrm 清理分支从不执行——`opkg remove` 后 `/etc/config/openclaw`（及 `-opkg`/`*.bak`）仍残留。改用 opkg 的 `PKG_UPGRADE` 判定：真卸载清理、升级保留。lede 实测：`opkg remove` 后配置/备份全清，升级后配置保留。
+- **卸载环境改为保留配置**：「卸载环境」只卸运行时（node/openclaw/用户/软链），现**保留 `/etc/config/openclaw`** 并仅将 `enabled` 置 0——记住 `install_path` 等设置便于重装。彻底清除配置交由「卸载插件」(`opkg remove`)。两者职责分层：卸载环境=卸运行时留配置，卸载插件=全清。
+
 ## [1.1.3]
 
 - **修复升级卡死 / 安装后 "Object not found"**：GitHub 发布用的 build_ipk.sh / build_run.sh 的 postinst 之前未重载 rpcd（与 Makefile 不一致），导致升级时旧 postrm 在模块文件缺失空档注销 `luci.openclaw` 对象、而新 postinst 不再注册 → 前端轮询全部失败、界面卡死；命令行全新安装同样报 "Object not found"。现 postinst/安装末尾补 `rpcd reload`（SIGHUP，保留登录会话）。

@@ -172,9 +172,14 @@ grep -q "root/usr/libexec" scripts/build_run.sh || fail "run script must package
 if grep -q '请自行执行: /etc/init.d/rpcd reload' scripts/build_ipk.sh; then fail "ipk postinst must reload rpcd, not defer it to the frontend"; fi
 if grep -q '由 LuCI 前端在安装成功后自动触发' scripts/build_run.sh; then fail "run installer must reload rpcd, not defer it to the frontend"; fi
 grep -q '/etc/init.d/rpcd reload' scripts/build_run.sh || fail "run installer must reload rpcd after install"
-# 完全卸载须清理 conffile 本体/opkg 副本/备份残留。
+# 卸载插件(opkg remove)须清理 conffile 本体/opkg 副本/备份残留。
 grep -q 'rm -f /etc/config/openclaw /etc/config/openclaw-opkg' scripts/build_ipk.sh || fail "ipk postrm must purge config artifacts on full removal"
-grep -q 'openclaw-opkg /etc/config/openclaw\*\.bak' root/usr/libexec/openclaw-rpc.sh || fail "uninstall-task must clean opkg/backup config residue"
+# postrm 须用 opkg 的 PKG_UPGRADE 判定升级/卸载, 而非 dpkg 的 $1=0(opkg 不传, 会导致清理永不执行)。
+if grep -q '\[ "$1" = "0" \]' scripts/build_ipk.sh; then fail "postrm must guard with PKG_UPGRADE, not dpkg-style \$1=0"; fi
+grep -q 'PKG_UPGRADE' scripts/build_ipk.sh || fail "ipk postrm must use PKG_UPGRADE to detect upgrade vs removal"
+# 卸载环境(uninstall-task)只卸运行时、保留配置(仅关自启), 不得删除 /etc/config/openclaw。
+if grep -A12 'uninstall-task)' root/usr/libexec/openclaw-rpc.sh | grep -q 'rm -f /etc/config/openclaw'; then fail "uninstall-task must keep /etc/config/openclaw (env uninstall only removes runtime)"; fi
+grep -A12 'uninstall-task)' root/usr/libexec/openclaw-rpc.sh | grep -q "openclaw.main.enabled='0'" || fail "uninstall-task must disable autostart while keeping config"
 grep -q "openclaw-workspace.sh" Makefile || fail "workspace helper must be packaged"
 grep -q "openclaw-backup.sh" Makefile || fail "backup safety helper must be packaged"
 grep -q "oc_sync_workspace_tools" root/usr/bin/openclaw-env || fail "setup and upgrade must sync workspace guidance"
