@@ -244,7 +244,7 @@ case "${1:-}" in
 		/etc/init.d/openclaw disable >/dev/null 2>&1 || true
 		uci delete openclaw.main 2>/dev/null || true
 		uci commit openclaw 2>/dev/null || true
-		rm -f /etc/config/openclaw
+		rm -f /etc/config/openclaw /etc/config/openclaw-opkg /etc/config/openclaw*.bak
 		echo "正在删除运行环境: $OC_ROOT"
 		# OC_ROOT 下的软链始终删除；NODE_BASE 下的仅在 remove_node=1 时删除
 		for b in node npm npx pnpm corepack; do

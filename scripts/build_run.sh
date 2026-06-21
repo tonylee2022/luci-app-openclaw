@@ -199,8 +199,9 @@ rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
 rm -f /tmp/luci-indexcache.*.json 2>/dev/null
 
 # 旧版残留的 root 配置终端进程由 uci-defaults 在升级时清理 (见 99-openclaw)。
-# rpcd 的 ucode 模块常驻内存, 新版后端需重载 rpcd 才能生效。
-# 重载(reload, 保留登录会话)由 LuCI 前端在安装成功后自动触发, 不在此处执行。
+# 重载 rpcd 使新 ucode 后端(luci.openclaw 对象)立即注册; 否则页面报 "Object not found"。
+# reload 为 SIGHUP, 保留登录会话。
+/etc/init.d/rpcd reload >/dev/null 2>&1 || true
 
 echo ""
 echo "✅ 安装完成！"

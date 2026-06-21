@@ -119,10 +119,9 @@ cat > "$CTRL_DIR/postinst" << 'EOF'
 		USER_TOKEN=$(sed -n "s/^\s*option\s\+token\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$OLD_CONFIG" 2>/dev/null | tail -1)
 		USER_INSTALL_PATH=$(sed -n "s/^\s*option\s\+install_path\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$OLD_CONFIG" 2>/dev/null | tail -1)
 		
-		# 步骤2: 备份旧配置 (带时间戳)
-		BAK_FILE="/etc/config/openclaw.$(date +%Y%m%d%H%M%S).bak"
-		cp "$OLD_CONFIG" "$BAK_FILE" 2>/dev/null || true
-		echo "旧配置已备份到: $BAK_FILE"
+		# 步骤2: 备份旧配置 (固定名, 避免每次升级累积备份)
+		cp "$OLD_CONFIG" /etc/config/openclaw.user.bak 2>/dev/null || true
+		echo "旧配置已备份到: /etc/config/openclaw.user.bak"
 		
 		# 步骤3: 使用新配置文件
 		mv "$NEW_CONFIG" "$OLD_CONFIG" 2>/dev/null || cp "$NEW_CONFIG" "$OLD_CONFIG" 2>/dev/null || true
@@ -153,9 +152,11 @@ cat > "$CTRL_DIR/postinst" << 'EOF'
 
 	# 旧版残留的 root 配置终端进程由 uci-defaults 在升级时清理 (见 99-openclaw)。
 
-	# rpcd 的 ucode 模块常驻内存，新版后端需重载 rpcd 才能生效。
-	# 经 LuCI「检测升级」路径安装时，重载由前端在安装完成后自动触发（reload 保留登录会话，不强制重登录）；
-	# 手动 opkg install 时，请自行执行: /etc/init.d/rpcd reload
+	# 重载 rpcd 使新 ucode 后端(luci.openclaw 对象)立即注册。
+	# 必须在 postinst 末尾(新文件已就位后)执行: 升级时 opkg 先删旧文件→跑旧 postrm(其 reload 会在
+	# 模块文件缺失的空档注销对象)→再装新文件→本 postinst, 此处 reload 把对象重新注册回来,
+	# 否则前端轮询 luci.openclaw/* 全部 "Object not found" 导致界面卡死。reload 为 SIGHUP, 保留登录会话。
+	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
 	exit 0
 }
 EOF
@@ -177,9 +178,9 @@ cat > "$CTRL_DIR/postrm" << 'EOF'
 [ -n "${IPKG_INSTROOT}" ] || {
 	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
 	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
-	# 清理备份文件 (仅在完全卸载时)
+	# 完全卸载时(非升级)收尾: 清理 conffile 本体、opkg 冲突副本与所有备份残留。
 	if [ "$1" = "0" ]; then
-		rm -f /etc/config/openclaw.user.bak /etc/config/openclaw.pre-upgrade.bak 2>/dev/null
+		rm -f /etc/config/openclaw /etc/config/openclaw-opkg /etc/config/openclaw*.bak 2>/dev/null
 	fi
 }
 EOF

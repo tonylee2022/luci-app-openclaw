@@ -1,5 +1,11 @@
 ﻿# 更新记录
 
+## [1.1.3]
+
+- **修复升级卡死 / 安装后 "Object not found"**：GitHub 发布用的 build_ipk.sh / build_run.sh 的 postinst 之前未重载 rpcd（与 Makefile 不一致），导致升级时旧 postrm 在模块文件缺失空档注销 `luci.openclaw` 对象、而新 postinst 不再注册 → 前端轮询全部失败、界面卡死；命令行全新安装同样报 "Object not found"。现 postinst/安装末尾补 `rpcd reload`（SIGHUP，保留登录会话）。
+- **卸载清理**：完全卸载(opkg remove 全删 / LuCI「卸载环境」)时一并清理 `/etc/config/openclaw` 本体、opkg 冲突副本 `-opkg` 与所有 `*.bak` 残留；升级仍保留用户配置。
+- 配置合并备份改用固定名 `openclaw.user.bak`，不再每次升级累积时间戳备份。
+
 ## [1.1.2]
 
 - **安全 · 网关令牌解耦**：网关认证令牌改由环境变量（`OPENCLAW_GATEWAY_TOKEN` / `gateway run --token`）注入，`openclaw.json` 不再写入明文令牌；令牌仅存于 UCI（不在 OpenClaw 备份范围内）。用户在 OpenClaw 内用 `openclaw secrets` 迁移/抹除 `gateway.auth.token` 不再影响 LuCI 控制台。

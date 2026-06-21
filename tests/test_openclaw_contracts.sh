@@ -168,6 +168,13 @@ fi
 
 grep -q "root/usr/libexec" scripts/build_ipk.sh || fail "ipk script must package shell helpers"
 grep -q "root/usr/libexec" scripts/build_run.sh || fail "run script must package shell helpers"
+# 安装器必须在 postinst/安装末尾 reload rpcd, 否则 luci.openclaw 对象不注册 -> 页面 "Object not found"/升级卡死。
+if grep -q '请自行执行: /etc/init.d/rpcd reload' scripts/build_ipk.sh; then fail "ipk postinst must reload rpcd, not defer it to the frontend"; fi
+if grep -q '由 LuCI 前端在安装成功后自动触发' scripts/build_run.sh; then fail "run installer must reload rpcd, not defer it to the frontend"; fi
+grep -q '/etc/init.d/rpcd reload' scripts/build_run.sh || fail "run installer must reload rpcd after install"
+# 完全卸载须清理 conffile 本体/opkg 副本/备份残留。
+grep -q 'rm -f /etc/config/openclaw /etc/config/openclaw-opkg' scripts/build_ipk.sh || fail "ipk postrm must purge config artifacts on full removal"
+grep -q 'openclaw-opkg /etc/config/openclaw\*\.bak' root/usr/libexec/openclaw-rpc.sh || fail "uninstall-task must clean opkg/backup config residue"
 grep -q "openclaw-workspace.sh" Makefile || fail "workspace helper must be packaged"
 grep -q "openclaw-backup.sh" Makefile || fail "backup safety helper must be packaged"
 grep -q "oc_sync_workspace_tools" root/usr/bin/openclaw-env || fail "setup and upgrade must sync workspace guidance"
