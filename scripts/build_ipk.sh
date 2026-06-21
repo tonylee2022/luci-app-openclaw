@@ -147,8 +147,8 @@ cat > "$CTRL_DIR/postinst" << 'EOF'
 	rm -f /usr/lib/lua/luci/controller/openclaw.lua
 	rm -rf /usr/lib/lua/luci/model/cbi/openclaw /usr/lib/lua/luci/view/openclaw /usr/lib/lua/openclaw
 	
-	# 清理 LuCI 缓存
-	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* /tmp/luci-indexcache.*.json 2>/dev/null
+	# 清理 LuCI 缓存与本插件状态缓存(后者含插件版本等, 升级后须刷新)
+	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* /tmp/luci-indexcache.*.json /tmp/luci-openclaw-status.* 2>/dev/null
 
 	# 旧版残留的 root 配置终端进程由 uci-defaults 在升级时清理 (见 99-openclaw)。
 

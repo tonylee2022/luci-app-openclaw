@@ -96,24 +96,23 @@ function static_status(p) {
 	let prefix = '/tmp/luci-openclaw-status';
 	let checked = +trim(readfile(prefix + '.time') || '0');
 	let cached_root = trim(readfile(prefix + '.root') || '');
+	// 注意: plugin_version 不进缓存——它只是读 /usr/share/openclaw/VERSION(极廉价),
+	// 且必须在插件升级后立刻反映新版本; 缓存会导致升级后概览仍显示旧版(直到 60s 过期)。
 	if (cached_root == p.root && time() - checked < 60) {
 		return {
 			node_version: trim(readfile(prefix + '.node') || ''),
 			oc_version: trim(readfile(prefix + '.openclaw') || ''),
-			plugin_version: trim(readfile(prefix + '.plugin') || ''),
 			disk_free: trim(readfile(prefix + '.disk') || '')
 		};
 	}
 	let data = {
 		node_version: access(p.node + '/bin/node') ? run(shellquote(p.node + '/bin/node') + ' --version') : '',
 		oc_version: package_version(p.root),
-		plugin_version: trim(readfile('/usr/share/openclaw/VERSION') || ''),
 		disk_free: run('df -h ' + shellquote(p.base) + " | tail -1 | awk '{print $4}'")
 	};
 	writefile(prefix + '.root', p.root);
 	writefile(prefix + '.node', data.node_version);
 	writefile(prefix + '.openclaw', data.oc_version);
-	writefile(prefix + '.plugin', data.plugin_version);
 	writefile(prefix + '.disk', data.disk_free);
 	writefile(prefix + '.time', '' + time());
 	return data;
@@ -148,7 +147,7 @@ function status() {
 		gateway_failed: !gateway && gateway_instance.exit_code != null && gateway_instance.exit_code != 0,
 		gateway_exit_code: gateway_instance.exit_code ?? '', pid,
 		memory_kb, uptime: '', node_version: cached.node_version,
-		oc_version: cached.oc_version, plugin_version: cached.plugin_version, disk_free: cached.disk_free,
+		oc_version: cached.oc_version, plugin_version: trim(readfile('/usr/share/openclaw/VERSION') || ''), disk_free: cached.disk_free,
 		active_model: config?.agents?.defaults?.model?.primary || '', channels: channel_text,
 		stable_version
 	});

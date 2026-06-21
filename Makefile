@@ -83,7 +83,7 @@ define Package/$(PKG_NAME)/postinst
 	( . /etc/uci-defaults/99-openclaw ) && rm -f /etc/uci-defaults/99-openclaw
 	rm -f /usr/lib/lua/luci/controller/openclaw.lua
 	rm -rf /usr/lib/lua/luci/model/cbi/openclaw /usr/lib/lua/luci/view/openclaw /usr/lib/lua/openclaw
-	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
+	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* /tmp/luci-openclaw-status.* 2>/dev/null
 	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
 	exit 0
 }

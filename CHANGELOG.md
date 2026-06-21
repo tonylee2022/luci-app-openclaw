@@ -1,5 +1,10 @@
 ﻿# 更新记录
 
+## [1.1.5]
+
+- **修复升级后状态概览插件版本陈旧**：插件版本之前被并入 60 秒状态缓存（`/tmp/luci-openclaw-status.*`），升级后概览仍显示旧版本，需多次刷新/等缓存过期才更新。现 `plugin_version` 不再缓存（它只是读 `/usr/share/openclaw/VERSION`，极廉价），每次实时读取，升级后立即正确。
+- **状态缓存失效更全面**：插件 postinst 与首次安装(setup)任务完成后均清理 `/tmp/luci-openclaw-status.*`，确保版本/磁盘等信息在安装/升级后立即刷新（此前仅 OpenClaw 升级、换 Node、卸载、会话隔离设置时清理）。
+
 ## [1.1.4]
 
 - **修复完全卸载未清理配置**：1.1.3 的卸载清理用了 dpkg 写法 `[ "$1" = "0" ]` 守卫，opkg 并不传该参数（实测 opkg 传 `PKG_UPGRADE=0`、参数 `remove`），导致 postrm 清理分支从不执行——`opkg remove` 后 `/etc/config/openclaw`（及 `-opkg`/`*.bak`）仍残留。改用 opkg 的 `PKG_UPGRADE` 判定：真卸载清理、升级保留。lede 实测：`opkg remove` 后配置/备份全清，升级后配置保留。

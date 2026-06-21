@@ -200,7 +200,7 @@ case "${1:-}" in
 		node_prefix=""
 		[ -n "$node_ver" ] && node_prefix=" NODE_VERSION=$(oc_quote "$node_ver")"
 		prefix="OC_VERSION=$(oc_quote "$version") OC_INSTALL_PATH=$(oc_quote "$base")${node_prefix}"
-		start_task /tmp/openclaw-setup "$prefix /usr/bin/openclaw-env setup; rc=\$?; if [ \$rc -eq 0 ]; then uci set openclaw.main.enabled=1; uci commit openclaw; /etc/init.d/openclaw enable; /etc/init.d/openclaw start; fi; exit \$rc"
+		start_task /tmp/openclaw-setup "$prefix /usr/bin/openclaw-env setup; rc=\$?; if [ \$rc -eq 0 ]; then uci set openclaw.main.enabled=1; uci commit openclaw; /etc/init.d/openclaw enable; /etc/init.d/openclaw start; fi; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
 		;;
 	env-upgrade-openclaw)
 		load_paths
