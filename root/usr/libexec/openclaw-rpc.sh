@@ -116,8 +116,10 @@ find_openclaw_entry() {
 }
 
 # 以 openclaw 用户运行 openclaw CLI 的环境前缀 (需先 load_paths)。
+# OPENCLAW_GATEWAY_TOKEN 让 CLI 与网关用同一令牌连接(env 赢过 openclaw.json 的引用/明文),
+# 与 init.d 注入的令牌一致; 用户在 OpenClaw 内迁移 gateway.auth.token 时 CLI 仍能认证。
 oc_cli_env() {
-	printf '%s' "HOME=$OC_HOME OPENCLAW_HOME=$OC_HOME OPENCLAW_STATE_DIR=$OC_STATE_DIR OPENCLAW_CONFIG_PATH=$CONFIG_FILE NPM_CONFIG_PREFIX=$OC_GLOBAL NPM_CONFIG_CACHE=$OC_NPM_CACHE TMPDIR=$OC_TMP PATH=$NODE_BASE/bin:$OC_GLOBAL/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+	printf '%s' "HOME=$OC_HOME OPENCLAW_HOME=$OC_HOME OPENCLAW_STATE_DIR=$OC_STATE_DIR OPENCLAW_CONFIG_PATH=$CONFIG_FILE NPM_CONFIG_PREFIX=$OC_GLOBAL NPM_CONFIG_CACHE=$OC_NPM_CACHE TMPDIR=$OC_TMP OPENCLAW_GATEWAY_TOKEN=$(uci -q get openclaw.main.token 2>/dev/null) PATH=$NODE_BASE/bin:$OC_GLOBAL/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 }
 
 # 同步执行一条 openclaw CLI 子命令并把 stdout 原样输出 (供 ucode json 解析)。
@@ -191,7 +193,7 @@ case "${1:-}" in
 			*) fail "Node.js 版本号格式无效" ;;
 		esac
 		if ! uci -q get openclaw.main >/dev/null 2>&1; then
-			printf "config openclaw 'main'\n\toption enabled '0'\n\toption port '18789'\n\toption bind 'lan'\n\toption token ''\n\toption pty_port '18793'\n\toption install_path '/opt'\n" > /etc/config/openclaw
+			printf "config openclaw 'main'\n\toption enabled '0'\n\toption port '18789'\n\toption bind 'lan'\n\toption token ''\n\toption install_path '/opt'\n" > /etc/config/openclaw
 		fi
 		uci set openclaw.main.install_path="$base"
 		uci commit openclaw
@@ -207,7 +209,9 @@ case "${1:-}" in
 		# 官方在 systemd 上会"停网关→更新→重启"; 在 procd 上 openclaw update 不认得我们的服务(既不停也不重启),
 		# 故由我们对齐: 先 procd 停网关, 再 update(--no-restart 跳过其自带服务管理), 完成后 procd 起网关。
 		# /usr/bin/openclaw 包装器自动降权到 openclaw 并配好环境。
-		cmd="/etc/init.d/openclaw stop; /usr/bin/openclaw update --yes --no-restart; rc=\$?; /etc/init.d/openclaw start; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
+		# 更新前 chown 修正 home 属主: 历史上若有 root 属主残留(如某插件目录), 以 openclaw 身份的
+		# 插件 update 会 EACCES(rename/unlink 失败); 先归位避免插件更新失败。
+		cmd="/etc/init.d/openclaw stop; chown -R openclaw:openclaw $(oc_quote "$OC_HOME") 2>/dev/null; /usr/bin/openclaw update --yes --no-restart; rc=\$?; /etc/init.d/openclaw start; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
 		start_task /tmp/openclaw-env-upgrade "$cmd"
 		;;
 	env-upgrade-npm)
@@ -516,6 +520,23 @@ fs.writeFileSync(index,JSON.stringify(accounts.filter(x=>x!==id),null,2)+"\n");'
 		rm -f /tmp/luci-openclaw-status.*
 		/etc/init.d/openclaw restart >/dev/null 2>&1 &
 		echo "会话隔离已设为 $val，网关重启中。"
+		;;
+	perm-check)
+		load_paths
+		[ -d "$OC_ROOT" ] || fail "OpenClaw 未安装"
+		find "$OC_ROOT" ! -user openclaw 2>/dev/null | wc -l | tr -d ' '   # 第一行: 数量
+		find "$OC_ROOT" ! -user openclaw 2>/dev/null | head -8             # 其余: 示例路径
+		;;
+	perm-fix)
+		load_paths
+		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		oc_safe_openclaw_root "$OC_ROOT" || fail "安装路径未通过安全校验"
+		# OpenClaw 以 openclaw 身份运行; root 属主残留会致插件 update EACCES。chown 归位(含符号链接)。
+		chown -R openclaw:openclaw "$OC_ROOT" 2>/dev/null
+		find "$OC_ROOT" -type l ! -user openclaw -exec chown -h openclaw:openclaw {} + 2>/dev/null
+		n=$(find "$OC_ROOT" ! -user openclaw 2>/dev/null | wc -l | tr -d ' ')
+		echo "已修复文件属主，剩余非 openclaw 条目: $n"
+		[ "$n" = "0" ]
 		;;
 	*) fail "未知 RPC 操作" ;;
 esac

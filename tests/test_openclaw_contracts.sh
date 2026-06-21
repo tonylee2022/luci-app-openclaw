@@ -95,7 +95,7 @@ done
 if find luasrc -type f 2>/dev/null | grep -q .; then fail "legacy luasrc files must be removed"; fi
 grep -Fq "return { 'luci.openclaw': methods };" root/usr/share/rpcd/ucode/luci.openclaw || fail "ubus object export missing"
 grep -Fq 'node: base + ' root/usr/share/rpcd/ucode/luci.openclaw || fail "ucode paths() must place node under base (not root) to match shell-side NODE_BASE"
-for method in status system_info install_path_probe update_check setup_log upgrade_log backup_list backup_verify gateway_token wechat_status wechat_install_log wechat_login_status wechat_update_check service_action setup uninstall upgrade backup_create backup_restore backup_delete wechat_install wechat_login wechat_logout wechat_upgrade wechat_uninstall; do
+for method in status system_info install_path_probe update_check setup_log upgrade_log backup_list backup_verify gateway_token wechat_status wechat_install_log wechat_login_status wechat_update_check service_action setup uninstall upgrade backup_create backup_restore backup_delete wechat_install wechat_login wechat_logout wechat_upgrade wechat_uninstall secrets_audit; do
 	grep -q "${method}:" root/usr/share/rpcd/ucode/luci.openclaw || fail "missing rpc method: $method"
 done
 if grep -q 'system_check:' root/usr/share/rpcd/ucode/luci.openclaw; then fail "write probe must not remain in legacy system_check"; fi
@@ -107,6 +107,29 @@ grep -q "Local login saved auth" root/usr/libexec/openclaw-rpc.sh || fail "succe
 grep -q "Local login saved auth" root/usr/share/rpcd/ucode/luci.openclaw || fail "Weixin login status must recognize saved local auth"
 grep -q '/etc/init.d/openclaw stop >/dev/null 2>&1 || true; /etc/init.d/openclaw start' root/usr/libexec/openclaw-rpc.sh || fail "successful Weixin login must safely restart the procd service"
 grep -q 'fix_openclaw_runtime_ownership' root/etc/init.d/openclaw || fail "service must repair root-owned OpenClaw runtime files"
+# 网关令牌解耦: 始终用 --token 显式启动 (env 赢过 openclaw.json 的引用/明文),
+# 使 LuCI 控制台对用户在 OpenClaw 内迁移/抹除 gateway.auth.token 免疫。
+grep -q 'gateway run.*--token' root/etc/init.d/openclaw || fail "gateway must launch with explicit --token to decouple auth from config"
+if grep -q 'gateway\.auth\.token=process\.env\.OC_SYNC_TOKEN' root/etc/init.d/openclaw; then
+	fail "sync must not force plaintext gateway.auth.token into openclaw.json"
+fi
+if grep -q '_sync_token_after_doctor\|JSON -> UCI' root/etc/init.d/openclaw; then
+	fail "must not pull gateway token from JSON back into UCI"
+fi
+grep -q 'OPENCLAW_GATEWAY_TOKEN' root/usr/libexec/openclaw-rpc.sh || fail "CLI must authenticate via OPENCLAW_GATEWAY_TOKEN env"
+grep -q 'SecretRef\|密钥已托管' root/usr/share/rpcd/ucode/luci.openclaw || fail "telegram_status must handle SecretRef botToken without calling getMe on a ref"
+# web-pty 根终端退役: 消除 openclaw->root 提权(世界可读 pty_token + root 终端)及其暴露面。
+if grep -q 'web-pty.js' Makefile scripts/build_ipk.sh scripts/build_run.sh; then fail "retired web-pty must not be packaged"; fi
+if grep -Eq 'oc-config\.sh|oc-config-interactive|oc-menu-engine' Makefile; then fail "retired config-menu cluster must not be packaged"; fi
+[ ! -e root/usr/share/openclaw/web-pty.js ] || fail "web-pty.js source must be removed"
+[ ! -e root/usr/share/openclaw/oc-config.sh ] || fail "oc-config.sh source must be removed"
+[ ! -e root/usr/share/openclaw/ui ] || fail "vendored web-pty ui/ must be removed"
+if grep -q 'procd_open_instance "pty"' root/etc/init.d/openclaw; then fail "pty service instance must be retired"; fi
+# init.d/ucode 不得再生成或读取 pty_token; uci-defaults 可引用它(仅为清理旧安装的残留)。
+if grep -q 'pty_token' root/etc/init.d/openclaw root/usr/share/rpcd/ucode/luci.openclaw; then fail "pty_token must not be generated/read after retirement"; fi
+grep -q 'delete openclaw.main.pty_token' root/etc/uci-defaults/99-openclaw || fail "uci-defaults must scrub legacy pty_token on upgrade"
+# allowInsecureAuth 仅放宽 localhost, 被 dangerouslyDisableDeviceAuth 覆盖 -> 不应再强制写 true(减少一个安全降级)。
+if grep -Eq 'allowInsecureAuth[^;]*true' root/etc/init.d/openclaw root/usr/bin/openclaw-env; then fail "redundant controlUi.allowInsecureAuth must not be force-enabled"; fi
 grep -Fq 'ubus call service list ' root/etc/init.d/openclaw || fail "restart must check whether the procd service object exists"
 grep -q '^restart() {' root/etc/init.d/openclaw || fail "service must provide an idempotent restart implementation"
 runtime_fix_line=$(grep -n '^fix_openclaw_runtime_ownership$' root/etc/init.d/openclaw | head -1 | cut -d: -f1)
@@ -128,6 +151,7 @@ grep -q 'luci-openclaw-status' root/usr/share/rpcd/ucode/luci.openclaw || fail "
 read_acl=$(sed -n '/"read"/,/"write"/p' root/usr/share/rpcd/acl.d/luci-app-openclaw.json)
 write_acl=$(sed -n '/"write"/,$p' root/usr/share/rpcd/acl.d/luci-app-openclaw.json)
 printf '%s' "$read_acl" | grep -q '"system_info"' || fail "system_info must be readable"
+printf '%s' "$read_acl" | grep -q '"secrets_audit"' || fail "secrets_audit must be readable"
 if printf '%s' "$read_acl" | grep -q '"gateway_token"\|"install_path_probe"'; then fail "sensitive or mutating methods must not be readable"; fi
 printf '%s' "$write_acl" | grep -q '"gateway_token"' || fail "gateway_token must require write ACL"
 printf '%s' "$write_acl" | grep -q '"install_path_probe"' || fail "install_path_probe must require write ACL"

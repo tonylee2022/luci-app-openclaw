@@ -13,7 +13,7 @@ PKG_MAINTAINER:=tonylee2022 <tonylee2022@users.noreply.github.com>
 PKG_LICENSE:=GPL-3.0
 
 LUCI_TITLE:=OpenClaw AI 网关 LuCI 管理插件
-LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +curl +openssl-util +script-utils +tar +ttyd +qrencode +libstdcpp
+LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +curl +openssl-util +tar +ttyd +qrencode +libstdcpp
 LUCI_PKGARCH:=all
 
 # 优先使用 luci.mk (feeds 模式), 不可用时回退 package.mk
@@ -75,12 +75,6 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_BIN) ./root/usr/share/rpcd/ucode/luci.openclaw $(1)/usr/share/rpcd/ucode/luci.openclaw
 	$(INSTALL_DIR) $(1)/usr/share/openclaw
 	$(INSTALL_DATA) ./VERSION $(1)/usr/share/openclaw/VERSION
-	$(INSTALL_BIN) ./root/usr/share/openclaw/oc-config.sh $(1)/usr/share/openclaw/oc-config.sh
-	$(INSTALL_DATA) ./root/usr/share/openclaw/oc-menu-engine.js $(1)/usr/share/openclaw/oc-menu-engine.js
-	$(INSTALL_DATA) ./root/usr/share/openclaw/oc-config-interactive.js $(1)/usr/share/openclaw/oc-config-interactive.js
-	$(INSTALL_DATA) ./root/usr/share/openclaw/web-pty.js $(1)/usr/share/openclaw/web-pty.js
-	$(INSTALL_DIR) $(1)/usr/share/openclaw/ui
-	$(CP) ./root/usr/share/openclaw/ui/* $(1)/usr/share/openclaw/ui/
 endef
 
 define Package/$(PKG_NAME)/postinst

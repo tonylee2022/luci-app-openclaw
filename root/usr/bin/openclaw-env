@@ -1,24 +1,30 @@
 #!/bin/sh
 # ============================================================================
-# openclaw-env — Node.js 环境自动检测/下载 + OpenClaw 安装
-# 用法:
-#   openclaw-env setup     — 完整安装 (Node.js + pnpm + OpenClaw)
-#   openclaw-env check     — 检查环境状态
-#   openclaw-env upgrade   — 升级 OpenClaw 到最新版
-#   openclaw-env node      — 仅下载/更新 Node.js
-# 环境变量:
-#   OC_VERSION  — stable 使用维护验证版，latest 使用 npm 正式 latest；不支持测试版本
+# openclaw-env — Node.js 环境检测/下载 + OpenClaw 安装与维护
+#
+# 用法：
+#   openclaw-env setup          — 完整安装 (Node.js + pnpm + OpenClaw)
+#   openclaw-env setup-offline  — 离线安装 (从本地文件，由 .run 安装器调用)
+#   openclaw-env check          — 检查环境状态
+#   openclaw-env upgrade        — 升级 OpenClaw 到 npm latest
+#   openclaw-env node [x.y.z]   — 仅下载/更新 Node.js (默认使用内置版本)
+#   openclaw-env factory-reset  — 恢复出厂设置 (清空配置后重新初始化)
+#
+# 环境变量：
+#   OC_VERSION             — stable 用维护验证版，latest 用 npm 正式 latest; 不支持测试版
+#   NODE_VERSION           — 覆盖默认 Node 版本 (仍须满足最低要求)
+#   OPENCLAW_INSTALL_PATH  — 覆盖安装基础目录 (默认取 uci openclaw.main.install_path)
 # ============================================================================
 set -e
 
 # ── Node.js 版本策略 ──
-# 默认运行时版本，用于 OpenClaw v2026.6.6+
-NODE_VERSION_V2="24.17.0"
+# 默认运行时版本，用于 OpenClaw v2026.6.9+
+NODE_VERSION_V2="22.22.3"
 # 可通过 NODE_VERSION 环境变量覆盖，但仍必须满足最低版本要求。
 NODE_VERSION="${NODE_VERSION:-${NODE_VERSION_V2}}"
 # 经过验证的 OpenClaw 稳定版本 (更新此值需同步测试)
-OC_TESTED_VERSION="2026.6.6"
-# OpenClaw 2026.6.6 package.json engines.node 的最低要求。
+OC_TESTED_VERSION="2026.6.9"
+# OpenClaw 2026.6.9 package.json engines.node 的最低要求。
 # 如果未来上游提高要求，安装成功后还会从 package.json 再做一次强校验。
 OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-22.19.0}"
 # 用户可通过 OC_VERSION 环境变量覆盖安装版本
@@ -57,8 +63,8 @@ fi
 # ── OverlayFS 兼容性修复 ──
 # iStoreOS/OpenWrt 上 Docker 的 bind mount (/overlay/upper/opt/docker)
 # 会导致 OverlayFS 合并视图中 /opt 完全不可写 (mkdir 报 "Directory not empty")。
-# 解决方案: 将 /overlay/upper/opt bind mount 到 /opt，绕过 OverlayFS 冲突。
-# 注意: 仅当基础路径为 /opt 时才需要此修复
+# 解决方案：将 /overlay/upper/opt bind mount 到 /opt，绕过 OverlayFS 冲突。
+# 注意：仅当基础路径为 /opt 时才需要此修复
 _oc_fix_opt() {
 	# 如果基础路径不是 /opt，无需修复
 	[ "$OC_BASE_PATH" != "/opt" ] && return 0
@@ -100,6 +106,18 @@ export TMPDIR="${OC_TMP}"
 log_info() { echo "  [✓] $1"; }
 log_warn() { echo "  [!] $1"; }
 log_error() { echo "  [✗] $1"; }
+
+# 写入 openclaw.json 的单个点路径键值：_oc_json_set <file> <dot.key> <value>。
+# 值先尝试按 JSON 解析(数字/布尔/对象), 失败则按字符串存。缺失的中间层自动补建。
+_oc_json_set() {
+	_OC_JS_FILE="$1" _OC_JS_KEY="$2" _OC_JS_VAL="$3" "$NODE_BIN" -e '
+const fs=require("fs"),f=process.env._OC_JS_FILE;let d={};
+try{d=JSON.parse(fs.readFileSync(f,"utf8"));}catch(e){}
+const ks=process.env._OC_JS_KEY.split(".");let o=d;
+for(let i=0;i<ks.length-1;i++){if(!o[ks[i]]||typeof o[ks[i]]!=="object")o[ks[i]]={};o=o[ks[i]];}
+let v=process.env._OC_JS_VAL;try{v=JSON.parse(v);}catch(e){}
+o[ks[ks.length-1]]=v;fs.writeFileSync(f,JSON.stringify(d,null,2));' 2>/dev/null
+}
 
 # 安全创建目录 (会在 _oc_fix_opt 修复 /opt 后使用标准路径)
 ensure_mkdir() {
@@ -195,7 +213,7 @@ detect_libc() {
 }
 
 # 在所有可能的位置查找 openclaw 入口文件
-# pnpm 全局安装路径形如: $OC_GLOBAL/5/node_modules/openclaw
+# pnpm 全局安装路径形如：$OC_GLOBAL/5/node_modules/openclaw
 find_oc_entry() {
 	local search_dirs="${OC_GLOBAL}/lib/node_modules/openclaw
 ${OC_GLOBAL}/node_modules/openclaw
@@ -278,7 +296,7 @@ download_node() {
 	local libc_type
 	libc_type=$(detect_libc)
 
-	# 如果已存在且版本兼容, 跳过
+	# 如果已存在且版本兼容，跳过
 	if [ -x "$NODE_BIN" ]; then
 		local current_ver
 		current_ver=$("$NODE_BIN" --version 2>/dev/null | sed 's/^v//')
@@ -287,7 +305,7 @@ download_node() {
 			assert_node_runtime
 			return 0
 		fi
-		# 已装版本与目标主版本号相同则视为兼容, 跳过下载(避免无谓重装)。
+		# 已装版本与目标主版本号相同则视为兼容，跳过下载(避免无谓重装)。
 		local cur_major=$(echo "$current_ver" | cut -d. -f1)
 		local want_major=$(echo "$node_ver" | cut -d. -f1)
 		if [ "$cur_major" = "$want_major" ]; then
@@ -350,7 +368,7 @@ download_node() {
 		exit 1
 	fi
 
-	# 解压: 先解到暂存目录(${NODE_BASE}.new), 校验通过后再替换现有 NODE_BASE。
+	# 解压：先解到暂存目录(${NODE_BASE}.new), 校验通过后再替换现有 NODE_BASE。
 	# 避免下载包损坏/解压失败时旧 node 已被删而新 node 没装上 → node 丢失、网关起不来。
 	local staging="${NODE_BASE}.new"
 	local staging_bin="${staging}/bin/node"
@@ -359,7 +377,7 @@ download_node() {
 	[ -d /overlay/upper ] && rm -rf "/overlay/upper${staging}" 2>/dev/null
 	ensure_mkdir "$staging"
 	# BusyBox tar 不内置 xz 自动解压，且遇到 xz 文件时会打印 "invalid tar magic"
-	# 却仍返回 0 (假成功)，因此不能依赖返回码判断。此处用内容检测:
+	# 却仍返回 0 (假成功)，因此不能依赖返回码判断。此处用内容检测：
 	# 若 tar 无法列出归档内容，则先用独立的 xz/xzcat 解压成普通 tar 再处理。
 	local tar_input="$tmp_file"
 	local decompressed=""
@@ -383,11 +401,11 @@ download_node() {
 		tar_input="$decompressed"
 	fi
 	# 兼容 BusyBox tar (不支持 --strip-components) 和 GNU tar
-	# 方法: 先解压到临时目录，再移动顶层子目录内容到目标目录
+	# 方法：先解压到临时目录，再移动顶层子目录内容到目标目录
 	if tar --strip-components=1 -xf "$tar_input" -C "$staging" 2>/dev/null && [ -x "$staging_bin" ]; then
 		: # GNU tar 成功
 	else
-		# BusyBox tar 回退: 解压到临时目录后手动移动
+		# BusyBox tar 回退：解压到临时目录后手动移动
 		local tmp_extract="/tmp/node-extract-$$"
 		rm -rf "$tmp_extract"
 		ensure_mkdir "$tmp_extract"
@@ -407,13 +425,13 @@ download_node() {
 	fi
 	rm -f "$tmp_file" "$decompressed"
 
-	# 暂存校验: 新 node 可执行且能报版本; 不通过则保留现有 node, 清理暂存。
+	# 暂存校验：新 node 可执行且能报版本；不通过则保留现有 node, 清理暂存。
 	if [ ! -x "$staging_bin" ] || ! "$staging_bin" --version >/dev/null 2>&1; then
 		log_error "新 Node.js 校验失败，已保留现有版本"
 		rm -rf "$staging"
 		exit 1
 	fi
-	# 校验通过, 替换现有 NODE_BASE(同盘 mv 极快, 无 node 的窗口仅毫秒级)。
+	# 校验通过，替换现有 NODE_BASE(同盘 mv 极快，无 node 的窗口仅毫秒级)。
 	rm -rf "$NODE_BASE" 2>/dev/null
 	[ -d /overlay/upper ] && rm -rf "/overlay/upper${NODE_BASE}" 2>/dev/null
 	if ! mv "$staging" "$NODE_BASE" 2>/dev/null; then
@@ -437,7 +455,7 @@ install_pnpm() {
 	echo ""
 	echo "=== 准备 pnpm (corepack) ==="
 
-	# OpenClaw 运行时用 pnpm 管理插件/渠道/技能。与官方一致, 用 Node 自带的 corepack 启用 pnpm 垫片,
+	# OpenClaw 运行时用 pnpm 管理插件/渠道/技能。与官方一致，用 Node 自带的 corepack 启用 pnpm 垫片，
 	# 不再手动 npm install -g pnpm。我们打包的 Node v22 必带 corepack, 故不保留 npm 回退。
 	# pnpm 实际版本由 corepack 在调用时按需匹配 (OpenClaw 用 11.x 均可)。
 	local COREPACK="${NODE_BASE}/bin/corepack"
@@ -449,7 +467,7 @@ install_pnpm() {
 		return 0
 	fi
 
-	# enable 默认把 pnpm 垫片装到 node 同目录 (NODE_BASE/bin, 已在 PATH 上)。幂等, 可重复执行。
+	# enable 默认把 pnpm 垫片装到 node 同目录 (NODE_BASE/bin, 已在 PATH 上)。幂等，可重复执行。
 	"$NODE_BIN" "$COREPACK" enable pnpm 2>/dev/null \
 		|| "$NODE_BIN" "$COREPACK" enable 2>/dev/null
 
@@ -463,7 +481,7 @@ install_pnpm() {
 
 # 把打包的 node 工具软链到 /usr/bin, 使其在标准 PATH 上可见。
 # node 打包在非标准位置 (/opt/openclaw/node/bin), 默认 PATH (/usr/sbin:/usr/bin:/sbin:/bin) 看不到它。
-# OpenClaw 给 agent 执行命令/工具时用的是净化过的环境, 没有软链就找不到 node。
+# OpenClaw 给 agent 执行命令/工具时用的是净化过的环境，没有软链就找不到 node。
 # 软链后任何上下文 (agent-exec / 登录 shell / 子进程) 都能直接用 node/npm/pnpm。
 link_node_tools() {
 	echo ""
@@ -815,7 +833,7 @@ do_factory_reset() {
 	# 5. 重新初始化
 	if [ -x "$NODE_BIN" ]; then
 		local oc_entry
-		oc_entry=$(find "$OC_GLOBAL" -name "openclaw.mjs" -path "*/openclaw/openclaw.mjs" 2>/dev/null | head -1)
+		oc_entry=$(find_oc_entry)
 		if [ -n "$oc_entry" ]; then
 			log_info "重新初始化..."
 			HOME="$OC_HOME" OPENCLAW_HOME="$OC_HOME" OPENCLAW_STATE_DIR="$OC_STATE_DIR" OPENCLAW_CONFIG_PATH="$CONFIG_FILE" \
@@ -824,21 +842,19 @@ do_factory_reset() {
 	fi
 
 	# 6. 应用 OpenWrt 适配配置
+	#    令牌只写 UCI(运行时经 env 注入网关), 不写明文进 openclaw.json —— 与 init.d 的令牌解耦一致。
 	if [ -x "$NODE_BIN" ] && [ -f "$config_file" ]; then
-		local new_token
+		local new_token kv
 		new_token=$(head -c 24 /dev/urandom | hexdump -e '24/1 "%02x"' 2>/dev/null || dd if=/dev/urandom bs=24 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n' | head -c 48)
-		_JS_KEY="gateway.port" _JS_VAL="18789" "$NODE_BIN" -e "const fs=require('fs');let d={};try{d=JSON.parse(fs.readFileSync('${config_file}','utf8'));}catch(e){}const ks=process.env._JS_KEY.split('.');let o=d;for(let i=0;i<ks.length-1;i++){if(!o[ks[i]]||typeof o[ks[i]]!=='object')o[ks[i]]={};o=o[ks[i]];}let v=process.env._JS_VAL;try{v=JSON.parse(v);}catch(e){}o[ks[ks.length-1]]=v;fs.writeFileSync('${config_file}',JSON.stringify(d,null,2));" 2>/dev/null
-		for kv in "gateway.bind=lan" "gateway.mode=local" "gateway.auth.mode=token" "gateway.auth.token=${new_token}" "gateway.controlUi.allowInsecureAuth=true" "gateway.controlUi.dangerouslyDisableDeviceAuth=true" "gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback=true" "gateway.tailscale.mode=off" "acp.dispatch.enabled=false" "tools.profile=coding"; do
-			local k="${kv%%=*}" v="${kv#*=}"
-			_JS_KEY="$k" _JS_VAL="$v" "$NODE_BIN" -e "const fs=require('fs');let d={};try{d=JSON.parse(fs.readFileSync('${config_file}','utf8'));}catch(e){}const ks=process.env._JS_KEY.split('.');let o=d;for(let i=0;i<ks.length-1;i++){if(!o[ks[i]]||typeof o[ks[i]]!=='object')o[ks[i]]={};o=o[ks[i]];}let v=process.env._JS_VAL;try{v=JSON.parse(v);}catch(e){}o[ks[ks.length-1]]=v;fs.writeFileSync('${config_file}',JSON.stringify(d,null,2));" 2>/dev/null
+		for kv in "gateway.port=18789" "gateway.bind=lan" "gateway.mode=local" "gateway.auth.mode=token" "gateway.controlUi.dangerouslyDisableDeviceAuth=true" "gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback=true" "gateway.tailscale.mode=off" "acp.dispatch.enabled=false" "tools.profile=coding"; do
+			_oc_json_set "$config_file" "${kv%%=*}" "${kv#*=}"
 		done
 		chown openclaw:openclaw "$config_file" 2>/dev/null || true
 
-		# 同步 token 到 UCI
-		. /lib/functions.sh 2>/dev/null || true
+		# 令牌写入 UCI (唯一真源); 网关重启时 init.d 经 env 注入。
 		uci set openclaw.main.token="$new_token" 2>/dev/null || true
 		uci commit openclaw 2>/dev/null || true
-		log_info "新认证令牌: $new_token"
+		log_info "新认证令牌已生成 (存于 UCI)"
 	fi
 
 	# 7. 确保数据目录权限正确 (防止 root 操作留下的文件)

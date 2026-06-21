@@ -69,15 +69,9 @@ install_files() {
 	mkdir -p "$dest/usr/share/rpcd/acl.d"
 	cp "$PKG_DIR/root/usr/share/rpcd/acl.d/"*.json "$dest/usr/share/rpcd/acl.d/"
 
-	# oc-config assets
+	# openclaw 共享资源 (仅 VERSION; web-pty/oc-config 配置菜单已退役)
 	mkdir -p "$dest/usr/share/openclaw"
 	cp "$PKG_DIR/VERSION" "$dest/usr/share/openclaw/VERSION"
-	cp "$PKG_DIR/root/usr/share/openclaw/oc-config.sh" "$dest/usr/share/openclaw/"
-	chmod +x "$dest/usr/share/openclaw/oc-config.sh"
-	cp "$PKG_DIR/root/usr/share/openclaw/"*.js "$dest/usr/share/openclaw/"
-
-	# Web PTY UI (recursive copy)
-	cp -r "$PKG_DIR/root/usr/share/openclaw/ui" "$dest/usr/share/openclaw/"
 }
 
 # 创建安装器脚本头部
@@ -106,10 +100,10 @@ case "$ARCH" in
 esac
 
 # 检查依赖 (与 control Depends 一致)
-# script-utils 提供 script 命令 (配置终端真实 PTY), tar 提供 GNU tar (解 Node.js .tar.xz, 自动带入 xz)
+# ttyd 提供配置向导终端, tar 提供 GNU tar (解 Node.js .tar.xz, 自动带入 xz)
 echo "正在检查依赖..."
 opkg update >/dev/null 2>&1 || true
-for dep in luci-base rpcd-mod-ucode curl openssl-util script-utils tar ttyd qrencode libstdcpp; do
+for dep in luci-base rpcd-mod-ucode curl openssl-util tar ttyd qrencode libstdcpp; do
 	if ! opkg list-installed 2>/dev/null | grep -q "^${dep} "; then
 		echo "  安装依赖 $dep ..."
 		opkg install "$dep" 2>/dev/null || echo "  ⚠ 安装 $dep 失败，请手动 opkg install $dep"
@@ -204,9 +198,7 @@ rm -rf /usr/lib/lua/luci/model/cbi/openclaw /usr/lib/lua/luci/view/openclaw /usr
 rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
 rm -f /tmp/luci-indexcache.*.json 2>/dev/null
 
-# 重启 Web PTY 服务 (使其加载新文件); procd 实例 kill 后自动 respawn
-PTY_PID=$(pgrep -f 'web-pty.js' 2>/dev/null | head -1)
-[ -n "$PTY_PID" ] && kill "$PTY_PID" 2>/dev/null
+# 旧版残留的 root 配置终端进程由 uci-defaults 在升级时清理 (见 99-openclaw)。
 # rpcd 的 ucode 模块常驻内存, 新版后端需重载 rpcd 才能生效。
 # 重载(reload, 保留登录会话)由 LuCI 前端在安装成功后自动触发, 不在此处执行。
 

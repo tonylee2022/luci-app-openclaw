@@ -123,11 +123,8 @@ function status() {
 	let p = paths();
 	if (!p) return reply(false, '安装路径无效');
 	let port = `${uci_get('port') || '18789'}`;
-	let pty_port = `${uci_get('pty_port') || '18793'}`;
 	if (!match(port, /^[0-9]+$/)) port = '18789';
-	if (!match(pty_port, /^[0-9]+$/)) pty_port = '18793';
 	let gateway = +run(`if command -v ss >/dev/null; then ss -tulnp | grep -c ':${port} '; else netstat -tulnp | grep -c ':${port} '; fi || true`) > 0;
-	let pty = +run(`if command -v ss >/dev/null; then ss -tulnp | grep -c ':${pty_port} '; else netstat -tulnp | grep -c ':${pty_port} '; fi || true`) > 0;
 	let pid = gateway ? run(`netstat -tulnp | awk '/:${port} /{split($NF,a,"/");print a[1];exit}'`) : '';
 	let config = {};
 	try { config = json(readfile(p.config)); } catch (e) {}
@@ -146,10 +143,10 @@ function status() {
 	let stable_version = stable_m ? stable_m[1] : '';
 	return reply(true, '', {
 		enabled: `${uci_get('enabled') || '0'}`,
-		port, pty_port, install_path: p.root, node_path: p.node, gateway_running: gateway,
+		port, install_path: p.root, node_path: p.node, gateway_running: gateway,
 		gateway_starting: !gateway && gateway_instance.running == true,
 		gateway_failed: !gateway && gateway_instance.exit_code != null && gateway_instance.exit_code != 0,
-		gateway_exit_code: gateway_instance.exit_code ?? '', pty_running: pty, pid,
+		gateway_exit_code: gateway_instance.exit_code ?? '', pid,
 		memory_kb, uptime: '', node_version: cached.node_version,
 		oc_version: cached.oc_version, plugin_version: cached.plugin_version, disk_free: cached.disk_free,
 		active_model: config?.agents?.defaults?.model?.primary || '', channels: channel_text,
@@ -233,7 +230,7 @@ function backup_list() {
 }
 
 function gateway_token() {
-	return reply(true, '', { token: uci_get('token') || '', pty_token: uci_get('pty_token') || '' });
+	return reply(true, '', { token: uci_get('token') || '' });
 }
 
 function wechat_status() {
@@ -261,12 +258,19 @@ function telegram_status(request) {
 	let cfg = {};
 	try { cfg = json(readfile(p.config)); } catch (e) {}
 	let tg = cfg?.channels?.telegram || {};
-	let token = `${tg.botToken || ''}`;
-	let bot_id = '';
-	let m = match(token, /^([0-9]+):/);
-	if (m) bot_id = m[1];
-	let bot_name = '', bot_username = '';
-	if (length(token)) {
+	// botToken 可能是: 明文(数字:字母), 或经 `openclaw secrets` 迁移后的 SecretRef
+	// (对象, 或 ${..}/$X/secret:// 字符串)。SecretRef 下密钥已托管、不可见,
+	// 不能拿占位符去调 getMe(必 401), 故此时仅标记“已配置”、跳过 getMe, 不报错。
+	let raw = tg.botToken;
+	let isObjRef = type(raw) == 'object';
+	let token = isObjRef ? '' : `${raw || ''}`;
+	let isPlain = !isObjRef && !!match(token, /^[0-9]+:/);
+	let secret_managed = isObjRef || (length(token) > 0 && !isPlain);
+	let configured = isObjRef || length(token) > 0;
+	let bot_id = '', bot_name = '', bot_username = '';
+	if (isPlain) {
+		let m = match(token, /^([0-9]+):/);
+		if (m) bot_id = m[1];
 		let cache = {};
 		if (!force) try { cache = json(readfile('/tmp/luci-openclaw-tg-bot.json')) || {}; } catch (e) {}
 		if (cache.bot_id == bot_id && length(`${cache.username || ''}`)) {
@@ -293,16 +297,58 @@ function telegram_status(request) {
 			if (type(af?.allowFrom) == 'array') for (let x in af.allowFrom) push(paired, `${x}`);
 		} catch (e) {}
 	}
-	return reply(true, '', { configured: length(token) > 0, enabled: tg.enabled == true, bot_id, bot_name, bot_username, paired_ids: paired });
+	return reply(true, '', { configured, secret_managed, enabled: tg.enabled == true, bot_id, bot_name, bot_username, paired_ids: paired });
 }
 
 // 渠道会话隔离: 读全局 session.dmScope。未显式设置时官方默认 "main"(所有私信共用一个会话, 即跨渠道共享)。
 function dm_scope() {
-	let out = trim(run('/usr/bin/openclaw config get session.dmScope --json 2>&1') || '');
+	// 直接读配置文件(瞬时, 网关没起也能读); 弃用慢的 `openclaw config get` CLI(~1.5s)。
+	let p = paths();
 	let scope = 'main';
-	let mm = match(out, /\b(per-account-channel-peer|per-channel-peer|per-peer|main)\b/);
-	if (mm) scope = mm[1];
+	if (p) {
+		try { let v = json(readfile(p.config))?.session?.dmScope; if (length(`${v || ''}`)) scope = `${v}`; } catch (e) {}
+	}
 	return reply(true, '', { scope });
+}
+
+// 文件权属检查: 扫描 OC_ROOT 下非 openclaw 属主的条目(数量 + 示例)。
+// root 属主残留会导致以 openclaw 身份的插件 update EACCES, 配合 perm_fix 一键归位。
+function perm_check() {
+	let p = paths();
+	if (!p) return reply(false, '安装路径无效');
+	if (!access(p.root)) return reply(false, 'OpenClaw 未安装');
+	let lines = split(trim(run('/usr/libexec/openclaw-rpc.sh perm-check 2>/dev/null') || ''), '\n');
+	let count = +trim(lines[0] ?? '0');
+	let samples = [];
+	for (let i = 1; i < length(lines); i++) { let l = trim(lines[i]); if (length(l)) push(samples, l); }
+	return reply(true, '', { count: count < 0 ? 0 : count, samples });
+}
+
+// 只读: openclaw secrets audit --json, 列出明文密钥/未解析引用/遗留残留。
+// 用于健康页提示用户用 `openclaw secrets configure` 迁移; audit 有发现时退出码非 0,
+// 但 run() 仍捕获 stdout, 故当信息态处理, 不视为失败。
+function secrets_audit() {
+	let p = paths();
+	if (!p) return reply(false, '安装路径无效');
+	if (!access(p.root)) return reply(false, 'OpenClaw 未安装');
+	let out = run('/usr/bin/openclaw secrets audit --json 2>/dev/null');
+	let j;
+	try { j = json(out); } catch (e) { return reply(false, '无法解析 secrets audit 输出', {}); }
+	if (type(j) != 'object') return reply(false, '命令无输出 (OpenClaw 未安装或不支持 secrets)', {});
+	let findings = [];
+	for (let f in (j.findings || []))
+		push(findings, { code: `${f.code || ''}`, severity: `${f.severity || ''}`, file: `${f.file || ''}`, path: `${f.jsonPath || ''}`, message: `${f.message || ''}` });
+	let s = j.summary || {};
+	return reply(true, '', {
+		status: `${j.status || ''}`,
+		summary: {
+			plaintext: +(s.plaintextCount || 0),
+			unresolved: +(s.unresolvedRefCount || 0),
+			shadowed: +(s.shadowedRefCount || 0),
+			legacy: +(s.legacyResidueCount || 0)
+		},
+		findings
+	});
 }
 
 function env_upgrade_check() {
@@ -364,22 +410,22 @@ function cli_json(action) {
 // channels list 的 accounts 是配置层面的账号槽位, 登出后仍保留;
 // 真实已登录账号要看 channels status 的 channelAccounts。这里合并运行态覆盖配置态。
 function channels_list() {
-	let listOut = run('/usr/libexec/openclaw-rpc.sh cli-channels-list');
-	if (!length(listOut)) return reply(false, '命令无输出 (网关可能未运行或 OpenClaw 未安装)', {});
-	let data;
-	try { data = json(listOut); }
-	catch (e) { return reply(false, '解析输出失败', { raw: listOut }); }
+	// 提速: 渠道清单/origin 从配置文件取(瞬时), 实时登录态只跑一次 `channels status`;
+	// 弃用慢的 `channels list`(~5.4s), 整体 9.3s → ~3.9s。无缓存, 每次实时。
+	let p = paths();
+	if (!p) return reply(false, '安装路径无效');
+	let cfgChannels = {};
+	try { cfgChannels = json(readfile(p.config))?.channels || {}; } catch (e) {}
+	let active = {};
 	let statusOut = run('/usr/libexec/openclaw-rpc.sh cli-channels-status');
-	if (length(statusOut)) {
-		try {
-			let active = json(statusOut)?.channelAccounts || {};
-			for (let name in (data?.chat || {})) {
-				if (type(active[name]) == 'array')
-					data.chat[name].accounts = active[name];
-			}
-		} catch (e) {}
-	}
-	return reply(true, '', data);
+	if (length(statusOut)) { try { active = json(statusOut)?.channelAccounts || {}; } catch (e) {} }
+	let chat = {};
+	for (let name in cfgChannels)
+		chat[name] = { accounts: (type(active[name]) == 'array' ? active[name] : []), origin: 'configured', installed: true };
+	for (let name in active)
+		if (!(name in chat)) chat[name] = { accounts: (type(active[name]) == 'array' ? active[name] : []), origin: 'configured', installed: true };
+	if (!length(chat) && !length(statusOut)) return reply(false, '命令无输出 (网关可能未运行或 OpenClaw 未安装)', {});
+	return reply(true, '', { chat });
 }
 
 function logs_tail(request) {
@@ -480,6 +526,9 @@ const methods = {
 	telegram_status: { args: { force: '' }, call: telegram_status },
 	dm_scope: { call: dm_scope },
 	dm_scope_set: { args: { scope: '' }, call: (r) => match(r.args.scope, /^(main|per-peer|per-channel-peer|per-account-channel-peer)$/) ? run_action('dm-scope-set', [ r.args.scope ]) : reply(false, '会话作用域无效') },
+	perm_check: { call: perm_check },
+	perm_fix: { call: () => run_action('perm-fix') },
+	secrets_audit: { call: secrets_audit },
 	wechat_install_log: { call: () => reply(true, '', task_status('/tmp/openclaw-wechat-install')) },
 	wechat_login_status: { call: () => { let data = task_status('/tmp/openclaw-wechat-login', '/tmp/openclaw-wechat-qrcode.txt'); data.qrcode = data.log; data.qrcode_url = match(data.log, /https?:\/\/[A-Za-z0-9._~:\/?#@!$&'()*+,;=%-]+/g)?.[-1]?.[0] || ''; data.logged_in = match(data.log, /(登录成功|成功登录|Login success|Logged in|Local login saved auth)/) != null; if (data.logged_in) data.state = 'success'; else if (data.running && data.qrcode_url) data.state = 'qrcode'; else if (data.running) data.state = 'starting'; return reply(true, '', data); } },
 	wechat_update_check: { call: wechat_update_check },

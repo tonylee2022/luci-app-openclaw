@@ -78,7 +78,7 @@ return view.extend({
 		api.wizardStop();
 		var status = E('div', { 'class': 'oc-action-status' });
 		dom.content(container, E('div', { 'class': 'oc-card-body' }, [
-			E('p', { 'class': 'oc-muted' }, _('配置已保存，正在重启网关使其生效：')),
+			E('p', { 'class': 'oc-muted' }, _('配置已保存。')),
 			status
 		]));
 		return this.restartGateway(status);
@@ -135,6 +135,9 @@ return view.extend({
 		this.healthStatus = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
 		this.fixState = E('div', { 'class': 'oc-task-state', 'style': 'display:none' });
 		this.fixLog = E('pre', { 'class': 'oc-log', 'style': 'display:none' }, '');
+		this.permState = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
+		this.secretsState = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
+		this.secretsBox = E('div', {});
 		return E('div', {}, [
 			E('div', { 'class': 'oc-card' }, [
 				E('div', { 'class': 'oc-card-title' }, _('健康检查与修复')),
@@ -147,8 +150,77 @@ return view.extend({
 					E('div', { 'class': 'oc-task-wrap' }, [ this.fixState, this.fixLog ]),
 					this.findingsBox
 				])
+			]),
+			E('div', { 'class': 'oc-card' }, [
+				E('div', { 'class': 'oc-card-title' }, _('文件权属')),
+				E('div', { 'class': 'oc-card-body' }, [
+					E('p', { 'class': 'oc-muted' }, _('OpenClaw 以 openclaw 用户运行；若安装目录里出现 root 属主残留文件，会导致插件更新失败（EACCES）。此处可检查并一键归位。')),
+					E('div', { 'class': 'oc-actions' }, [
+						ocui.button(_('检查权属'), 'cbi-button-action', L.bind(this.runPermCheck, this)),
+						ocui.button(_('修复权属'), 'cbi-button-positive', L.bind(this.runPermFix, this))
+					]),
+					this.permState
+				])
+			]),
+			E('div', { 'class': 'oc-card' }, [
+				E('div', { 'class': 'oc-card-title' }, _('密钥明文扫描')),
+				E('div', { 'class': 'oc-card-body' }, [
+					E('p', { 'class': 'oc-muted' }, _('扫描 openclaw.json 等文件中以明文存储的密钥。OpenClaw 备份到私有 git 仓库时，明文会一并提交。如需迁移为 SecretRef（引用），请在 OpenClaw 终端运行 openclaw secrets configure。网关令牌由本插件经环境变量注入，无需迁移。')),
+					E('div', { 'class': 'oc-actions' }, [
+						ocui.button(_('扫描明文密钥'), 'cbi-button-action', L.bind(this.runSecretsAudit, this))
+					]),
+					this.secretsState,
+					this.secretsBox
+				])
 			])
 		]);
+	},
+
+	runSecretsAudit: function() {
+		var self = this;
+		ocui.setStatus(this.secretsState, 'running', _('正在扫描明文密钥...'));
+		dom.content(this.secretsBox, '');
+		return api.secretsAudit().then(function(r) {
+			if (!r.ok) { ocui.setStatus(self.secretsState, 'error', r.message || _('扫描失败')); ocui.hideStatusLater(self.secretsState); return; }
+			var d = r.data || {}, s = d.summary || {}, findings = d.findings || [];
+			var plain = s.plaintext || 0;
+			if (!findings.length) { ocui.setStatus(self.secretsState, 'success', _('未发现明文密钥。')); ocui.hideStatusLater(self.secretsState); return; }
+			if (plain > 0) ocui.setStatus(self.secretsState, 'warn', _('发现 %s 处明文密钥；可在 OpenClaw 终端运行 openclaw secrets configure 迁移。').format(plain));
+			else ocui.setStatus(self.secretsState, 'success', _('无明文密钥（仅信息项）。'));
+			var rows = findings.map(function(f) {
+				var sev = f.severity === 'warn' ? 'warning' : (f.severity || 'info');
+				return E('div', { 'class': 'oc-finding' }, [
+					E('span', { 'class': 'oc-badge ' + severityClass(sev) }, f.code || ''),
+					E('div', { 'class': 'oc-finding-body' }, [
+						E('div', { 'class': 'oc-finding-msg' }, f.message || ''),
+						E('div', { 'class': 'oc-finding-id' }, (f.path || '') + (f.file ? '  ·  ' + f.file : ''))
+					])
+				]);
+			});
+			dom.content(self.secretsBox, rows);
+		}).catch(function(e) { ocui.setStatus(self.secretsState, 'error', String(e && e.message || e)); });
+	},
+
+	runPermCheck: function() {
+		var self = this;
+		ocui.setStatus(this.permState, 'running', _('正在检查文件权属...'));
+		return api.permCheck().then(function(r) {
+			if (!r.ok) { ocui.setStatus(self.permState, 'error', r.message || _('检查失败')); ocui.hideStatusLater(self.permState); return; }
+			var d = r.data || {};
+			if (!d.count) { ocui.setStatus(self.permState, 'success', _('文件属主正常（全部归 openclaw）。')); ocui.hideStatusLater(self.permState); return; }
+			var eg = (d.samples || []).slice(0, 3).join('，');
+			ocui.setStatus(self.permState, 'warn', _('发现 %s 个非 openclaw 属主文件，建议点「修复权属」。示例：%s').format(d.count, eg || '-'));
+		}).catch(function(e) { ocui.setStatus(self.permState, 'error', String(e && e.message || e)); });
+	},
+
+	runPermFix: function() {
+		var self = this;
+		return ocui.runOp(this.permState, {
+			running: _('正在修复文件权属...'),
+			success: _('文件权属已修复。'),
+			submit: function() { return api.permFix(); },
+			onDone: function(ok) { if (ok) self.runPermCheck(); }
+		});
 	},
 
 	renderFindings: function(result) {
@@ -352,7 +424,7 @@ return view.extend({
 					E('div', { 'class': 'oc-actions' }, [
 						ocui.button(_('配置消息渠道（向导）'), 'cbi-button-positive', L.bind(function() { return this.launchWizard(this.channelWizard, 'channels'); }, this)),
 						ocui.button(_('渠道会话隔离'), 'cbi-button-action', L.bind(this.showDmScope, this)),
-						ocui.button(_('刷新'), '', L.bind(function() { return this.refreshChannels(true); }, this))
+						ocui.button(_('刷新'), '', L.bind(function() { this.refreshDmScopeLabel(); return this.refreshChannels(true); }, this))
 					]),
 					E('p', { 'class': 'oc-muted', 'style': 'margin-top:.6rem' }, _('说明：官方向导配置微信渠道时只会安装 openclaw-weixin 插件，不会进入扫码登录。安装完成后，请到下方「微信渠道」卡片点击「扫码登录」完成账号登录。'))
 				])
@@ -408,7 +480,7 @@ return view.extend({
 						E('div', { 'class': 'oc-field', 'style': 'align-items:center' }, [ E('span', {}, _('渠道状态')), this.tgState ]),
 					E('div', { 'class': 'oc-actions', 'style': 'margin-top:.6rem' }, [
 						ocui.button(_('保存并启用'), 'cbi-button-positive', L.bind(this.saveTelegram, this)),
-						ocui.button(_('刷新'), '', L.bind(function() { return this.refreshChannels(true); }, this))
+						ocui.button(_('刷新'), '', L.bind(function() { this.refreshDmScopeLabel(); return this.refreshChannels(true); }, this))
 					]),
 					E('div', { 'class': 'oc-section-label' }, _('配对（审批私信发起者）')),
 					E('p', { 'class': 'oc-muted' }, _('保存 token 后，点「配对助手」，再用 Telegram 给你的 Bot 发一条私信；助手会自动捕获配对请求并批准（无需手动复制配对码）。也可手动填配对码兜底。')),

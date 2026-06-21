@@ -19,7 +19,6 @@ return view.extend({
 				state: d.gateway_running ? _('运行中') : d.gateway_starting ? _('启动中') : d.gateway_failed ? _('启动失败') : _('已停止'),
 				autostart: d.enabled === '1' ? _('是') : _('否'),
 				gateway: d.gateway_running ? _('监听端口 %s').format(d.port) : _('未监听'),
-				pty: d.pty_running ? _('监听端口 %s').format(d.pty_port) : _('未监听'),
 				model: d.active_model || _('未配置'), channels: d.channels || _('未配置'), pid: d.pid || '-',
 				memory: d.memory_kb ? (d.memory_kb / 1024).toFixed(1) + ' MB' : '-', node: d.node_version || _('未安装'),
 				openclaw: d.oc_version || _('未安装'), plugin: d.plugin_version || '-', path: d.oc_version ? (d.install_path || '-') : '-', node_path: d.node_version ? (d.node_path || '-') : '-', disk: d.disk_free || '-'
@@ -597,7 +596,7 @@ return view.extend({
 		var ghLink = E('a', { href: 'https://github.com/tonylee2022/luci-app-openclaw', target: '_blank', rel: 'noopener', 'class': 'oc-gh' });
 		ghLink.innerHTML = '<svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>github.com/tonylee2022/luci-app-openclaw</span>';
 		var statusGroups = [
-			{ label: _('服务'), fields: [ ['state', _('状态'), 'cbi-button oc-state-run oc-state-badge'], ['autostart', _('开机自启')], ['gateway', _('网关')], ['pty', _('配置终端')], ['model', _('活跃模型')], ['channels', _('消息渠道')] ] },
+			{ label: _('服务'), fields: [ ['state', _('状态'), 'cbi-button oc-state-run oc-state-badge'], ['autostart', _('开机自启')], ['gateway', _('网关')], ['model', _('活跃模型')], ['channels', _('消息渠道')] ] },
 			{ label: '', fields: [ ['pid', _('PID')], ['memory', _('内存')] ] },
 			{ label: '', fields: [ ['node', _('Node.js')], ['openclaw', _('OpenClaw 版本')], ['plugin', _('插件版本')], ['path', _('安装路径')], ['node_path', _('Node.js 路径')], ['disk', _('剩余空间')] ] }
 		];

@@ -27,7 +27,7 @@ OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 ## ✨ 功能特性
 
 ### 基本设置（服务 → OpenClaw → 基本设置）
-- **状态概览**：运行状态徽标（运行中 / 启动中 / 已停止）、开机自启（可一键切换）、网关与配置终端端口、活跃模型、消息渠道、PID、内存、Node.js / OpenClaw / 插件版本、安装路径、剩余空间。
+- **状态概览**：运行状态徽标（运行中 / 启动中 / 已停止）、开机自启（可一键切换）、网关端口、活跃模型、消息渠道、PID、内存、Node.js / OpenClaw / 插件版本、安装路径、剩余空间。
 - **快捷操作**：安装运行环境、启动 / 重启 / 仅重启网关 / 停止、切换开机自启、检测升级（LuCI 插件）、环境升级、备份/恢复、卸载环境。每个操作点击即在信息栏提示进度，长任务带实时日志面板。
 - **安装运行环境**：自动列出可用磁盘挂载点及可用空间，选择安装位置 + 版本（稳定版/最新版），安装前做容量与写入权限检查。
 - **环境升级**：升级 OpenClaw 到最新版、更新内置 npm、升级指定版本 Node.js（升级后自动重启网关）。
@@ -40,7 +40,7 @@ OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 - **渠道**：仅列出已配置渠道。
   - **微信渠道**：安装插件 / 扫码登录（清晰可扫的二维码）/ 检测升级 / 卸载 / 已登录账号管理。
   - **Telegram 渠道**：填入 Bot Token 一键配置；并提供**配对**：填配对码审批私信发起者 / 查看待配对请求。
-- **健康检查**：运行 `openclaw doctor`（lint / 一键修复）。
+- **健康检查**：运行 `openclaw doctor`（lint / 一键修复）；**文件权属**检查与一键修复（修正 root 属主残留导致的插件更新 EACCES）；**密钥明文扫描**（`openclaw secrets audit`，列出 `openclaw.json` / auth-profiles 中以明文存储的密钥，引导在终端用 `openclaw secrets configure` 迁移为 SecretRef）。
 - **日志**：网关日志查看（行数 50/100/200、加载、清空、2 秒自动刷新）。
 
 ### 其它
@@ -55,7 +55,7 @@ OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 | 固件 | OpenWrt **23.05+** 及其衍生版（LEDE / ImmortalWrt / iStoreOS 等） |
 | 架构 | x86_64 或 aarch64 (ARM64) |
 | C 库 | musl（自动检测） |
-| 依赖 | luci-base、rpcd-mod-ucode、curl、openssl-util、tar、script-utils、ttyd、qrencode、libstdcpp |
+| 依赖 | luci-base、rpcd-mod-ucode、curl、openssl-util、tar、ttyd、qrencode、libstdcpp |
 | 存储 | **2GB 以上可用空间** |
 | 内存 | 推荐 1GB 及以上 |
 
@@ -63,7 +63,7 @@ OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 
 | 组件 | 默认版本 | 说明 |
 |------|----------|------|
-| OpenClaw | `2026.6.6` | 默认安装版本；可选「最新版」 |
+| OpenClaw | `2026.6.9` | 默认安装版本；可选「最新版」 |
 | Node.js | `22.22.3` | 最低要求 `22.19.0` |
 | 微信插件 | 官方兼容版本 | `@tencent-weixin/openclaw-weixin@latest` |
 
@@ -175,8 +175,12 @@ openclaw-env setup
 
 ## 🔒 安全模型
 
-- OpenClaw 以 `openclaw` 系统用户运行；`/usr/bin/openclaw` 与 `openclaw-shell` 在被 root 调用时自动降权，配置终端（ttyd）也以 `openclaw` 身份运行。
-- 插件的启用、禁用、白名单、拒绝列表等策略完全由 OpenClaw 官方机制与用户配置管理，本项目不干预这些策略。
+- **非 root 运行**：OpenClaw 始终以 `openclaw` 系统用户运行；`/usr/bin/openclaw` 与 `openclaw-shell` 在被 root 调用时自动降权，配置向导终端（ttyd）以 `openclaw` 身份运行并绑定 `br-lan`（仅 LAN 可达）。
+- **网关令牌解耦**：网关认证令牌存于 UCI（`/etc/config/openclaw`，不在 OpenClaw 的状态目录/git 备份范围内），运行时经环境变量（`OPENCLAW_GATEWAY_TOKEN` / `gateway run --token`）注入网关与 CLI。`openclaw.json` **不再写入明文令牌**——因此用户在 OpenClaw 内用 `openclaw secrets configure/apply` 迁移或抹除 `gateway.auth.token` 时，env 注入优先生效，LuCI 控制台与各功能不受影响。
+- **SecretRef 兼容**：Telegram 等渠道状态在密钥被迁移为 SecretRef（密钥已托管）后能优雅降级显示，不会因读到引用而出错；健康检查提供「密钥明文扫描」引导迁移。
+- **配置终端**：早期以 root 监听网络的 Web PTY（`web-pty`）已**退役**（它曾构成 `openclaw`→root 本地提权面）；配置统一改用以 `openclaw` 身份、绑 `br-lan` 的 ttyd 向导。
+- **Web 控制台的信任假设**：内嵌的 OpenClaw 控制台经 LAN、HTTP 访问，为此放宽了网关的设备认证与来源校验，意味着**信任 LAN 内的访问者**——请勿将网关端口（默认 18789）暴露到 WAN。详见 [SECURITY.md](SECURITY.md)。
+- **插件策略不干预**：插件的启用、禁用、白名单、拒绝列表等策略完全由 OpenClaw 官方机制与用户配置管理，本项目不干预（微信渠道的用户驱动安装/启用/卸载除外）。
 
 ## 📜 版权与开源声明
 
@@ -208,7 +212,7 @@ luci-app-openclaw/
 │       └── share/
 │           ├── luci/menu.d/          # LuCI 菜单
 │           ├── rpcd/                 # ucode API 与 ACL
-│           └── openclaw/             # 配置终端资源
+│           └── openclaw/             # VERSION 等共享资源
 ├── scripts/                          # .ipk / .run 构建与发布脚本
 └── .github/workflows/                # 在线构建并发布到 GitHub Release
 ```

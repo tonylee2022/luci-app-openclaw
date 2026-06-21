@@ -66,15 +66,9 @@ chmod +x "$DATA_DIR/usr/share/rpcd/ucode/luci.openclaw"
 mkdir -p "$DATA_DIR/usr/share/rpcd/acl.d"
 cp "$PKG_DIR/root/usr/share/rpcd/acl.d/"*.json "$DATA_DIR/usr/share/rpcd/acl.d/"
 
-# oc-config assets
+# openclaw 共享资源 (仅 VERSION; web-pty/oc-config 配置菜单已退役)
 mkdir -p "$DATA_DIR/usr/share/openclaw"
 cp "$PKG_DIR/VERSION" "$DATA_DIR/usr/share/openclaw/VERSION"
-cp "$PKG_DIR/root/usr/share/openclaw/oc-config.sh" "$DATA_DIR/usr/share/openclaw/"
-chmod +x "$DATA_DIR/usr/share/openclaw/oc-config.sh"
-cp "$PKG_DIR/root/usr/share/openclaw/"*.js "$DATA_DIR/usr/share/openclaw/"
-
-# Web PTY UI
-cp -r "$PKG_DIR/root/usr/share/openclaw/ui" "$DATA_DIR/usr/share/openclaw/"
 
 # 计算安装大小
 INSTALLED_SIZE=$(du -sk "$DATA_DIR" | awk '{print $1}')
@@ -123,7 +117,6 @@ cat > "$CTRL_DIR/postinst" << 'EOF'
 		USER_PORT=$(sed -n "s/^\s*option\s\+port\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$OLD_CONFIG" 2>/dev/null | tail -1)
 		USER_BIND=$(sed -n "s/^\s*option\s\+bind\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$OLD_CONFIG" 2>/dev/null | tail -1)
 		USER_TOKEN=$(sed -n "s/^\s*option\s\+token\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$OLD_CONFIG" 2>/dev/null | tail -1)
-		USER_PTY_PORT=$(sed -n "s/^\s*option\s\+pty_port\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$OLD_CONFIG" 2>/dev/null | tail -1)
 		USER_INSTALL_PATH=$(sed -n "s/^\s*option\s\+install_path\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$OLD_CONFIG" 2>/dev/null | tail -1)
 		
 		# 步骤2: 备份旧配置 (带时间戳)
@@ -141,7 +134,6 @@ cat > "$CTRL_DIR/postinst" << 'EOF'
 		[ -n "$USER_PORT" ] && sed -i "s/^\(\s*option\s\+port\s\+\).*/\\1'$USER_PORT'/" "$OLD_CONFIG" 2>/dev/null || true
 		[ -n "$USER_BIND" ] && sed -i "s/^\(\s*option\s\+bind\s\+\).*/\\1'$USER_BIND'/" "$OLD_CONFIG" 2>/dev/null || true
 		[ -n "$USER_TOKEN" ] && sed -i "s/^\(\s*option\s\+token\s\+\).*/\\1'$USER_TOKEN'/" "$OLD_CONFIG" 2>/dev/null || true
-		[ -n "$USER_PTY_PORT" ] && sed -i "s/^\(\s*option\s\+pty_port\s\+\).*/\\1'$USER_PTY_PORT'/" "$OLD_CONFIG" 2>/dev/null || true
 		[ -n "$USER_INSTALL_PATH" ] && sed -i "s/^\(\s*option\s\+install_path\s\+\).*/\\1'$USER_INSTALL_PATH'/" "$OLD_CONFIG" 2>/dev/null || true
 		
 		echo "配置合并完成，用户设置已保留"
@@ -159,9 +151,7 @@ cat > "$CTRL_DIR/postinst" << 'EOF'
 	# 清理 LuCI 缓存
 	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* /tmp/luci-indexcache.*.json 2>/dev/null
 
-	# 重启 Web PTY (使其加载新文件); procd 会自动 respawn
-	PTY_PID=$(pgrep -f 'web-pty.js' 2>/dev/null | head -1)
-	[ -n "$PTY_PID" ] && kill "$PTY_PID" 2>/dev/null || true
+	# 旧版残留的 root 配置终端进程由 uci-defaults 在升级时清理 (见 99-openclaw)。
 
 	# rpcd 的 ucode 模块常驻内存，新版后端需重载 rpcd 才能生效。
 	# 经 LuCI「检测升级」路径安装时，重载由前端在安装完成后自动触发（reload 保留登录会话，不强制重登录）；

@@ -1,5 +1,17 @@
 ﻿# 更新记录
 
+## [1.1.2]
+
+- **安全 · 网关令牌解耦**：网关认证令牌改由环境变量（`OPENCLAW_GATEWAY_TOKEN` / `gateway run --token`）注入，`openclaw.json` 不再写入明文令牌；令牌仅存于 UCI（不在 OpenClaw 备份范围内）。用户在 OpenClaw 内用 `openclaw secrets` 迁移/抹除 `gateway.auth.token` 不再影响 LuCI 控制台。
+- **安全 · 退役 Web PTY 根终端**：移除以 root 监听网络、凭世界可读令牌即得 root shell 的 `web-pty`（及 `oc-config.sh`/`ui` 等遗留资源），消除 `openclaw`→root 本地提权面；配置统一改用以 `openclaw` 身份运行的 ttyd 向导。依赖去掉 `script-utils`。
+- **安全 · 移除冗余 `controlUi.allowInsecureAuth`**：该标志仅放宽 localhost，已被 `dangerouslyDisableDeviceAuth` 覆盖，不再写入并清理旧值。
+- **SecretRef 兼容**：Telegram 渠道状态在 Bot Token 迁移为 SecretRef 后优雅降级（密钥已托管），不再因读到引用而出错。
+- **健康检查 · 密钥明文扫描**：新增 `openclaw secrets audit` 入口，列出明文存储的密钥并引导迁移。
+- **消息渠道状态提速**：渠道状态加载由 ~11s 降至 ~4s（减少慢 CLI 调用、`dm_scope` 改读配置文件），无缓存、刷新即实时。
+- **版本默认值**：默认 OpenClaw 稳定版 `2026.6.6` → `2026.6.9`；默认 Node.js `24.17.0` → `22.22.3`（最低要求仍为 `22.19.0`）。
+- **openclaw-env 整理**：抽出 `_oc_json_set` 复用配置写入逻辑（消除重复内联脚本）；`factory-reset` 复用 `find_oc_entry`，且令牌只写 UCI、不再写明文进 `openclaw.json`（与令牌解耦一致）。
+- 文档（README / SECURITY）同步更新安全模型与信任假设。
+
 ## [1.1.1]
 
 - 升级 OpenClaw 改用官方 `openclaw update` 编排（核心 + 插件 sync + doctor），对齐官方"停网关→更新→起网关"。

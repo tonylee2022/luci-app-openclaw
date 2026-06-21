@@ -28,6 +28,7 @@
 .oc-task-running { color: #174ea6; background: #e8f0fe; border-color: #aecbfa; }
 .oc-task-success { color: #137333; background: #e6f4ea; border-color: #a8dab5; }
 .oc-task-error { color: #b3261e; background: #fce8e6; border-color: #f5b7b1; white-space: pre-wrap; }
+.oc-task-warn { color: #8a4b00; background: #fef7e0; border-color: #f7d774; white-space: pre-wrap; }
 .oc-capacity { margin: .85rem 0; padding: .8rem; border: 1px solid #d5d8dc; border-radius: .4rem; background: #f7f8fa; }
 .oc-capacity-title { font-weight: 600; margin-bottom: .55rem; }
 .oc-capacity-grid { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: .35rem .75rem; }
@@ -83,6 +84,7 @@
 .oc-dark .oc-task-running { color: #8ab4f8; background: rgba(138,180,248,.12); border-color: rgba(138,180,248,.3); }
 .oc-dark .oc-task-success { color: #81c995; background: rgba(129,201,149,.12); border-color: rgba(129,201,149,.3); }
 .oc-dark .oc-task-error   { color: #f28b82; background: rgba(242,139,130,.12); border-color: rgba(242,139,130,.3); }
+.oc-dark .oc-task-warn    { color: #ffa857; background: rgba(255,168,87,.12); border-color: rgba(255,168,87,.3); }
 .oc-dark .oc-capacity { background: #252525; border-color: #3a3a3a; }
 .oc-dark .oc-capacity-checking { color: #8ab4f8; background: rgba(138,180,248,.12); border-color: rgba(138,180,248,.3); }
 .oc-dark .oc-capacity-ok    { color: #81c995; background: rgba(129,201,149,.12); border-color: rgba(129,201,149,.3); }

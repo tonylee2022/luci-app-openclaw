@@ -8,7 +8,7 @@ STOP=10
 EXTRA_COMMANDS="setup status_service restart_gateway"
 EXTRA_HELP="    setup            下载 Node.js 并安装 OpenClaw
         status_service   显示服务状态
-        restart_gateway  仅重启 Gateway 实例 (不影响 Web PTY)"
+        restart_gateway  仅重启 Gateway 实例"
 
 # ── 安装路径 (支持自定义) ──
 # 从 UCI 配置读取自定义路径，公开字段仍为 install_path。
@@ -153,8 +153,8 @@ done
 }
 
 sync_uci_to_json() {
-# 将 UCI 配置同步到 openclaw.json，同时确保 token 双向同步
-local port bind token json_token
+# 将 UCI 配置同步到 openclaw.json (端口/绑定/控制台安全项等)。
+local port bind token
 port=$(uci -q get openclaw.main.port || echo "18789")
 bind=$(uci -q get openclaw.main.bind || echo "lan")
 token=$(uci -q get openclaw.main.token || echo "")
@@ -165,23 +165,10 @@ if [ ! -f "$CONFIG_FILE" ]; then
 echo '{}' > "$CONFIG_FILE"
 fi
 
-# 尝试从 JSON 读取 token (用于双向同步检测)
-if [ -x "$NODE_BIN" ]; then
-	json_token=$("$NODE_BIN" -e "
-try{const d=JSON.parse(require('fs').readFileSync('${CONFIG_FILE}','utf8'));
-if(d.gateway&&d.gateway.auth&&d.gateway.auth.token)process.stdout.write(d.gateway.auth.token);}catch(e){}
-" 2>/dev/null)
-fi
-
-# 双向同步时 JSON 中的 token 优先。
-# 原因: doctor --fix 或其他操作可能修改 JSON 中的 token
-# 如果 JSON 有 token 且与 UCI 不同，以 JSON 为准
-if [ -n "$json_token" ] && [ "$json_token" != "$token" ]; then
-	token="$json_token"
-	logger -t openclaw "Token 同步: JSON -> UCI"
-fi
-
-# UCI 和 JSON 都没有 token 时，生成一个新的
+# 令牌解耦: 运行时网关认证改由 --token / OPENCLAW_GATEWAY_TOKEN env 提供(env 赢过配置)。
+# 不再从 openclaw.json 回读令牌, UCI 成为唯一真源; openclaw.json 不再保存明文令牌。
+# 这样用户在 OpenClaw 内用 secrets 迁移/抹除 gateway.auth.token, 也不影响 LuCI 控制台。
+# UCI 没有 token 时生成一个 (LuCI 与控制台共用的本地令牌)。
 if [ -z "$token" ]; then
 	token=$(head -c 24 /dev/urandom | hexdump -e '24/1 "%02x"' 2>/dev/null || openssl rand -hex 24 2>/dev/null || dd if=/dev/urandom bs=24 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n' | head -c 48)
 	logger -t openclaw "Token 生成: 新 token"
@@ -197,7 +184,7 @@ fi
 
 # 使用 Node.js 写入 JSON (如果可用)
 if [ -x "$NODE_BIN" ]; then
-OC_SYNC_PORT="$port" OC_SYNC_BIND="$bind" OC_SYNC_TOKEN="$token" OC_SYNC_FILE="$CONFIG_FILE" \
+OC_SYNC_PORT="$port" OC_SYNC_BIND="$bind" OC_SYNC_FILE="$CONFIG_FILE" \
 "$NODE_BIN" -e "
 // OPENCLAW_SYNC_JS_START
 const fs=require('fs');
@@ -210,9 +197,12 @@ d.gateway.bind=process.env.OC_SYNC_BIND||'lan';
 d.gateway.mode='local';
 if(!d.gateway.auth)d.gateway.auth={};
 d.gateway.auth.mode='token';
-d.gateway.auth.token=process.env.OC_SYNC_TOKEN||'';
+// 不写明文令牌: 运行时由 --token/OPENCLAW_GATEWAY_TOKEN env 提供(env 赢过配置)。
+// 保留用户经 secrets 迁移的 SecretRef(对象或 \${..}/secret:// 字符串), 否则删除明文键, 避免明文进入 git 备份。
+{var _t=d.gateway.auth.token;var _isRef=(_t&&typeof _t==='object')||(typeof _t==='string'&&(_t.charAt(0)==='\$'||_t.indexOf('secret://')===0));if(!_isRef){delete d.gateway.auth.token;}}
 if(!d.gateway.controlUi)d.gateway.controlUi={};
-d.gateway.controlUi.allowInsecureAuth=true;
+// allowInsecureAuth 仅放宽 localhost, 已被 dangerouslyDisableDeviceAuth(全局关设备校验)覆盖, 冗余 -> 移除并清旧值。
+delete d.gateway.controlUi.allowInsecureAuth;
 d.gateway.controlUi.dangerouslyDisableDeviceAuth=true;
 d.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback=true;
 // 清理无效字段，避免配置验证失败。
@@ -259,12 +249,11 @@ chown openclaw:openclaw "$CONFIG_FILE" 2>/dev/null || true
 }
 
 start_service() {
-local enabled port bind pty_port
+local enabled port bind
 config_load openclaw
 config_get enabled main enabled "0"
 config_get port main port "18789"
 config_get bind main bind "lan"
-config_get pty_port main pty_port "18793"
 
 [ "$enabled" = "1" ] || {
 echo "openclaw 已禁用。请在 /etc/config/openclaw 中设置 enabled 为 1"
@@ -374,8 +363,8 @@ if (!d.gateway.port) d.gateway.port = 18789;
 if (!d.gateway.bind) d.gateway.bind = 'lan';
 
 // 确保 controlUi 安全配置存在 (允许非 loopback 绑定和 LuCI iframe 嵌入)
+// allowInsecureAuth 仅放宽 localhost, 已被 dangerouslyDisableDeviceAuth 覆盖, 冗余 -> 不再写入。
 if (!d.gateway.controlUi) d.gateway.controlUi = {};
-if (d.gateway.controlUi.allowInsecureAuth !== true) d.gateway.controlUi.allowInsecureAuth = true;
 if (d.gateway.controlUi.dangerouslyDisableDeviceAuth !== true) d.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
 if (d.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback !== true) d.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
 
@@ -402,27 +391,8 @@ fs.writeFileSync(f, JSON.stringify(d, null, 2));
 	}
 	_ensure_critical_config
 
-		# doctor --fix 后再次同步 token。
-		# doctor --fix 可能修改了 JSON 中的 token，必须同步回 UCI
-		# 否则 LuCI 显示的 token 与 Gateway 实际使用的 token 不一致
-		_sync_token_after_doctor() {
-			[ ! -f "$CONFIG_FILE" ] && return
-			[ ! -x "$NODE_BIN" ] && return
-			local json_token uci_token
-			json_token=$("$NODE_BIN" -e "
-try{const d=JSON.parse(require('fs').readFileSync('${CONFIG_FILE}','utf8'));
-if(d.gateway&&d.gateway.auth&&d.gateway.auth.token)process.stdout.write(d.gateway.auth.token);}catch(e){}
-			" 2>/dev/null)
-			uci_token=$(uci -q get openclaw.main.token || echo "")
-
-			# JSON 有 token 且与 UCI 不同时，以 JSON 为准更新 UCI
-			if [ -n "$json_token" ] && [ "$json_token" != "$uci_token" ]; then
-				uci set openclaw.main.token="$json_token"
-				uci commit openclaw 2>/dev/null
-				logger -t openclaw "Token 同步 (doctor 后): JSON -> UCI"
-			fi
-		}
-		_sync_token_after_doctor
+		# 令牌解耦后无需在 doctor 之后回读 JSON 令牌: 运行时由 env 注入(env 赢过配置),
+		# UCI 是唯一真源。doctor --fix 即使改动 openclaw.json 的 gateway.auth.token 也不影响认证。
 
 		# 确保 Gateway 启动前所有数据目录权限正确。
 		# doctor --fix 或 _ensure_critical_config 可能创建新的目录/文件
@@ -514,13 +484,19 @@ _ensure_port_free "$port"
 	# 在交给 procd 的最后一刻恢复运行用户权限。
 	fix_openclaw_runtime_ownership
 
+	# 网关认证令牌: 由 LuCI 经 env/--token 注入(env 赢过 openclaw.json 的引用/明文)。
+	# 令牌存于 UCI(/etc/config, 不在 OpenClaw 的 git 备份内); sync_uci_to_json 已确保其存在。
+	# 这样用户在 OpenClaw 内迁移/抹除 gateway.auth.token 也不会让控制台失去登录入口。
+	local gw_token
+	gw_token=$(uci -q get openclaw.main.token 2>/dev/null || echo "")
+
 	procd_open_instance "gateway"
 	# procd_set_param env 与 procd_set_param user 组合时, env 不会被应用到降权后的进程
 	# (实测网关拿到的是 procd 自身的 HOME=/root + 无 node 的默认 PATH, 进而污染 agent-exec/工具子进程环境)。
 	# 故用 /bin/sh -c 在进程内显式 export 全套环境再 exec node。路径在此处(init 脚本作用域)展开为字面值,
 	# 运行时不再依赖 uci/oc_load_paths 解析, 不受 procd 受限环境影响。网关及其派生子进程均继承正确环境。
 	procd_set_param command /bin/sh -c \
-	"export HOME='$OC_HOME' OPENCLAW_HOME='$OC_HOME' OPENCLAW_STATE_DIR='$OC_STATE_DIR' OPENCLAW_CONFIG_PATH='$CONFIG_FILE' NPM_CONFIG_PREFIX='$OC_GLOBAL' NPM_CONFIG_CACHE='$OC_NPM_CACHE' TMPDIR='$OC_TMP' NODE_ICU_DATA='${NODE_BASE}/share/icu' PATH='${NODE_BASE}/bin:${OC_GLOBAL}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'; exec '$NODE_BIN' '$oc_entry' gateway run --port '$port' --bind '$gw_bind'"
+	"export HOME='$OC_HOME' OPENCLAW_HOME='$OC_HOME' OPENCLAW_STATE_DIR='$OC_STATE_DIR' OPENCLAW_CONFIG_PATH='$CONFIG_FILE' NPM_CONFIG_PREFIX='$OC_GLOBAL' NPM_CONFIG_CACHE='$OC_NPM_CACHE' TMPDIR='$OC_TMP' NODE_ICU_DATA='${NODE_BASE}/share/icu' OPENCLAW_GATEWAY_TOKEN='$gw_token' PATH='${NODE_BASE}/bin:${OC_GLOBAL}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'; exec '$NODE_BIN' '$oc_entry' gateway run --port '$port' --bind '$gw_bind' --token '$gw_token'"
 	# procd env+user 共存时 env 无效，故不在此设 env。
 procd_set_param user openclaw
 procd_set_param respawn 3600 10 5
@@ -529,41 +505,8 @@ procd_set_param stderr 1
 procd_set_param pidfile /var/run/openclaw.pid
 procd_close_instance
 
-# 启动 Web PTY 配置终端 (辅助服务)
-# 复用已有 PTY token，只在不存在时才生成新的
-# 这样避免服务重启时 PTY WebSocket 连接因 token 变化而断开
-local pty_token
-pty_token=$(uci -q get openclaw.main.pty_token || echo "")
-if [ -z "$pty_token" ]; then
-	pty_token=$(head -c 16 /dev/urandom | hexdump -e '16/1 "%02x"' 2>/dev/null || openssl rand -hex 16 2>/dev/null || echo "pty_$(date +%s)")
-	uci set openclaw.main.pty_token="$pty_token"
-	uci commit openclaw 2>/dev/null
-fi
-
-procd_open_instance "pty"
-procd_set_param command "$NODE_BIN" /usr/share/openclaw/web-pty.js
-procd_set_param env \
-OC_CONFIG_PORT="$pty_port" \
-OC_PTY_TOKEN="$pty_token" \
-OC_CONFIG_SCRIPT="/usr/share/openclaw/oc-config.sh" \
-NODE_ICU_DATA="${NODE_BASE}/share/icu" \
-NODE_BASE="$NODE_BASE" \
-OC_GLOBAL="$OC_GLOBAL" \
-OC_DATA="$OC_DATA" \
-OC_HOME="$OC_HOME" \
-HOME="$OC_HOME" \
-OPENCLAW_HOME="$OC_HOME" \
-OPENCLAW_STATE_DIR="$OC_STATE_DIR" \
-OPENCLAW_CONFIG_PATH="$CONFIG_FILE" \
-NPM_CONFIG_PREFIX="$OC_GLOBAL" \
-NPM_CONFIG_CACHE="$OC_NPM_CACHE" \
-TMPDIR="$OC_TMP" \
-PATH="${NODE_BASE}/bin:${OC_GLOBAL}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-procd_set_param respawn 3600 5 5
-procd_set_param stdout 1
-procd_set_param stderr 1
-procd_set_param pidfile /var/run/openclaw-pty.pid
-procd_close_instance
+# Web PTY 配置终端已退役: 它以 root 监听网络、凭世界可读的终端令牌即得 root shell,
+# 构成 openclaw->root 本地提权。配置改由 ttyd 向导(openclaw 身份, 绑 br-lan)完成。
 }
 
 stop_service() {
@@ -614,8 +557,7 @@ if [ $wait_count -ge $max_wait ]; then
 fi
 
 # 5) 终极保险：使用暴力匹配端口杀死该名下任何相关占用进程
-local _pty_port=$(uci -q get openclaw.main.pty_port || echo "18793")
-for _p in "$port" "$_pty_port"; do
+for _p in "$port"; do
         local _spid=""
         if command -v ss >/dev/null 2>&1; then
                 _spid=$(ss -tulnp 2>/dev/null | grep ":${_p} " | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
@@ -652,8 +594,7 @@ echo "正在调用 openclaw-env setup..."
 }
 
 restart_gateway() {
-# 仅重启 Gateway 进程，通过 kill 触发 procd respawn
-# 绝对不能调用 start_service，否则会重启 PTY 实例
+# 仅重启 Gateway 进程，通过 kill 触发 procd respawn (不整体 start_service)
 
 local port
 port=$(uci -q get openclaw.main.port || echo "18789")
@@ -704,9 +645,8 @@ fi
 }
 
 status_service() {
-local port pty_port
+local port
 port=$(uci -q get openclaw.main.port || echo "18789")
-pty_port=$(uci -q get openclaw.main.pty_port || echo "18793")
 
 echo "=== OpenClaw 服务状态 ==="
 
@@ -774,12 +714,5 @@ elif pgrep -f "openclaw.*gateway" >/dev/null 2>&1; then
 echo "网关:     正在启动 (首次启动可能需要 2~5 分钟)"
 else
 echo "网关:     已停止"
-fi
-
-# PTY port
-if _check_port "$pty_port"; then
-echo "Web PTY:  运行中 (端口 $pty_port)"
-else
-echo "Web PTY:  已停止"
 fi
 }
