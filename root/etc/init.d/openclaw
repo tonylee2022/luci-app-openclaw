@@ -53,7 +53,8 @@ fi
 # 注意: 仅当基础路径为 /opt 时才需要此修复
 _oc_fix_opt() {
 	[ "$OC_BASE_PATH" != "/opt" ] && return 0
-	mkdir -p /opt/openclaw/.probe 2>/dev/null && { rmdir /opt/openclaw/.probe 2>/dev/null; return 0; }
+	# 探针用 /opt 根下临时目录, 不再用 /opt/openclaw/.probe(会残留空 /opt/openclaw)。
+	mkdir -p "/opt/.oc-write-test.$$" 2>/dev/null && { rmdir "/opt/.oc-write-test.$$" 2>/dev/null; return 0; }
 	if [ -d /overlay/upper/opt ]; then
 		mkdir -p /overlay/upper/opt/openclaw 2>/dev/null
 		mount --bind /overlay/upper/opt /opt 2>/dev/null && return 0
@@ -110,15 +111,16 @@ fix_openclaw_runtime_ownership() {
 	chmod -R u+rwX,go-rwx "$runtime_dir" 2>/dev/null || true
 }
 
+# 受管插件(.openclaw/npm/projects)归一到运行身份 openclaw。
+# OpenClaw 接受「插件文件属主 = 加载者(此处 openclaw) 或 root」两种(docs/tools/plugin.md:299);
+# 以 openclaw 持有最干净: 与 npm 安装的天然属主一致、不触发 perm_check 误报、不和 perm_fix 拉扯。
+# 旧版曾强制 root:root(图「插件代码不可被 openclaw/AI 篡改」的免疫), 但安装/向导/AI 工具装插件时
+# 会留 root 残留→属主检查误判、且全局其余目录本就 openclaw 可写, 该免疫意义有限。改为每次启动归一,
+# 无论谁(官方向导/内部 AI/CLI)装的插件都被规整为 openclaw, 杜绝 root 残留致重启失败/EACCES。
 fix_managed_plugin_ownership() {
 	local projects="${OC_DATA}/.openclaw/npm/projects"
 	[ -d "$projects" ] || return 0
-	local manifest plugin_dir
-	for manifest in $(find "$projects" -path '*/node_modules/*/openclaw.plugin.json' -type f 2>/dev/null); do
-		plugin_dir=${manifest%/*}
-		chown -R root:root "$plugin_dir" 2>/dev/null || true
-		chmod -R a+rX "$plugin_dir" 2>/dev/null || true
-	done
+	chown -R openclaw:openclaw "$projects" 2>/dev/null || true
 }
 
 patch_iframe_headers() {

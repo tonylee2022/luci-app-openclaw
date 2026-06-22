@@ -68,9 +68,10 @@ fi
 _oc_fix_opt() {
 	# 如果基础路径不是 /opt，无需修复
 	[ "$OC_BASE_PATH" != "/opt" ] && return 0
-	# 如果 /opt 可正常写入，无需修复
-	if mkdir -p /opt/openclaw/.probe 2>/dev/null; then
-		rmdir /opt/openclaw/.probe 2>/dev/null
+	# 如果 /opt 可正常写入，无需修复。探针用 /opt 根下的临时目录(用完即删),
+	# 不再用 /opt/openclaw/.probe —— 那会残留空的 /opt/openclaw 目录。
+	if mkdir -p "/opt/.oc-write-test.$$" 2>/dev/null; then
+		rmdir "/opt/.oc-write-test.$$" 2>/dev/null
 		return 0
 	fi
 	# /opt 不可写且 overlay upper 层存在 — 执行 bind mount 修复
@@ -137,6 +138,14 @@ ensure_openclaw_user() {
 	# OpenWrt 默认没有 useradd/adduser 的完整实现，所以沿用 uci-defaults 的轻量写法。
 	# 这里在安装链路再兜底一次，避免用户删除账号后微信插件安装或 Gateway 启动失败。
 	if id openclaw >/dev/null 2>&1 || grep -q '^openclaw:' /etc/passwd 2>/dev/null; then
+		# 已存在：纠正可能陈旧的 home（如旧 /opt 安装遗留——opkg remove 不删系统用户），
+		# 使其与当前安装路径一致，避免以 openclaw 身份的进程回退到旧 home。
+		local _cur_home
+		_cur_home=$(grep '^openclaw:' /etc/passwd 2>/dev/null | cut -d: -f6)
+		if [ -n "$_cur_home" ] && [ "$_cur_home" != "$OC_HOME" ]; then
+			flock /etc/passwd -c "sed -i 's|^\\(openclaw:[^:]*:[^:]*:[^:]*:[^:]*:\\)[^:]*:|\\1${OC_HOME}:|' /etc/passwd"
+			log_info "已更新 openclaw 用户 home：${_cur_home} -> ${OC_HOME}"
+		fi
 		return 0
 	fi
 

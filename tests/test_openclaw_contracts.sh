@@ -117,6 +117,11 @@ if grep -q '_sync_token_after_doctor\|JSON -> UCI' root/etc/init.d/openclaw; the
 	fail "must not pull gateway token from JSON back into UCI"
 fi
 grep -q 'OPENCLAW_GATEWAY_TOKEN' root/usr/libexec/openclaw-rpc.sh || fail "CLI must authenticate via OPENCLAW_GATEWAY_TOKEN env"
+# 同步网关 CLI 经 ucode popen 跑在 rpcd uloop 上, 必须有 timeout 上限, 否则网关挂死会锁死整个 LuCI。
+grep -Eq 'timeout [0-9]+ su -s /bin/sh openclaw' root/usr/libexec/openclaw-rpc.sh || fail "oc_cli_run must bound gateway CLI with timeout to avoid rpcd lockup"
+# 设置活跃模型必须用快速直写(model.primary), 不得同步跑会阻塞 rpcd 的 'models set'(连慢网关)或 'config patch'(实测 6s)。
+if grep -q 'oc_cli_run "models set' root/usr/libexec/openclaw-rpc.sh; then fail "model set must not block on slow 'openclaw models set'"; fi
+grep -A10 'cli-models-set)' root/usr/libexec/openclaw-rpc.sh | grep -q 'model.primary=process.env' || fail "cli-models-set must set primary via fast direct write"
 grep -q 'SecretRef\|密钥已托管' root/usr/share/rpcd/ucode/luci.openclaw || fail "telegram_status must handle SecretRef botToken without calling getMe on a ref"
 # web-pty 根终端退役: 消除 openclaw->root 提权(世界可读 pty_token + root 终端)及其暴露面。
 if grep -q 'web-pty.js' Makefile scripts/build_ipk.sh scripts/build_run.sh; then fail "retired web-pty must not be packaged"; fi

@@ -178,10 +178,12 @@ cat > "$CTRL_DIR/postrm" << 'EOF'
 [ -n "${IPKG_INSTROOT}" ] || {
 	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
 	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
-	# 完全卸载时(非升级)收尾: 清理 conffile 本体、opkg 冲突副本与所有备份残留。
+	# 完全卸载时(非升级)收尾: 清理 conffile 本体、opkg 冲突副本与所有备份残留, 以及 /tmp 中的任务/缓存/日志残留。
 	# opkg 升级时会设 PKG_UPGRADE=1, 真正卸载时未设; 仅真卸载才清理(opkg 默认保留 modified conffile)。
 	if [ "${PKG_UPGRADE}" != "1" ]; then
 		rm -f /etc/config/openclaw /etc/config/openclaw-opkg /etc/config/openclaw*.bak 2>/dev/null
+		rm -rf /tmp/openclaw 2>/dev/null
+		rm -f /tmp/openclaw-* /tmp/luci-openclaw-* 2>/dev/null
 	fi
 }
 EOF

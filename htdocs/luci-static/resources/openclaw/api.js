@@ -57,6 +57,7 @@ return baseclass.extend({
 	logsTail: call('logs_tail', [ 'lines' ]),
 	configSummary: call('config_summary'),
 	modelSet: call('model_set', [ 'model' ]),
+	modelFallbacksSet: call('model_fallbacks_set', [ 'models' ]),
 	qrEncode: call('qr_encode', [ 'text' ]),
 	taskCancel: call('task_cancel', [ 'name' ]),
 	wizardStatus: call('wizard_status'),

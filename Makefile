@@ -95,9 +95,9 @@ define Package/$(PKG_NAME)/postrm
 	rm -f /tmp/luci-openclaw-* /tmp/luci-openclaw-update-cache.* 2>/dev/null
 	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
 	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
-	# 完全卸载时(非升级)清理 conffile 本体、opkg 冲突副本与备份残留。
+	# 完全卸载时(非升级)清理 conffile 本体、opkg 冲突副本、备份残留, 以及 /tmp 任务/缓存/日志残留。
 	# opkg 升级时设 PKG_UPGRADE=1, 真卸载时为 0/未设; 仅真卸载才清理。
-	[ "$${PKG_UPGRADE}" = "1" ] || rm -f /etc/config/openclaw /etc/config/openclaw-opkg /etc/config/openclaw*.bak 2>/dev/null
+	[ "$${PKG_UPGRADE}" = "1" ] || { rm -f /etc/config/openclaw /etc/config/openclaw-opkg /etc/config/openclaw*.bak 2>/dev/null; rm -rf /tmp/openclaw 2>/dev/null; rm -f /tmp/openclaw-* /tmp/luci-openclaw-* 2>/dev/null; }
 }
 endef
 

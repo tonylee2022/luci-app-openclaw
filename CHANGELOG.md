@@ -1,5 +1,16 @@
 ﻿# 更新记录
 
+## [1.1.6]
+
+- **修复「设置活跃模型」卡死并拖垮 LuCI**：原先同步跑 `openclaw models set`（连慢网关 + 触发热重载重启 provider，网络异常时可达数十秒），经 ucode popen 阻塞 rpcd 的 uloop，导致整个 LuCI 无响应/打不开。改为**直接写 `agents.defaults.model.primary`**（实测 0.04s），网关 file-watcher 自动热重载该键；不再调用慢的 `config patch`（实测 6s）或 `models set`，也不再额外重启网关。附带消除"所选模型被塞进回退列表"问题（只改 primary）。
+- **`oc_cli_run` 加 `timeout` 安全网**：所有同步网关 CLI（channels/doctor/health/logs 等）经 ucode popen 跑在 rpcd 上，网关挂死时至多阻塞 30s 后返回，杜绝永久锁死 rpcd。
+- **插件安装零 `/opt` 足迹**：`uci-defaults` 不再在装插件时创建 `openclaw` 系统用户与 `/opt/openclaw` 目录骨架——这些改由「安装运行环境」(`openclaw-env setup`) 按所选安装路径创建。避免未装运行时就落地默认 `/opt` 残留、以及选自定义路径后的孤儿目录。
+- **修复自定义安装路径仍残留 `/opt/openclaw`**：①`_oc_fix_opt` 的 /opt 可写性探针改用 `/opt/.oc-write-test.$$`（用完即删），不再用 `/opt/openclaw/.probe`（会残留空 `/opt/openclaw`）；②`ensure_openclaw_user` 在用户已存在时**纠正陈旧 home**（旧 `/opt` 安装遗留、`opkg remove` 不删用户），使其与当前安装路径一致。
+- **修复自定义安装路径下 `openclaw` CLI 全线失效（回退 `/opt`）**：`/usr/bin/openclaw` 以 root 调用时先 `su` 降权到 openclaw，降权后 PATH 变为 `/bin:/usr/bin`（不含 `/sbin`），`uci`（在 `/sbin`）找不到 → `install_path` 解析回退到 `/opt` → 找不到 `/opt/node` 报 "OpenClaw Node.js not found"。装在 `/root` 等非默认路径时所有 `openclaw …` 命令（含 `agents auth`、Claude CLI 登录）均报错。现解析前补 `/sbin /usr/sbin` 进 PATH；`openclaw-shell` 同步加固。
+- **修复装插件/技能后留 root 属主文件、可致网关重启失败**：init.d 的 `fix_managed_plugin_ownership` 旧版每次启动把受管插件目录强制 `chown root:root`（图代码不可被 AI 篡改的免疫），导致官方向导/内部 AI/CLI 装的插件全留 root 残留 → `perm_check` 误报大量「权属问题」、与 `perm_fix` 反复拉扯。实测 OpenClaw 同时接受「插件属主 = 运行身份(openclaw) 或 root」(docs/tools/plugin.md)，故改为每次启动归一到 **openclaw**：无论谁装的插件/技能都被规整为运行身份，杜绝 root 残留与误报。
+- **新增「回退模型」直接管理**：提供商页新增入口，多选保留/一键清空 `agents.defaults.model.fallbacks` 并直接写配置（与活跃模型同款快路径，0.05s，网关热重载、不连网关、不阻塞 rpcd）。绕开官方 `configure` 向导——其模型多选会把已勾选的非 primary 模型全堆进 fallback，本入口提供稳定的兜底清理/精选；概览同时显示当前回退模型列表。
+- **重启网关后自动刷新配置页**：在配置页内重启网关（官方向导完成 / openclaw-shell）后，已加载的「提供商」「渠道」数据自动重新拉取，不必手动点各卡片「刷新」。
+
 ## [1.1.5]
 
 - **修复升级后状态概览插件版本陈旧**：插件版本之前被并入 60 秒状态缓存（`/tmp/luci-openclaw-status.*`），升级后概览仍显示旧版本，需多次刷新/等缓存过期才更新。现 `plugin_version` 不再缓存（它只是读 `/usr/share/openclaw/VERSION`，极廉价），每次实时读取，升级后立即正确。

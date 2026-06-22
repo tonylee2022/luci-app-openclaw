@@ -10,6 +10,9 @@ fi
 
 [ -r /usr/libexec/openclaw-paths.sh ] && . /usr/libexec/openclaw-paths.sh
 
+# 降权到 openclaw 后 PATH 可能不含 /sbin(uci 所在), 导致 install_path 解析失败、
+# 回退到 /opt——自定义安装路径(如 /root)会被错当成 /opt。补上 /sbin /usr/sbin。
+case ":$PATH:" in *:/sbin:*) ;; *) PATH="/usr/sbin:/sbin:$PATH" ;; esac
 configured_path="${OPENCLAW_INSTALL_PATH:-$(uci -q get openclaw.main.install_path 2>/dev/null || echo /opt)}"
 if command -v oc_load_paths >/dev/null 2>&1; then
 	oc_load_paths "$configured_path" || {

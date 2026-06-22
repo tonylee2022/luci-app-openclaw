@@ -129,7 +129,9 @@ oc_cli_run() {
 	entry=$(find_openclaw_entry) || fail "OpenClaw 未安装"
 	id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
 	# 直接交给 su -c (单层解析), 此处不可用 oc_quote, 否则单引号会成为字面量。
-	su -s /bin/sh openclaw -c "$(oc_cli_env) $NODE_BASE/bin/node $entry $1"
+	# timeout 安全网: 同步 CLI 经 ucode popen 跑在 rpcd 的 uloop 上, 网关挂死时会阻塞整个 rpcd → LuCI 打不开。
+	# 30s 宽于正常慢操作(health/logs 自带 12s), 但杜绝无限阻塞。
+	timeout 30 su -s /bin/sh openclaw -c "$(oc_cli_env) $NODE_BASE/bin/node $entry $1"
 }
 
 if [ "${OPENCLAW_RPC_LIBRARY_ONLY:-0}" = "1" ]; then
@@ -267,7 +269,9 @@ case "${1:-}" in
 		else
 			echo "Node.js 运行时已保留: $NODE_BASE"
 		fi
-		rm -f /tmp/openclaw-setup.* /tmp/openclaw-plugin-upgrade.* /tmp/openclaw-wechat-* /var/run/openclaw*.pid /tmp/luci-openclaw-status.*
+		# 清理 /tmp 残留: 网关日志目录、各任务文件(本卸载任务自身的 openclaw-uninstall.* 在用, 由 opkg 卸载的 postrm 收尾)、状态/缓存。
+		rm -rf /tmp/openclaw 2>/dev/null
+		rm -f /tmp/openclaw-setup.* /tmp/openclaw-plugin-upgrade.* /tmp/openclaw-wechat-* /tmp/openclaw-telegram-add.* /tmp/openclaw-doctor-fix.* /tmp/openclaw-env-upgrade.* /var/run/openclaw*.pid /tmp/luci-openclaw-*
 		sed -i '/^openclaw:/d' /etc/passwd /etc/shadow /etc/group 2>/dev/null || true
 		rm -f /etc/profile.d/openclaw.sh
 		echo "OpenClaw 运行环境已卸载。"
@@ -307,7 +311,34 @@ case "${1:-}" in
 	cli-models-set)
 		model="${2:-}"
 		echo "$model" | grep -Eq '^[A-Za-z0-9._/-]+$' || fail "模型 ID 无效"
-		oc_cli_run "models set $(oc_quote "$model")"
+		load_paths
+		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		# 仅改写 agents.defaults.model.primary, 直接写 openclaw.json(实测 0.04s); 网关 file-watcher 自动热重载该键
+		# (实测 config hot reload applied), provider 重启在网关内异步进行。
+		# 不再同步跑 `openclaw config patch`(实测 6s)或 `openclaw models set`(连慢网关+污染 fallbacks)——
+		# 它们经 ucode popen 跑在 rpcd uloop 上, 会阻塞整个 rpcd → LuCI 卡死打不开。
+		# model 经严格正则校验, 与文件路径均经 env 传入避免注入; 以 openclaw 身份写, 不产生 root 属主。
+		_js='const fs=require("fs"),f=process.env.OC_M_FILE;let d={};try{d=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){process.exit(1)}d.agents=(d.agents||{});d.agents.defaults=(d.agents.defaults||{});d.agents.defaults.model=(d.agents.defaults.model||{});d.agents.defaults.model.primary=process.env.OC_M_VAL;fs.writeFileSync(f,JSON.stringify(d,null,2))'
+		inner="OC_M_FILE=$(oc_quote "$CONFIG_FILE") OC_M_VAL=$(oc_quote "$model") $NODE_BASE/bin/node -e $(oc_quote "$_js")"
+		timeout 30 su -s /bin/sh openclaw -c "$inner" || fail "写入配置失败"
+		echo "活跃模型已设为 $model"
+		;;
+	cli-models-fallbacks-set)
+		# 直接改写 agents.defaults.model.fallbacks(逗号分隔; 空=清空), 绕开官方 configure 向导
+		# ——其 allowlist 多选默认勾上已配置模型(含 primary), 会把非-primary 全堆进 fallback。
+		# 与 cli-models-set 同款: 直接写 openclaw.json(快, 网关 file-watcher 热重载), 不连网关、不阻塞 rpcd。
+		list="${2:-}"
+		if [ -n "$list" ]; then
+			for m in $(echo "$list" | tr ',' ' '); do
+				echo "$m" | grep -Eq '^[A-Za-z0-9._/-]+$' || fail "回退模型 ID 无效: $m"
+			done
+		fi
+		load_paths
+		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		_js='const fs=require("fs"),f=process.env.OC_F_FILE;const a=(process.env.OC_F_VAL||"").split(",").map(s=>s.trim()).filter(Boolean);let d={};try{d=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){process.exit(1)}d.agents=(d.agents||{});d.agents.defaults=(d.agents.defaults||{});d.agents.defaults.model=(d.agents.defaults.model||{});if(a.length)d.agents.defaults.model.fallbacks=a;else delete d.agents.defaults.model.fallbacks;fs.writeFileSync(f,JSON.stringify(d,null,2))'
+		inner="OC_F_FILE=$(oc_quote "$CONFIG_FILE") OC_F_VAL=$(oc_quote "$list") $NODE_BASE/bin/node -e $(oc_quote "$_js")"
+		timeout 30 su -s /bin/sh openclaw -c "$inner" || fail "写入配置失败"
+		[ -n "$list" ] && echo "回退模型已更新" || echo "回退模型已清空"
 		;;
 	wizard-start)
 		# 按需拉起一个 ttyd 实例, 以 openclaw 身份在真实 PTY 中跑官方 configure 向导。
@@ -429,6 +460,7 @@ case "${1:-}" in
 		# 版本由 OpenClaw 官方逻辑(@latest)解析其认定的兼容版本, 不强取 npm raw latest。
 		# --force: 已装旧版时替换(install 否则会因 "plugin already exists" 失败);
 		# 登录态在 .openclaw/openclaw-weixin/ 单独保存, 不随插件代码替换而丢失。
+		# 插件属主由 init.d 的 fix_managed_plugin_ownership 在起网关时归一到 openclaw, 此处无需 chown。
 		cmd="/etc/init.d/openclaw stop; /usr/bin/openclaw plugins install --force '@tencent-weixin/openclaw-weixin@latest'; rc=\$?; /usr/bin/openclaw plugins enable openclaw-weixin >/dev/null 2>&1; /etc/init.d/openclaw start; exit \$rc"
 		start_task /tmp/openclaw-wechat-install "$cmd"
 		;;

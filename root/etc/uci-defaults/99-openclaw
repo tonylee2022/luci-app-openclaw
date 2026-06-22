@@ -1,63 +1,10 @@
 #!/bin/sh
-# luci-app-openclaw — 首次安装/升级初始化脚本
+# luci-app-openclaw — 插件安装/升级初始化（最小化）
+# 只做与“管理插件”相关的初始化：生成网关令牌、清理已退役残留、按需开机自启。
+# openclaw 系统用户与 /opt/openclaw 运行目录改由「安装运行环境」(openclaw-env setup) 按所选安装路径创建——
+# 装插件本身不再产生 /opt 足迹、也不创建系统用户（避免在选定安装路径前就落地默认 /opt，及未装运行时的残留）。
 
-# 获取安装路径 (支持自定义)
-# 用户配置的是基础路径，程序会在此路径下创建 openclaw 目录。
-# 这里复用统一路径解析，兼容用户误填 /mnt/data/openclaw 的情况。
-[ -r /usr/libexec/openclaw-paths.sh ] && . /usr/libexec/openclaw-paths.sh
-OC_CONFIGURED_PATH="$(uci -q get openclaw.main.install_path 2>/dev/null || echo '/opt')"
-if command -v oc_load_paths >/dev/null 2>&1 && oc_load_paths "$OC_CONFIGURED_PATH"; then
-	OC_BASE_PATH="$OPENCLAW_INSTALL_PATH"
-	OC_INSTALL_PATH="$OC_ROOT"
-else
-	OC_BASE_PATH="/opt"
-	OC_INSTALL_PATH="/opt/openclaw"
-fi
-
-# 创建 openclaw 系统用户 (无 home, 无 shell)
-if ! id openclaw >/dev/null 2>&1; then
-	# 动态查找可用 UID/GID (从 1000 开始，避免与已有用户冲突)
-	OC_UID=1000
-	while grep -q "^[^:]*:x:${OC_UID}:" /etc/passwd 2>/dev/null; do
-		OC_UID=$((OC_UID + 1))
-	done
-	OC_GID=$OC_UID
-	while grep -q "^[^:]*:x:${OC_GID}:" /etc/group 2>/dev/null; do
-		OC_GID=$((OC_GID + 1))
-	done
-	# OpenWrt 方式：直接写入 /etc/passwd 和 /etc/shadow（flock 防止并发安装竞态）
-	if ! grep -q '^openclaw:' /etc/passwd 2>/dev/null; then
-		flock /etc/passwd -c "echo \"openclaw:x:${OC_UID}:${OC_GID}:openclaw:${OC_INSTALL_PATH}:/bin/false\" >> /etc/passwd"
-	fi
-	if ! grep -q '^openclaw:' /etc/shadow 2>/dev/null; then
-		flock /etc/shadow -c "echo 'openclaw:x:0:0:99999:7:::' >> /etc/shadow"
-	fi
-	if ! grep -q '^openclaw:' /etc/group 2>/dev/null; then
-		flock /etc/group  -c "echo \"openclaw:x:${OC_GID}:\" >> /etc/group"
-	fi
-fi
-
-# 创建数据目录
-# ── OverlayFS 兼容: Docker bind mount 可能导致 /opt 不可写 (仅当基础路径为 /opt 时) ──
-if [ "$OC_BASE_PATH" = "/opt" ]; then
-	if ! mkdir -p /opt/openclaw/.probe 2>/dev/null; then
-		if [ -d /overlay/upper/opt ]; then
-			mkdir -p /overlay/upper/opt/openclaw 2>/dev/null
-			mount --bind /overlay/upper/opt /opt 2>/dev/null
-		fi
-		rmdir /opt/openclaw/.probe 2>/dev/null
-	else
-		rmdir /opt/openclaw/.probe 2>/dev/null
-	fi
-fi
-mkdir -p "${OC_INSTALL_PATH}/node"
-mkdir -p "${OC_INSTALL_PATH}/.npm-global"
-mkdir -p "${OC_INSTALL_PATH}/.npm"
-mkdir -p "${OC_INSTALL_PATH}/.openclaw"
-mkdir -p "${OC_INSTALL_PATH}/.tmp"
-chown -R openclaw:openclaw "${OC_INSTALL_PATH}" 2>/dev/null || true
-
-# 生成随机 Token (如果尚未设置)
+# 生成随机网关令牌（如尚未设置；令牌存 UCI，运行时经 env 注入网关）。
 CURRENT_TOKEN=$(uci -q get openclaw.main.token)
 if [ -z "$CURRENT_TOKEN" ]; then
 	TOKEN=$(head -c 24 /dev/urandom | hexdump -e '24/1 "%02x"' 2>/dev/null || dd if=/dev/urandom bs=24 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n' | head -c 48)
@@ -65,7 +12,7 @@ if [ -z "$CURRENT_TOKEN" ]; then
 	uci commit openclaw
 fi
 
-# Web PTY 已退役: 清理旧安装的残留(世界可读的 root 终端令牌 + 仍在运行的 root 终端进程)。
+# Web PTY 已退役：清理旧安装残留（世界可读的 root 终端令牌 + 仍在运行的 root 终端进程）。
 if [ -n "$(uci -q get openclaw.main.pty_token)" ] || [ -n "$(uci -q get openclaw.main.pty_port)" ]; then
 	uci -q delete openclaw.main.pty_token
 	uci -q delete openclaw.main.pty_port
@@ -73,13 +20,9 @@ if [ -n "$(uci -q get openclaw.main.pty_token)" ] || [ -n "$(uci -q get openclaw
 fi
 for _ptypid in $(pgrep -f 'web-pty.js' 2>/dev/null); do kill "$_ptypid" 2>/dev/null || true; done
 
-# 启用服务自启动 (创建 /etc/rc.d/S99openclaw 符号链接)
-# 这一步确保安装/升级后服务能随系统启动
-# 注意: 仅当 UCI 中 enabled='1' 或尚未设置 enabled 时才启用
-# 如果用户明确设置 enabled='0' (禁用)，则尊重用户选择
+# 启用服务自启动（仅当 enabled 非 0；尊重用户禁用选择）。
 if [ -x /etc/init.d/openclaw ]; then
 	OC_ENABLED=$(uci -q get openclaw.main.enabled)
-	# enabled='1' 或未设置时启用自启动；enabled='0' 时不操作
 	if [ "$OC_ENABLED" != "0" ]; then
 		/etc/init.d/openclaw enable 2>/dev/null
 	fi

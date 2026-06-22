@@ -41,8 +41,16 @@ return view.extend({
 		}, this));
 	},
 
+	// 重启网关后刷新已加载的配置派生数据(提供商/渠道), 使界面跟随重启后的最新配置,
+	// 不必手动点各卡片的「刷新」。仅刷新已加载过的 tab, 避免触发未访问 tab 的请求。
+	refreshLoadedData: function() {
+		if (this._providerLoaded) this.refreshProviders();
+		if (this._channelLoaded) { this.refreshChannels(true); this.refreshDmScopeLabel(); }
+	},
+
 	// 重启网关并就地显示完整进度(提交→重启中→就绪/失败/超时), 不必切到基本设置查看。
 	restartGateway: function(statusEl, onDone) {
+		var self = this;
 		ocui.setStatus(statusEl, 'running', _('「重启网关」命令已提交，正在重启...'));
 		return api.serviceAction('restart_gateway').then(function(r) {
 			if (r && r.ok === false) { ocui.setStatus(statusEl, 'error', r.message || _('重启失败')); return; }
@@ -54,6 +62,7 @@ return view.extend({
 						if (d.gateway_running === true) {
 							ocui.setStatus(statusEl, 'success', _('网关已就绪，运行中（端口 %s）。').format(d.port || '-'));
 							ocui.hideStatusLater(statusEl);
+							self.refreshLoadedData();
 							if (onDone) onDone(true);
 							return resolve();
 						}
@@ -317,6 +326,7 @@ return view.extend({
 					E('div', { 'class': 'oc-actions' }, [
 						ocui.button(_('配置模型/提供商'), 'cbi-button-positive', L.bind(function() { return this.launchWizard(this.providerWizard, 'model'); }, this)),
 						ocui.button(_('设置活跃模型'), 'cbi-button-action', L.bind(this.showSetActiveModel, this)),
+						ocui.button(_('回退模型'), 'cbi-button-action', L.bind(this.showSetFallbacks, this)),
 						ocui.button(_('刷新'), '', L.bind(this.refreshProviders, this))
 					])
 				])
@@ -331,6 +341,7 @@ return view.extend({
 			var items = [
 				E('div', { 'class': 'oc-kv' }, [
 					E('span', {}, _('活跃模型')), E('strong', {}, d.primary_model || _('未配置')),
+					E('span', {}, _('回退模型')), E('span', {}, (d.fallback_models || []).length ? (d.fallback_models || []).join('、') : _('无')),
 					E('span', {}, _('网关端口')), E('span', {}, d.gateway_port || '-'),
 					E('span', {}, _('绑定模式')), E('span', {}, d.gateway_bind || '-')
 				])
@@ -375,21 +386,73 @@ return view.extend({
 			var doSet = L.bind(function() {
 				return ocui.runOp(status, {
 					running: _('正在设置活跃模型...'),
-					success: _('活跃模型已设置，网关重启中。'),
+					success: _('活跃模型已设置，正在生效。'),
 					submit: function() { return api.modelSet(sel.value); },
 					onDone: L.bind(function(ok) {
-						if (ok) api.serviceAction('restart_gateway');
+						// 仅改写 primary, 网关自动热重载生效, 无需重启网关(避免断会话与阻塞)。
 						this.refreshProviders();
 					}, this)
 				});
 			}, this);
 			ui.showModal(_('设置活跃模型'), [
-				E('p', { 'class': 'oc-muted' }, _('在已配置且已授权的模型中选择活跃（默认）模型，保存后将自动重启网关生效。')),
+				E('p', { 'class': 'oc-muted' }, _('在已配置且已授权的模型中选择活跃（默认）模型，保存后网关自动热重载生效。')),
 				E('div', { 'class': 'oc-field' }, [ E('span', {}, _('活跃模型')), sel ]),
 				status,
 				E('div', { 'class': 'right' }, [
 					ocui.closeButton(_('关闭')),
 					ocui.button(_('保存'), 'cbi-button-positive', doSet)
+				])
+			]);
+		}, this));
+	},
+
+	// 直接管理 agents.defaults.model.fallbacks：勾选要保留的回退模型、一键清空。
+	// 绕开官方 configure 向导(其 allowlist 默认勾上已配置模型,会把非 primary 全堆进 fallback)。
+	showSetFallbacks: function() {
+		return api.configSummary().then(L.bind(function(result) {
+			var d = result.data || {};
+			var primary = d.primary_model || '';
+			var current = {};
+			(d.fallback_models || []).forEach(function(k) { current[k] = true; });
+			// 候选：已授权且非 primary 的模型；并入当前已配置的 fallback(即使其 provider 已无授权也要能取消)。
+			var seen = {}, cands = [];
+			(d.allowed_models || []).forEach(function(m) {
+				if (m.auth && m.key !== primary && !seen[m.key]) { seen[m.key] = true; cands.push({ key: m.key, alias: m.alias }); }
+			});
+			(d.fallback_models || []).forEach(function(k) {
+				if (k !== primary && !seen[k]) { seen[k] = true; cands.push({ key: k, alias: '' }); }
+			});
+			var status = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
+			if (!cands.length) {
+				ui.showModal(_('回退模型'), [
+					E('p', { 'class': 'oc-muted' }, _('没有可作为回退的模型：需要先在「配置模型/提供商」里配置并授权多个模型（回退模型不能是当前活跃模型）。')),
+					E('div', { 'class': 'right' }, [ ocui.closeButton(_('关闭')) ])
+				]);
+				return;
+			}
+			var boxes = cands.map(function(m) {
+				var cb = E('input', { 'type': 'checkbox', 'value': m.key });
+				if (current[m.key]) cb.checked = true;
+				var label = m.alias ? m.alias + ' (' + m.key + ')' : m.key;
+				return E('label', { 'style': 'display:flex;align-items:center;gap:.4rem;padding:.15rem 0' }, [ cb, E('span', {}, label) ]);
+			});
+			var pick = function() { return boxes.map(function(l) { var cb = l.querySelector('input'); return cb.checked ? cb.value : null; }).filter(Boolean); };
+			var save = L.bind(function() {
+				return ocui.runOp(status, {
+					running: _('正在保存回退模型...'),
+					success: _('回退模型已保存，正在生效。'),
+					submit: function() { return api.modelFallbacksSet(pick().join(',')); },
+					onDone: L.bind(function(ok) { this.refreshProviders(); }, this)
+				});
+			}, this);
+			ui.showModal(_('回退模型'), [
+				E('p', { 'class': 'oc-muted' }, _('勾选活跃模型不可用时按顺序尝试的回退模型；不勾即清空。保存后网关自动热重载生效。当前活跃模型：%s').format(primary || _('未配置'))),
+				E('div', { 'style': 'max-height:16rem;overflow:auto;border:1px solid var(--oc-border,#ddd);border-radius:4px;padding:.4rem .6rem;margin:.4rem 0' }, boxes),
+				status,
+				E('div', { 'class': 'right' }, [
+					ocui.closeButton(_('关闭')),
+					ocui.button(_('全部取消'), '', function() { boxes.forEach(function(l) { l.querySelector('input').checked = false; }); }),
+					ocui.button(_('保存'), 'cbi-button-positive', save)
 				])
 			]);
 		}, this));

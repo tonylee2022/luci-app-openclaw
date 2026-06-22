@@ -483,11 +483,13 @@ function config_summary() {
 	let channels = [];
 	for (let item in [ ['openclaw-weixin','微信'], ['qqbot','QQ'], ['telegram','Telegram'], ['discord','Discord'], ['feishu','飞书'], ['slack','Slack'] ])
 		if (config?.channels?.[item[0]]) push(channels, { id: item[0], name: item[1] });
+	let fallbacks = config?.agents?.defaults?.model?.fallbacks;
+	if (type(fallbacks) != 'array') fallbacks = [];
 	return reply(true, '', {
 		primary_model: primary,
 		gateway_port: `${config?.gateway?.port || ''}`,
 		gateway_bind: config?.gateway?.bind || '',
-		providers, channels, allowed_models
+		providers, channels, allowed_models, fallback_models: fallbacks
 	});
 }
 
@@ -556,6 +558,7 @@ const methods = {
 	logs_tail: { args: { lines: 200 }, call: logs_tail },
 	config_summary: { call: config_summary },
 	model_set: { args: { model: '' }, call: (r) => match(r.args.model, /^[A-Za-z0-9_.\/-]+$/) ? run_action('cli-models-set', [r.args.model]) : reply(false, '模型 ID 无效') },
+	model_fallbacks_set: { args: { models: '' }, call: (r) => { let v = trim(`${r.args.models ?? ''}`); if (length(v) && !match(v, /^[A-Za-z0-9_.\/-]+(,[A-Za-z0-9_.\/-]+)*$/)) return reply(false, '回退模型列表无效'); return run_action('cli-models-fallbacks-set', [v]); } },
 	qr_encode: { args: { text: '' }, call: qr_encode },
 	task_cancel: { args: { name: '' }, call: (r) => match(r.args.name, /^[A-Za-z0-9-]+$/) ? run_action('task-cancel', [r.args.name]) : reply(false, '任务名无效') },
 	wizard_status: { call: () => reply(true, '', { available: access('/usr/bin/ttyd') }) },
