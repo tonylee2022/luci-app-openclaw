@@ -1,5 +1,9 @@
 ﻿# 更新记录
 
+## [1.1.8]
+
+- **彻底改用 `.tar.gz`、不再依赖 `xz`**：1.1.7 用「gz 优先 + xz 回退 + xz 依赖兜底」。现进一步**只下载 `.tar.gz`**（gzip 为 busybox tar 内置，零外部命令），移除 `.tar.xz` 回退与 `xz`/`xzcat` 解压代码，并从 Makefile/build_ipk/build_run 的依赖中**移除 `xz`**。离线安装也只接受 `node.tar.gz`。无 `xz` 机器实测：下载 `.tar.gz`、解压安装成功。
+
 ## [1.1.7]
 
 - **修复其他机器「安装运行环境」解压 Node.js 包报错退出码 127**：在线安装下载 `node-…-musl.tar.xz`，而解 `.tar.xz` 依赖独立的 `xz` 命令（OpenWrt 上 `tar` 与 `xz` 是两个包，`tar` 解 xz 时会去 exec `xz`）；目标机未装 `xz` 时 tar 子进程 exec 失败 → **退出 127**。lede 恰好装了 `xz` 才正常。修复：`download_node` **优先下载 `.tar.gz`**（gzip 为 busybox 内置、无需外部命令，任意机器可解），`.tar.xz` 仅作回退；同时把 `xz` 加入依赖（兜底 .xz/离线场景），离线安装分支也优先接受 `node.tar.gz`。无 `xz` 机器实测：抓 `.tar.gz`、解压成功、无 127。
