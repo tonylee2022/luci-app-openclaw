@@ -326,30 +326,30 @@ download_node() {
 	fi
 
 	# ── 构建下载 URL 列表 (按优先级排列，支持双版本回退) ──
+	# 优先 .tar.gz: gzip 是 busybox tar 内置, 无需外部命令; .tar.xz 解压依赖独立的 xz 包,
+	# 缺 xz 的机器 tar 会 exec xz 失败并退出 127。故所有 .gz 排在 .xz 前, 让无 xz 机器命中 gz 即成功。
 	local mirror_list=""
-	local musl_tarball="node-v${node_ver}-${node_arch}-musl.tar.xz"
-	local glibc_tarball="node-v${node_ver}-${node_arch}.tar.xz"
-
 	if [ "$libc_type" = "musl" ]; then
 		echo ""
 		echo "=== 下载 Node.js v${node_ver} (${node_arch}, musl libc) ==="
 
-		# unofficial-builds 同时提供 x64 与 arm64 musl 构建
-		# 1) unofficial-builds (官方非官方构建)
-		mirror_list="${NODE_MUSL_MIRROR}/v${node_ver}/${musl_tarball}"
-		# 2) npmmirror 镜像
-		mirror_list="$mirror_list ${NODE_MIRROR_CN}/v${node_ver}/${musl_tarball}"
+		# musl 构建仅 unofficial-builds 提供 (npmmirror 只镜像官方 glibc); 同时提供 .gz 与 .xz。
+		local musl_base="${NODE_MUSL_MIRROR}/v${node_ver}/node-v${node_ver}-${node_arch}-musl"
+		mirror_list="${musl_base}.tar.gz ${musl_base}.tar.xz"
 	else
 		echo ""
 		echo "=== 下载 Node.js v${node_ver} (${node_arch}, glibc) ==="
 
-		mirror_list="${NODE_MIRROR}/v${node_ver}/${glibc_tarball}"
-		mirror_list="$mirror_list ${NODE_MIRROR_CN}/v${node_ver}/${glibc_tarball}"
+		local glibc_name="node-v${node_ver}-${node_arch}"
+		# 先两个镜像的 .gz, 再两个镜像的 .xz。
+		mirror_list="${NODE_MIRROR}/v${node_ver}/${glibc_name}.tar.gz ${NODE_MIRROR_CN}/v${node_ver}/${glibc_name}.tar.gz"
+		mirror_list="$mirror_list ${NODE_MIRROR}/v${node_ver}/${glibc_name}.tar.xz ${NODE_MIRROR_CN}/v${node_ver}/${glibc_name}.tar.xz"
 	fi
 
 	# ── 逐个尝试下载 ──
 	local downloaded=0
-	local tmp_file="/tmp/node-v${node_ver}.tar.xz"
+	# 文件名与扩展名无关: 解压逻辑靠内容探测(tar tf 能否列出)判断 gz/xz, 不看后缀。
+	local tmp_file="/tmp/node-v${node_ver}.tarball"
 	local attempt=0
 	local total=$(echo "$mirror_list" | wc -w)
 
@@ -905,8 +905,14 @@ do_setup_offline() {
 	probe_install_root
 
 	# [1] 安装 Node.js
-	local node_tarball="$offline_dir/node.tar.xz"
-	if [ -f "$node_tarball" ]; then
+	# 优先 .tar.gz(gzip, busybox 内置, 无需 xz); 仅 .tar.xz 时退而求其次(需目标机有 xz)。
+	local node_tarball=""
+	if [ -f "$offline_dir/node.tar.gz" ]; then
+		node_tarball="$offline_dir/node.tar.gz"
+	elif [ -f "$offline_dir/node.tar.xz" ]; then
+		node_tarball="$offline_dir/node.tar.xz"
+	fi
+	if [ -n "$node_tarball" ]; then
 		echo "=== 安装 Node.js (离线) ==="
 		rm -rf "$NODE_BASE" 2>/dev/null
 		[ -d /overlay/upper ] && rm -rf "/overlay/upper${NODE_BASE}" 2>/dev/null

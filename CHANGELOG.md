@@ -1,5 +1,9 @@
 ﻿# 更新记录
 
+## [1.1.7]
+
+- **修复其他机器「安装运行环境」解压 Node.js 包报错退出码 127**：在线安装下载 `node-…-musl.tar.xz`，而解 `.tar.xz` 依赖独立的 `xz` 命令（OpenWrt 上 `tar` 与 `xz` 是两个包，`tar` 解 xz 时会去 exec `xz`）；目标机未装 `xz` 时 tar 子进程 exec 失败 → **退出 127**。lede 恰好装了 `xz` 才正常。修复：`download_node` **优先下载 `.tar.gz`**（gzip 为 busybox 内置、无需外部命令，任意机器可解），`.tar.xz` 仅作回退；同时把 `xz` 加入依赖（兜底 .xz/离线场景），离线安装分支也优先接受 `node.tar.gz`。无 `xz` 机器实测：抓 `.tar.gz`、解压成功、无 127。
+
 ## [1.1.6]
 
 - **修复「设置活跃模型」卡死并拖垮 LuCI**：原先同步跑 `openclaw models set`（连慢网关 + 触发热重载重启 provider，网络异常时可达数十秒），经 ucode popen 阻塞 rpcd 的 uloop，导致整个 LuCI 无响应/打不开。改为**直接写 `agents.defaults.model.primary`**（实测 0.04s），网关 file-watcher 自动热重载该键；不再调用慢的 `config patch`（实测 6s）或 `models set`，也不再额外重启网关。附带消除"所选模型被塞进回退列表"问题（只改 primary）。
