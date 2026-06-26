@@ -46,6 +46,7 @@ OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 ### 其它
 - **Web 控制台**：嵌入 OpenClaw 控制台。
 - **主题适配**：插件自带明/暗两套样式，跟随当前 LuCI 主题（如 Argon）的明暗自动切换。
+- **中英双语**：界面、菜单与操作反馈支持简体中文 / English，随 LuCI 界面语言自动切换（标准 LuCI i18n，语言包 `po/zh_Hans/`，安装为 `usr/lib/lua/luci/i18n/openclaw.zh-cn.lmo`）。注：网页内嵌终端（官方配置向导 / openclaw-shell）由 ttyd 运行，其输出不随界面语言切换。
 - **安全模型**：OpenClaw 以 `openclaw` 系统用户运行；`openclaw` / `openclaw-shell` 在以 root 调用时自动降权到正确用户身份。
 
 ## 系统要求

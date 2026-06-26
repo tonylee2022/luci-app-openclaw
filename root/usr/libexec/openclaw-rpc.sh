@@ -13,7 +13,7 @@ fail() {
 
 load_paths() {
 	base=$(uci -q get openclaw.main.install_path || echo /opt)
-	oc_load_paths "$base" || fail "UCI 安装路径无效"
+	oc_load_paths "$base" || fail "Invalid UCI install path"
 	# 备份目录可经 UCI 覆盖, 但必须在安装根目录之外; 非法值静默回退到默认 OC_BACKUP_DIR。
 	bp=$(uci -q get openclaw.main.backup_path || true)
 	if [ -n "${bp:-}" ]; then
@@ -51,8 +51,8 @@ operation_locked() {
 
 acquire_operation_lock() {
 	operation="${1:-unknown}"
-	operation_locked && fail "另一项 OpenClaw 系统操作正在进行"
-	mkdir "$OPERATION_LOCK" 2>/dev/null || fail "另一项 OpenClaw 系统操作正在进行"
+	operation_locked && fail "Another OpenClaw system operation is in progress"
+	mkdir "$OPERATION_LOCK" 2>/dev/null || fail "Another OpenClaw system operation is in progress"
 	printf '%s\n' "$$" > "$OPERATION_LOCK/pid"
 	printf '%s\n' "$operation" > "$OPERATION_LOCK/operation"
 }
@@ -87,7 +87,7 @@ start_task() {
 	command="$2"
 	task_log="${3:-${prefix}.log}"
 	if task_running "$prefix"; then
-		fail "已有同类任务正在运行"
+		fail "A task of the same type is already running"
 	fi
 	acquire_operation_lock "${prefix##*/}"
 	rm -f "${prefix}.log" "${prefix}.pid" "${prefix}.exit" "$task_log"
@@ -126,8 +126,8 @@ oc_cli_env() {
 # 用法: oc_cli_run "doctor --lint --json"
 oc_cli_run() {
 	load_paths
-	entry=$(find_openclaw_entry) || fail "OpenClaw 未安装"
-	id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+	entry=$(find_openclaw_entry) || fail "OpenClaw is not installed"
+	id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 	# 直接交给 su -c (单层解析), 此处不可用 oc_quote, 否则单引号会成为字面量。
 	# timeout 安全网: 同步 CLI 经 ucode popen 跑在 rpcd 的 uloop 上, 网关挂死时会阻塞整个 rpcd → LuCI 打不开。
 	# 30s 宽于正常慢操作(health/logs 自带 12s), 但杜绝无限阻塞。
@@ -143,7 +143,7 @@ case "${1:-}" in
 		action="${2:-}"
 		case "$action" in
 			start|stop|restart|enable|disable|restart_gateway) ;;
-			*) fail "不支持的服务操作" ;;
+			*) fail "Unsupported service action" ;;
 		esac
 		/etc/init.d/openclaw "$action"
 		;;
@@ -151,11 +151,11 @@ case "${1:-}" in
 		# 开机自启总开关: init.d 的 start_service 以 uci openclaw.main.enabled 为准 (为0则拒绝启动),
 		# 同时同步 rc.d 自启软链。仅改标志, 不启停当前进程。
 		val="${2:-}"
-		case "$val" in 0|1) ;; *) fail "参数无效" ;; esac
+		case "$val" in 0|1) ;; *) fail "Invalid parameter" ;; esac
 		uci set openclaw.main.enabled="$val"
 		uci commit openclaw
 		if [ "$val" = "1" ]; then /etc/init.d/openclaw enable; else /etc/init.d/openclaw disable; fi
-		echo "已更新开机自启"
+		echo "Autostart updated"
 		;;
 	backup-path-set)
 		load_paths
@@ -165,10 +165,10 @@ case "${1:-}" in
 		if [ -z "$val" ]; then
 			target="$OC_BACKUP_DIR_DEFAULT"
 		else
-			target=$(oc_normalize_backup_dir "$val") || fail "备份路径无效: 需为绝对路径且位于安装目录之外"
+			target=$(oc_normalize_backup_dir "$val") || fail "Invalid backup path: must be absolute and outside the install directory"
 		fi
 		if [ "$target" != "$from" ]; then
-			mkdir -p "$target" || fail "无法创建备份目录: $target"
+			mkdir -p "$target" || fail "Failed to create backup directory"
 			chown openclaw:openclaw "$target" 2>/dev/null || true
 			# 迁移已有备份到新目录, 保持列表连续。
 			mv "$from"/*-openclaw-backup.tar.gz "$target/" 2>/dev/null || true
@@ -176,23 +176,23 @@ case "${1:-}" in
 		if [ -z "$val" ]; then
 			uci -q delete openclaw.main.backup_path
 			uci commit openclaw
-			echo "已恢复默认备份路径: $target"
+			echo "Default backup path restored."
 		else
 			uci set openclaw.main.backup_path="$target"
 			uci commit openclaw
-			echo "备份路径已设为: $target"
+			echo "Backup path updated."
 		fi
 		;;
 	setup)
 		version="${2:-}"
 		base="${3:-}"
 		node_ver="${4:-}"
-		case "$version" in stable|latest) ;; *) fail "安装版本无效" ;; esac
-		oc_normalize_install_path "$base" >/dev/null || fail "安装路径无效"
+		case "$version" in stable|latest) ;; *) fail "Invalid install version" ;; esac
+		oc_normalize_install_path "$base" >/dev/null || fail "Invalid install path"
 		base=$(oc_normalize_install_path "$base")
 		case "$node_ver" in
 			""|[0-9]*.[0-9]*.[0-9]*) ;;
-			*) fail "Node.js 版本号格式无效" ;;
+			*) fail "Invalid Node.js version format" ;;
 		esac
 		if ! uci -q get openclaw.main >/dev/null 2>&1; then
 			printf "config openclaw 'main'\n\toption enabled '0'\n\toption port '18789'\n\toption bind 'lan'\n\toption token ''\n\toption install_path '/opt'\n" > /etc/config/openclaw
@@ -206,7 +206,7 @@ case "${1:-}" in
 		;;
 	env-upgrade-openclaw)
 		load_paths
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		# 走官方 openclaw update 编排(核心 + 插件 update sync + doctor), 与官方升级一致。
 		# 官方在 systemd 上会"停网关→更新→重启"; 在 procd 上 openclaw update 不认得我们的服务(既不停也不重启),
 		# 故由我们对齐: 先 procd 停网关, 再 update(--no-restart 跳过其自带服务管理), 完成后 procd 起网关。
@@ -218,14 +218,14 @@ case "${1:-}" in
 		;;
 	env-upgrade-npm)
 		load_paths
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		# 原地升级捆绑 npm: NPM_CONFIG_PREFIX 指到 node 目录(否则装到 .npm-global 被 PATH 遮蔽)。
 		cmd="su -s /bin/sh openclaw -c $(oc_quote "HOME=$OC_HOME NPM_CONFIG_CACHE=$OC_NPM_CACHE TMPDIR=$OC_TMP NPM_CONFIG_PREFIX=$NODE_BASE PATH=$NODE_BASE/bin:/usr/sbin:/usr/bin:/sbin:/bin $NODE_BASE/bin/npm install -g npm@latest")"
 		start_task /tmp/openclaw-env-upgrade "$cmd"
 		;;
 	env-upgrade-node)
 		ver="${2:-}"
-		echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Node 版本号格式无效 (如 22.22.3)"
+		echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Invalid Node version format (e.g. 22.22.3)"
 		load_paths
 		# openclaw-env node <ver> 暂存→校验→替换(失败保留现有 node)。仅成功(rc=0)才 chown + 重启网关;
 		# 失败则不重启, 网关继续跑在现有 node 上, 不会把安装搞坏。
@@ -240,15 +240,15 @@ case "${1:-}" in
 	uninstall-task)
 		remove_node="${2:-0}"
 		load_paths
-		oc_safe_openclaw_root "$OC_ROOT" || fail "安装路径未通过安全校验"
-		echo "正在停止 OpenClaw 服务..."
+		oc_safe_openclaw_root "$OC_ROOT" || fail "Install path failed safety validation"
+		echo "Stopping OpenClaw service..."
 		/etc/init.d/openclaw stop >/dev/null 2>&1 || true
 		/etc/init.d/openclaw disable >/dev/null 2>&1 || true
 		# 卸载环境只卸"运行时", 保留 /etc/config/openclaw(记住 install_path/port/bind 等便于重装),
 		# 仅关闭自启避免空跑。彻底清除配置请用「卸载插件」(opkg remove)。
 		uci set openclaw.main.enabled='0' 2>/dev/null || true
 		uci commit openclaw 2>/dev/null || true
-		echo "正在删除运行环境: $OC_ROOT"
+		echo "Removing runtime..."
 		# OC_ROOT 下的软链始终删除；NODE_BASE 下的仅在 remove_node=1 时删除
 		for b in node npm npx pnpm corepack; do
 			if [ -L "/usr/bin/$b" ]; then
@@ -263,24 +263,24 @@ case "${1:-}" in
 		rm -rf "$OC_ROOT"
 		[ ! -d "/overlay/upper$OC_ROOT" ] || rm -rf "/overlay/upper$OC_ROOT"
 		if [ "$remove_node" = "1" ]; then
-			echo "正在删除 Node.js 运行时: $NODE_BASE"
+			echo "Removing Node.js runtime..."
 			rm -rf "$NODE_BASE"
 			[ ! -d "/overlay/upper$NODE_BASE" ] || rm -rf "/overlay/upper$NODE_BASE"
 		else
-			echo "Node.js 运行时已保留: $NODE_BASE"
+			echo "Node.js runtime kept."
 		fi
 		# 清理 /tmp 残留: 网关日志目录、各任务文件(本卸载任务自身的 openclaw-uninstall.* 在用, 由 opkg 卸载的 postrm 收尾)、状态/缓存。
 		rm -rf /tmp/openclaw 2>/dev/null
 		rm -f /tmp/openclaw-setup.* /tmp/openclaw-plugin-upgrade.* /tmp/openclaw-wechat-* /tmp/openclaw-telegram-add.* /tmp/openclaw-doctor-fix.* /tmp/openclaw-env-upgrade.* /var/run/openclaw*.pid /tmp/luci-openclaw-*
 		sed -i '/^openclaw:/d' /etc/passwd /etc/shadow /etc/group 2>/dev/null || true
 		rm -f /etc/profile.d/openclaw.sh
-		echo "OpenClaw 运行环境已卸载。"
+		echo "OpenClaw runtime uninstalled."
 		;;
 	upgrade)
 		version="${2:-}"
-		echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "版本号格式无效"
+		echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Invalid version format"
 		url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-app-openclaw_${version}-1_all.ipk"
-		cmd="curl -fsSL --connect-timeout 15 --max-time 120 -o /tmp/luci-app-openclaw-update.ipk $(oc_quote "$url"); rc=\$?; if [ \$rc -ne 0 ]; then echo '下载失败'; exit \$rc; fi; opkg install --force-reinstall /tmp/luci-app-openclaw-update.ipk; rc=\$?; rm -f /tmp/luci-app-openclaw-update.ipk; exit \$rc"
+		cmd="curl -fsSL --connect-timeout 15 --max-time 120 -o /tmp/luci-app-openclaw-update.ipk $(oc_quote "$url"); rc=\$?; if [ \$rc -ne 0 ]; then echo 'Download failed'; exit \$rc; fi; opkg install --force-reinstall /tmp/luci-app-openclaw-update.ipk; rc=\$?; rm -f /tmp/luci-app-openclaw-update.ipk; exit \$rc"
 		start_task /tmp/openclaw-plugin-upgrade "$cmd"
 		;;
 	cli-doctor-lint)
@@ -303,16 +303,16 @@ case "${1:-}" in
 		;;
 	cli-doctor-fix)
 		load_paths
-		entry=$(find_openclaw_entry) || fail "OpenClaw 未安装"
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		entry=$(find_openclaw_entry) || fail "OpenClaw is not installed"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		cmd="su -s /bin/sh openclaw -c $(oc_quote "$(oc_cli_env) $NODE_BASE/bin/node $entry doctor --fix --non-interactive --no-workspace-suggestions")"
 		start_task /tmp/openclaw-doctor-fix "$cmd"
 		;;
 	cli-models-set)
 		model="${2:-}"
-		echo "$model" | grep -Eq '^[A-Za-z0-9._/-]+$' || fail "模型 ID 无效"
+		echo "$model" | grep -Eq '^[A-Za-z0-9._/-]+$' || fail "Invalid model ID"
 		load_paths
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		# 仅改写 agents.defaults.model.primary, 直接写 openclaw.json(实测 0.04s); 网关 file-watcher 自动热重载该键
 		# (实测 config hot reload applied), provider 重启在网关内异步进行。
 		# 不再同步跑 `openclaw config patch`(实测 6s)或 `openclaw models set`(连慢网关+污染 fallbacks)——
@@ -320,8 +320,8 @@ case "${1:-}" in
 		# model 经严格正则校验, 与文件路径均经 env 传入避免注入; 以 openclaw 身份写, 不产生 root 属主。
 		_js='const fs=require("fs"),f=process.env.OC_M_FILE;let d={};try{d=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){process.exit(1)}d.agents=(d.agents||{});d.agents.defaults=(d.agents.defaults||{});d.agents.defaults.model=(d.agents.defaults.model||{});d.agents.defaults.model.primary=process.env.OC_M_VAL;fs.writeFileSync(f,JSON.stringify(d,null,2))'
 		inner="OC_M_FILE=$(oc_quote "$CONFIG_FILE") OC_M_VAL=$(oc_quote "$model") $NODE_BASE/bin/node -e $(oc_quote "$_js")"
-		timeout 30 su -s /bin/sh openclaw -c "$inner" || fail "写入配置失败"
-		echo "活跃模型已设为 $model"
+		timeout 30 su -s /bin/sh openclaw -c "$inner" || fail "Failed to write configuration"
+		echo "Active model set."
 		;;
 	cli-models-fallbacks-set)
 		# 直接改写 agents.defaults.model.fallbacks(逗号分隔; 空=清空), 绕开官方 configure 向导
@@ -330,25 +330,25 @@ case "${1:-}" in
 		list="${2:-}"
 		if [ -n "$list" ]; then
 			for m in $(echo "$list" | tr ',' ' '); do
-				echo "$m" | grep -Eq '^[A-Za-z0-9._/-]+$' || fail "回退模型 ID 无效: $m"
+				echo "$m" | grep -Eq '^[A-Za-z0-9._/-]+$' || fail "Invalid fallback model ID"
 			done
 		fi
 		load_paths
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		_js='const fs=require("fs"),f=process.env.OC_F_FILE;const a=(process.env.OC_F_VAL||"").split(",").map(s=>s.trim()).filter(Boolean);let d={};try{d=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){process.exit(1)}d.agents=(d.agents||{});d.agents.defaults=(d.agents.defaults||{});d.agents.defaults.model=(d.agents.defaults.model||{});if(a.length)d.agents.defaults.model.fallbacks=a;else delete d.agents.defaults.model.fallbacks;fs.writeFileSync(f,JSON.stringify(d,null,2))'
 		inner="OC_F_FILE=$(oc_quote "$CONFIG_FILE") OC_F_VAL=$(oc_quote "$list") $NODE_BASE/bin/node -e $(oc_quote "$_js")"
-		timeout 30 su -s /bin/sh openclaw -c "$inner" || fail "写入配置失败"
-		[ -n "$list" ] && echo "回退模型已更新" || echo "回退模型已清空"
+		timeout 30 su -s /bin/sh openclaw -c "$inner" || fail "Failed to write configuration"
+		[ -n "$list" ] && echo "Fallback models updated" || echo "Fallback models cleared"
 		;;
 	wizard-start)
 		# 按需拉起一个 ttyd 实例, 以 openclaw 身份在真实 PTY 中跑官方 configure 向导。
 		# 安全模型: 仅绑 br-lan + 随机高端口 + -o 单客户端用完即退 + 命令降权到 openclaw。
 		section="${2:-full}"
-		case "$section" in model|channels|full|shell) ;; *) fail "无效的向导分段" ;; esac
-		command -v ttyd >/dev/null 2>&1 || fail "ttyd 未安装 (opkg install ttyd)"
+		case "$section" in model|channels|full|shell) ;; *) fail "Invalid wizard section" ;; esac
+		command -v ttyd >/dev/null 2>&1 || fail "ttyd is not installed (opkg install ttyd)"
 		load_paths
-		find_openclaw_entry >/dev/null 2>&1 || fail "OpenClaw 未安装"
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		find_openclaw_entry >/dev/null 2>&1 || fail "OpenClaw is not installed"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		# 杀掉旧实例
 		/usr/libexec/openclaw-rpc.sh wizard-stop >/dev/null 2>&1
 		uid=$(id -u openclaw); gid=$(id -g openclaw)
@@ -390,9 +390,9 @@ case "${1:-}" in
 		trap 'release_operation_lock' EXIT INT TERM
 		load_paths
 		only_config="${2:-1}"
-		case "$only_config" in 0|1) ;; *) fail "备份类型无效" ;; esac
-		entry=$(find_openclaw_entry) || fail "OpenClaw 未安装"
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		case "$only_config" in 0|1) ;; *) fail "Invalid backup type" ;; esac
+		entry=$(find_openclaw_entry) || fail "OpenClaw is not installed"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		mkdir -p "$OC_BACKUP_DIR"
 		chown openclaw:openclaw "$OC_BACKUP_DIR" 2>/dev/null || true
 		# 迁移历史版本遗留在安装路径内的备份, 避免卸载丢失。
@@ -414,12 +414,12 @@ case "${1:-}" in
 		if [ -z "$file" ]; then
 			file=$(ls -t "$OC_BACKUP_DIR"/*-openclaw-backup.tar.gz 2>/dev/null | head -1)
 		else
-			echo "$file" | grep -Eq '^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$' || fail "备份文件名无效"
+			echo "$file" | grep -Eq '^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$' || fail "Invalid backup file name"
 			file="$OC_BACKUP_DIR/$file"
 		fi
-		[ -f "$file" ] || fail "备份文件不存在"
-		entry=$(find_openclaw_entry) || fail "OpenClaw 未安装"
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		[ -f "$file" ] || fail "Backup file does not exist"
+		entry=$(find_openclaw_entry) || fail "OpenClaw is not installed"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		# 以 openclaw 身份运行(带 env), 否则 root 触发临时目录安全校验失败。
 		su -s /bin/sh openclaw -c "$(oc_cli_env) $NODE_BASE/bin/node $entry backup verify $(oc_quote "$file")"
 		;;
@@ -428,8 +428,8 @@ case "${1:-}" in
 		trap 'release_operation_lock' EXIT INT TERM
 		load_paths
 		file="${2:-}"
-		echo "$file" | grep -Eq '^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$' || fail "备份文件名无效"
-		[ -f "$OC_BACKUP_DIR/$file" ] || fail "备份文件不存在"
+		echo "$file" | grep -Eq '^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$' || fail "Invalid backup file name"
+		[ -f "$OC_BACKUP_DIR/$file" ] || fail "Backup file does not exist"
 		rm -f "$OC_BACKUP_DIR/$file"
 		;;
 	backup-restore)
@@ -437,14 +437,14 @@ case "${1:-}" in
 		trap 'release_operation_lock' EXIT INT TERM
 		load_paths
 		file="${2:-}"
-		echo "$file" | grep -Eq '^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$' || fail "备份文件名无效"
+		echo "$file" | grep -Eq '^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$' || fail "Invalid backup file name"
 		archive="$OC_BACKUP_DIR/$file"
-		[ -f "$archive" ] || fail "备份文件不存在"
-		restore_stage=$(mktemp -d "${OC_TMP:-/tmp}/openclaw-restore.XXXXXX") || fail "无法创建恢复临时目录"
+		[ -f "$archive" ] || fail "Backup file does not exist"
+		restore_stage=$(mktemp -d "${OC_TMP:-/tmp}/openclaw-restore.XXXXXX") || fail "Failed to create restore temp directory"
 		trap 'rm -rf "$restore_stage"; release_operation_lock' EXIT INT TERM
-		restore_source=$(oc_prepare_backup_restore "$archive" "$OC_STATE_DIR" "$restore_stage") || fail "备份包含不安全路径、链接或非状态目录内容"
-		[ -f "$restore_source/openclaw.json" ] || fail "备份中缺少 openclaw.json"
-		"$NODE_BASE/bin/node" -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$restore_source/openclaw.json" || fail "备份配置无效"
+		restore_source=$(oc_prepare_backup_restore "$archive" "$OC_STATE_DIR" "$restore_stage") || fail "Backup contains unsafe paths, links, or non-state content"
+		[ -f "$restore_source/openclaw.json" ] || fail "Backup is missing openclaw.json"
+		"$NODE_BASE/bin/node" -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$restore_source/openclaw.json" || fail "Invalid backup configuration"
 		cp -f "$CONFIG_FILE" "$CONFIG_FILE.pre-restore" 2>/dev/null || true
 		/etc/init.d/openclaw stop >/dev/null 2>&1 || true
 		mkdir -p "$OC_STATE_DIR"
@@ -454,7 +454,7 @@ case "${1:-}" in
 		;;
 	wechat-install)
 		load_paths
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		# 仅安装插件(不登录, 解耦)。停网关→装插件(openclaw 身份, /usr/bin/openclaw 自动降权)→起网关加载新插件。
 		# 登录请另走「扫码登录」(channels login 热重载, 不碰 OpenClaw 自带的网关重启)。
 		# 版本由 OpenClaw 官方逻辑(@latest)解析其认定的兼容版本, 不强取 npm raw latest。
@@ -466,20 +466,20 @@ case "${1:-}" in
 		;;
 	wechat-upgrade)
 		load_paths
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		# 走 OpenClaw 官方更新逻辑, 由其解析兼容版本(不强取 npm raw latest); 与「检测升级」用的 --dry-run 同源。
 		cmd="/etc/init.d/openclaw stop; /usr/bin/openclaw plugins update openclaw-weixin; rc=\$?; /etc/init.d/openclaw start; exit \$rc"
 		start_task /tmp/openclaw-wechat-install "$cmd"
 		;;
 	wechat-login)
 		load_paths
-		entry=$(find_openclaw_entry) || fail "OpenClaw 未安装"
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		entry=$(find_openclaw_entry) || fail "OpenClaw is not installed"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		pkill -f 'channels login --channel openclaw-weixin' 2>/dev/null || true
 		rm -f /tmp/openclaw-wechat-qrcode.txt /tmp/openclaw-wechat-login.pid /tmp/openclaw-wechat-login.exit /tmp/openclaw-wechat-restarted
 		# 登录前先幂等 enable 插件: OpenClaw 核心升级可能丢掉 plugins.entries.openclaw-weixin,
 		# 导致 channels login 退化成交互式"是否安装插件"提问、后台流程答不了而失败。
-		cmd="su -s /bin/sh openclaw -c $(oc_quote "export HOME=$OC_HOME OPENCLAW_HOME=$OC_HOME OPENCLAW_STATE_DIR=$OC_STATE_DIR OPENCLAW_CONFIG_PATH=$CONFIG_FILE NPM_CONFIG_PREFIX=$OC_GLOBAL NPM_CONFIG_CACHE=$OC_NPM_CACHE TMPDIR=$OC_TMP PATH=$NODE_BASE/bin:$OC_GLOBAL/bin:/usr/sbin:/usr/bin:/sbin:/bin; $NODE_BASE/bin/node $entry plugins enable openclaw-weixin >/dev/null 2>&1; $NODE_BASE/bin/node $entry channels login --channel openclaw-weixin"); rc=\$?; if grep -q 'Local login saved auth' /tmp/openclaw-wechat-qrcode.txt; then echo '微信认证已保存，正在通过 procd 重启 OpenClaw 服务...'; /etc/init.d/openclaw stop >/dev/null 2>&1 || true; /etc/init.d/openclaw start; touch /tmp/openclaw-wechat-restarted; exit 0; fi; exit \$rc"
+		cmd="su -s /bin/sh openclaw -c $(oc_quote "export HOME=$OC_HOME OPENCLAW_HOME=$OC_HOME OPENCLAW_STATE_DIR=$OC_STATE_DIR OPENCLAW_CONFIG_PATH=$CONFIG_FILE NPM_CONFIG_PREFIX=$OC_GLOBAL NPM_CONFIG_CACHE=$OC_NPM_CACHE TMPDIR=$OC_TMP PATH=$NODE_BASE/bin:$OC_GLOBAL/bin:/usr/sbin:/usr/bin:/sbin:/bin; $NODE_BASE/bin/node $entry plugins enable openclaw-weixin >/dev/null 2>&1; $NODE_BASE/bin/node $entry channels login --channel openclaw-weixin"); rc=\$?; if grep -q 'Local login saved auth' /tmp/openclaw-wechat-qrcode.txt; then echo 'WeChat auth saved; restarting OpenClaw service via procd...'; /etc/init.d/openclaw stop >/dev/null 2>&1 || true; /etc/init.d/openclaw start; touch /tmp/openclaw-wechat-restarted; exit 0; fi; exit \$rc"
 		start_task /tmp/openclaw-wechat-login "$cmd" /tmp/openclaw-wechat-qrcode.txt
 		ln -sf /tmp/openclaw-wechat-qrcode.txt /tmp/openclaw-wechat-login.log
 		;;
@@ -490,10 +490,10 @@ case "${1:-}" in
 		name="${2:-}"
 		case "$name" in
 			openclaw-setup|openclaw-uninstall|openclaw-plugin-upgrade|openclaw-wechat-install|openclaw-wechat-login|openclaw-doctor-fix) ;;
-			*) fail "无效的任务名" ;;
+			*) fail "Invalid task name" ;;
 		esac
 		cancel_task "/tmp/$name"
-		echo "已停止"
+		echo "Stopped"
 		;;
 	wechat-uninstall)
 		load_paths
@@ -509,7 +509,7 @@ case "${1:-}" in
 		trap 'release_operation_lock' EXIT INT TERM
 		load_paths
 		account="${2:-}"
-		echo "$account" | grep -Eq '^[A-Za-z0-9_.-]+$' || fail "账号 ID 无效"
+		echo "$account" | grep -Eq '^[A-Za-z0-9_.-]+$' || fail "Invalid account ID"
 		OC_STATE_DIR="$OC_STATE_DIR" OC_ACCOUNT_ID="$account" "$NODE_BASE/bin/node" -e '
 const fs=require("fs"),path=require("path"),state=process.env.OC_STATE_DIR,id=process.env.OC_ACCOUNT_ID;
 const wx=path.join(state,"openclaw-weixin"),index=path.join(wx,"accounts.json");
@@ -522,10 +522,10 @@ fs.writeFileSync(index,JSON.stringify(accounts.filter(x=>x!==id),null,2)+"\n");'
 		;;
 	telegram-add)
 		tok="${2:-}"
-		echo "$tok" | grep -Eq '^[0-9]+:[A-Za-z0-9_-]+$' || fail "Bot Token 格式无效"
+		echo "$tok" | grep -Eq '^[0-9]+:[A-Za-z0-9_-]+$' || fail "Invalid Bot Token format"
 		load_paths
-		entry=$(find_openclaw_entry) || fail "OpenClaw 未安装"
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
+		entry=$(find_openclaw_entry) || fail "OpenClaw is not installed"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
 		# 非交互添加 telegram 渠道(token 已校验, 无 shell 元字符), 完成后 procd 重启生效。
 		inner="$(oc_cli_env) $NODE_BASE/bin/node $entry channels add --channel telegram --token $tok"
 		cmd="su -s /bin/sh openclaw -c $(oc_quote "$inner"); rc=\$?; /etc/init.d/openclaw restart; exit \$rc"
@@ -533,7 +533,7 @@ fs.writeFileSync(index,JSON.stringify(accounts.filter(x=>x!==id),null,2)+"\n");'
 		;;
 	telegram-pair)
 		code="${2:-}"
-		echo "$code" | grep -Eq '^[A-Za-z0-9]{4,16}$' || fail "配对码格式无效"
+		echo "$code" | grep -Eq '^[A-Za-z0-9]{4,16}$' || fail "Invalid pairing code format"
 		# --notify: 批准后在 Telegram 里通知发起者已获授权。
 		oc_cli_run "pairing approve --channel telegram $(oc_quote "$code") --notify"
 		;;
@@ -542,34 +542,34 @@ fs.writeFileSync(index,JSON.stringify(accounts.filter(x=>x!==id),null,2)+"\n");'
 		;;
 	dm-scope-set)
 		val="${2:-}"
-		case "$val" in main|per-peer|per-channel-peer|per-account-channel-peer) ;; *) fail "会话作用域无效" ;; esac
+		case "$val" in main|per-peer|per-channel-peer|per-account-channel-peer) ;; *) fail "Invalid session scope" ;; esac
 		# main = 回到无显式配置(null 删除该键); 其余写显式值。官方 config patch 校验写入(stdin)。
 		if [ "$val" = "main" ]; then
 			patch='{"session":{"dmScope":null}}'
 		else
 			patch=$(printf '{"session":{"dmScope":"%s"}}' "$val")
 		fi
-		printf '%s' "$patch" | oc_cli_run "config patch --stdin" || fail "写入配置失败"
+		printf '%s' "$patch" | oc_cli_run "config patch --stdin" || fail "Failed to write configuration"
 		rm -f /tmp/luci-openclaw-status.*
 		/etc/init.d/openclaw restart >/dev/null 2>&1 &
-		echo "会话隔离已设为 $val，网关重启中。"
+		echo "Session isolation saved; gateway is restarting."
 		;;
 	perm-check)
 		load_paths
-		[ -d "$OC_ROOT" ] || fail "OpenClaw 未安装"
+		[ -d "$OC_ROOT" ] || fail "OpenClaw is not installed"
 		find "$OC_ROOT" ! -user openclaw 2>/dev/null | wc -l | tr -d ' '   # 第一行: 数量
 		find "$OC_ROOT" ! -user openclaw 2>/dev/null | head -8             # 其余: 示例路径
 		;;
 	perm-fix)
 		load_paths
-		id openclaw >/dev/null 2>&1 || fail "openclaw 系统用户不存在"
-		oc_safe_openclaw_root "$OC_ROOT" || fail "安装路径未通过安全校验"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
+		oc_safe_openclaw_root "$OC_ROOT" || fail "Install path failed safety validation"
 		# OpenClaw 以 openclaw 身份运行; root 属主残留会致插件 update EACCES。chown 归位(含符号链接)。
 		chown -R openclaw:openclaw "$OC_ROOT" 2>/dev/null
 		find "$OC_ROOT" -type l ! -user openclaw -exec chown -h openclaw:openclaw {} + 2>/dev/null
 		n=$(find "$OC_ROOT" ! -user openclaw 2>/dev/null | wc -l | tr -d ' ')
-		echo "已修复文件属主，剩余非 openclaw 条目: $n"
+		echo "File ownership fixed."
 		[ "$n" = "0" ]
 		;;
-	*) fail "未知 RPC 操作" ;;
+	*) fail "Unknown RPC action" ;;
 esac

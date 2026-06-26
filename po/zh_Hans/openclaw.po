@@ -1,0 +1,1294 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: zh_Hans\n"
+
+msgid "\"%s\" command submitted"
+msgstr "「%s」命令已提交"
+
+msgid "\"Approve pairing\" command submitted"
+msgstr "「审批配对」命令已提交"
+
+msgid "\"Restart gateway\" command submitted; restarting..."
+msgstr "「重启网关」命令已提交，正在重启..."
+
+msgid "\"Save Telegram\" command submitted"
+msgstr "「保存 Telegram」命令已提交"
+
+msgid "\"Uninstall runtime\" command submitted"
+msgstr "「卸载环境」命令已提交"
+
+msgid "%s done."
+msgstr "%s完成。"
+
+msgid "%s logged in"
+msgstr "已登录 %s 个"
+
+msgid "%s paired"
+msgstr "已配对 %s"
+
+msgid "(current)"
+msgstr "（当前）"
+
+msgid "A task of the same type is already running"
+msgstr "已有同类任务正在运行"
+
+msgid "Account logged out."
+msgstr "账号已退出。"
+
+msgid "Action"
+msgstr "操作"
+
+msgid "Active model"
+msgstr "活跃模型"
+
+msgid "Active model set."
+msgstr "活跃模型已设置。"
+
+msgid "Active model set; applying."
+msgstr "活跃模型已设置，正在生效。"
+
+msgid "Active model: %s"
+msgstr "活跃模型：%s"
+
+msgid "Actual path"
+msgstr "实际路径"
+
+msgid "Adds an account dimension for multi-account scenarios; strongest isolation."
+msgstr "多账号场景再加账号维度，隔离最强。"
+
+msgid "After config changes, click Restart or Restart gateway to apply; a Running status badge means it is healthy."
+msgstr "配置改动后点「重启」或「重启网关」使其生效；状态徽标显示「运行中」即正常。"
+
+msgid "After saving the token, click Pairing Helper, then send a private message to your bot on Telegram; the helper auto-captures and approves the pairing request (no need to copy the pairing code). You can also enter the pairing code manually as a fallback."
+msgstr "保存 token 后，点「配对助手」，再用 Telegram 给你的 Bot 发一条私信；助手会自动捕获配对请求并批准（无需手动复制配对码）。也可手动填配对码兜底。"
+
+msgid "All channels and all peers share one session; selecting and saving this clears the option, reverting to no explicit configuration."
+msgstr "所有渠道、所有对端共用一个会话；选此项保存将清除该配置项，回到无显式配置。"
+
+msgid "All good, no issues found."
+msgstr "一切正常，未发现问题。"
+
+msgid "Already the latest version (%s)"
+msgstr "当前已是最新版本（%s）"
+
+msgid "Already the latest version."
+msgstr "已是最新版本。"
+
+msgid "Already up to date (core and plugins, %s)"
+msgstr "当前已是最新（核心与插件，%s）"
+
+msgid "Another OpenClaw system operation is in progress"
+msgstr "另一项 OpenClaw 系统操作正在进行"
+
+msgid "Approval error %s: %s"
+msgstr "❌ 批准出错 %s：%s"
+
+msgid "Approval failed %s: %s"
+msgstr "❌ 批准失败 %s：%s"
+
+msgid "Authorize"
+msgstr "授权"
+
+msgid "Authorized %s; pairing helper stopped."
+msgstr "✅ 已授权 %s，配对助手已停止。"
+
+msgid "Auto refresh (2s)"
+msgstr "自动刷新 (2s)"
+
+msgid "Autostart"
+msgstr "开机自启"
+
+msgid "Autostart disabled (the current process is unaffected)."
+msgstr "已禁用开机自启（当前进程不受影响）。"
+
+msgid "Autostart enabled."
+msgstr "已启用开机自启。"
+
+msgid "Autostart updated"
+msgstr "已更新开机自启"
+
+msgid "Available"
+msgstr "可用"
+
+msgid "Backup / Restore"
+msgstr "备份/恢复"
+
+msgid "Backup and restore"
+msgstr "备份与恢复"
+
+msgid "Backup contains unsafe paths, links, or non-state content"
+msgstr "备份包含不安全路径、链接或非状态目录内容"
+
+msgid "Backup deleted."
+msgstr "备份已删除。"
+
+msgid "Backup directory (outside the install directory; not removed when uninstalling the runtime):"
+msgstr "备份保存目录（位于安装目录之外，卸载环境不会删除）："
+
+msgid "Backup file does not exist"
+msgstr "备份文件不存在"
+
+msgid "Backup is missing openclaw.json"
+msgstr "备份中缺少 openclaw.json"
+
+msgid "Backup path updated."
+msgstr "备份路径已更新。"
+
+msgid "Backup restored; service is restarting."
+msgstr "备份已恢复，服务重启中。"
+
+msgid "Backup verified."
+msgstr "备份验证通过。"
+
+msgid "Basic Settings"
+msgstr "基本设置"
+
+msgid "Bind mode"
+msgstr "绑定模式"
+
+msgid "Bot offline"
+msgstr "Bot 离线"
+
+msgid "Bot online"
+msgstr "Bot 在线"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Cancel all"
+msgstr "全部取消"
+
+msgid "Cannot scan? Click to open:"
+msgstr "无法扫码？点击访问："
+
+msgid "Captured pairing request %s (%s), approving automatically..."
+msgstr "捕获配对请求 %s（%s），正在自动批准…"
+
+msgid "Channel session isolation"
+msgstr "渠道会话隔离"
+
+msgid "Channel status"
+msgstr "渠道状态"
+
+msgid "Channels"
+msgstr "渠道"
+
+msgid "Check failed"
+msgstr "检查失败"
+
+msgid "Check for upgrades"
+msgstr "检测升级"
+
+msgid "Check ownership"
+msgstr "检查权属"
+
+msgid "Checking file ownership..."
+msgstr "正在检查文件权属..."
+
+msgid "Checking install path capacity and write permission..."
+msgstr "正在检查安装路径容量和写入权限..."
+
+msgid "Checking install path capacity..."
+msgstr "正在检查安装路径容量..."
+
+msgid "Checking version..."
+msgstr "正在检查版本..."
+
+msgid "Choose how to isolate direct-message sessions; saving writes the config and restarts the gateway to apply."
+msgstr "选择私信会话的隔离方式；保存后写入配置并重启网关生效。"
+
+msgid "Choose the active (default) model among configured and authorized models; the gateway hot-reloads after saving."
+msgstr "在已配置且已授权的模型中选择活跃（默认）模型，保存后网关自动热重载生效。"
+
+msgid "Clear"
+msgstr "清空"
+
+msgid "Click Load log to fetch the latest logs."
+msgstr "点击「加载日志」获取最新日志。"
+
+msgid "Click Run health check to start diagnosis."
+msgstr "点击「运行健康检查」开始诊断。"
+
+msgid "Close"
+msgstr "关闭"
+
+msgid "Closed"
+msgstr "已关闭"
+
+msgid "Config backup created."
+msgstr "配置备份已创建。"
+
+msgid "Config only"
+msgstr "仅配置"
+
+msgid "Configuration"
+msgstr "配置管理"
+
+msgid "Configuration saved."
+msgstr "配置已保存。"
+
+msgid "Configure WeChat / Telegram under Configuration > Channels; troubleshoot via Configuration > Health check or openclaw doctor."
+msgstr "微信 / Telegram 在「配置管理 → 渠道」配置；遇问题用「配置管理 → 健康检查」或 openclaw doctor 排查。"
+
+msgid "Configure messaging channels (wizard)"
+msgstr "配置消息渠道（向导）"
+
+msgid "Configure models/providers"
+msgstr "配置模型/提供商"
+
+msgid "Configured"
+msgstr "已配置"
+
+msgid "Configured models"
+msgstr "已配置模型"
+
+msgid "Configured providers"
+msgstr "已配置提供商"
+
+msgid "Confirm uninstall"
+msgstr "确认卸载"
+
+msgid "Create config backup"
+msgstr "创建配置备份"
+
+msgid "Create full backup"
+msgstr "创建完整备份"
+
+msgid "Creating config backup..."
+msgstr "正在创建配置备份..."
+
+msgid "Creating full backup..."
+msgstr "正在创建完整备份..."
+
+msgid "Custom path"
+msgstr "自定义路径"
+
+msgid "Custom version..."
+msgstr "自定义版本…"
+
+msgid "Default backup path restored."
+msgstr "已恢复默认备份路径。"
+
+msgid "Delete"
+msgstr "删除"
+
+msgid "Delete this backup?"
+msgstr "确定删除此备份？"
+
+msgid "Deleting backup..."
+msgstr "正在删除备份..."
+
+msgid "Detect mount points"
+msgstr "检测挂载点"
+
+msgid "Detection failed"
+msgstr "检测失败"
+
+msgid "Disable autostart"
+msgstr "禁用自启"
+
+msgid "Disk free space"
+msgstr "磁盘可用容量"
+
+msgid "Disk total space"
+msgstr "磁盘总容量"
+
+msgid "Download failed"
+msgstr "下载失败"
+
+msgid "Embeds the official OpenClaw admin interface."
+msgstr "嵌入 OpenClaw 官方管理界面。"
+
+msgid "Enable autostart"
+msgstr "启用自启"
+
+msgid "Enter another path manually..."
+msgstr "手动输入其他路径…"
+
+msgid "Enter path manually"
+msgstr "手动输入路径"
+
+msgid "Enter the Bot Token from BotFather; after saving it is added via the official CLI and the gateway restarts automatically (no wizard needed)."
+msgstr "填入 BotFather 提供的 Bot Token，保存后通过官方 CLI 添加并自动重启网关生效（无需进向导）。"
+
+msgid "Error"
+msgstr "错误"
+
+msgid "Failed to check for updates (check your network)"
+msgstr "无法查询更新（请检查网络）"
+
+msgid "Failed to create backup directory"
+msgstr "无法创建备份目录"
+
+msgid "Failed to create restore temp directory"
+msgstr "无法创建恢复临时目录"
+
+msgid "Failed to fetch the latest version"
+msgstr "无法获取最新版本"
+
+msgid "Failed to generate QR code"
+msgstr "二维码生成失败"
+
+msgid "Failed to parse output"
+msgstr "解析输出失败"
+
+msgid "Failed to parse secrets audit output"
+msgstr "无法解析 secrets audit 输出"
+
+msgid "Failed to query npm version (check your network)"
+msgstr "无法查询 npm 版本（请检查网络）"
+
+msgid "Failed to query plugin version (check your network)"
+msgstr "无法查询插件版本（请检查网络）"
+
+msgid "Failed to read channels"
+msgstr "读取渠道失败"
+
+msgid "Failed to read logs"
+msgstr "读取日志失败"
+
+msgid "Failed to read task status"
+msgstr "无法读取任务状态"
+
+msgid "Failed to start background operation"
+msgstr "无法启动后台操作"
+
+msgid "Failed to start the install task"
+msgstr "无法启动安装任务"
+
+msgid "Failed to write configuration"
+msgstr "写入配置失败"
+
+msgid "Failed, exit code: %s"
+msgstr "失败，退出码：%s"
+
+msgid "Fallback models"
+msgstr "回退模型"
+
+msgid "Fallback models cleared"
+msgstr "回退模型已清空"
+
+msgid "Fallback models saved; applying."
+msgstr "回退模型已保存，正在生效。"
+
+msgid "Fallback models updated"
+msgstr "回退模型已更新"
+
+msgid "Feishu"
+msgstr "飞书"
+
+msgid "File ownership"
+msgstr "文件权属"
+
+msgid "File ownership fixed."
+msgstr "文件权属已修复。"
+
+msgid "File ownership is fine (all owned by openclaw)."
+msgstr "文件属主正常（全部归 openclaw）。"
+
+msgid "First time: click Install runtime, then configure models/channels under Configuration > Official setup or via openclaw-shell."
+msgstr "首次使用：先点「安装运行环境」，装好后到「配置管理 → 官方配置」或 openclaw-shell 配置模型/渠道。"
+
+msgid "Fix completed."
+msgstr "修复完成。"
+
+msgid "Fix failed, exit code: %s"
+msgstr "修复失败，退出码：%s"
+
+msgid "Fix in progress..."
+msgstr "修复进行中..."
+
+msgid "Fix ownership"
+msgstr "修复权属"
+
+msgid "Fix task running, please wait..."
+msgstr "修复任务正在运行，请稍候..."
+
+msgid "Fixing file ownership..."
+msgstr "正在修复文件权属..."
+
+msgid "Format: x.y.z"
+msgstr "格式：x.y.z"
+
+msgid "Found %s files not owned by openclaw; click Fix ownership. Examples: %s"
+msgstr "发现 %s 个非 openclaw 属主文件，建议点「修复权属」。示例：%s"
+
+msgid "Found %s plaintext secrets; run openclaw secrets configure in the OpenClaw terminal to migrate."
+msgstr "发现 %s 处明文密钥；可在 OpenClaw 终端运行 openclaw secrets configure 迁移。"
+
+msgid "Free space"
+msgstr "剩余空间"
+
+msgid "Full"
+msgstr "完整"
+
+msgid "Full backup created."
+msgstr "完整备份已创建。"
+
+msgid "Gateway"
+msgstr "网关"
+
+msgid "Gateway failed to start; check the Log to troubleshoot."
+msgstr "网关启动失败，请到「日志」排查。"
+
+msgid "Gateway failed to start; check the logs to troubleshoot."
+msgstr "网关启动失败，请在日志中排查。"
+
+msgid "Gateway is ready and running (port %s)."
+msgstr "网关已就绪，运行中（端口 %s）。"
+
+msgid "Gateway is ready and running."
+msgstr "网关已就绪，运行中。"
+
+msgid "Gateway is restarting, please wait..."
+msgstr "网关重启中，请稍候..."
+
+msgid "Gateway is starting"
+msgstr "网关正在启动"
+
+msgid "Gateway is starting, please wait..."
+msgstr "网关启动中，请稍候..."
+
+msgid "Gateway log"
+msgstr "网关日志"
+
+msgid "Gateway not running"
+msgstr "网关未运行"
+
+msgid "Gateway port"
+msgstr "网关端口"
+
+msgid "Gateway stopped."
+msgstr "网关已停止。"
+
+msgid "Graphical access to the official OpenClaw CLI: health check, doctor fix, provider and channel configuration, log queries."
+msgstr "图形化调用 OpenClaw 官方命令行：健康检查、医生修复、提供商与渠道配置、日志查询。"
+
+msgid "Health check"
+msgstr "健康检查"
+
+msgid "Health check and fix"
+msgstr "健康检查与修复"
+
+msgid "Health check completed."
+msgstr "健康检查完成。"
+
+msgid "Health check failed"
+msgstr "健康检查失败"
+
+msgid "If the wizard is awkward to use, switch to openclaw-shell and type CLI commands directly (more reliable)."
+msgstr "向导交互不顺时，可改用 openclaw-shell 直接敲 CLI 命令配置（更可靠）。"
+
+msgid "Install app"
+msgstr "安装插件"
+
+msgid "Install environment check passed"
+msgstr "安装环境检测通过"
+
+msgid "Install location"
+msgstr "安装位置"
+
+msgid "Install path"
+msgstr "安装路径"
+
+msgid "Install path changed; wait for the capacity check to finish."
+msgstr "安装路径已变化，请等待容量检查完成。"
+
+msgid "Install path failed safety validation"
+msgstr "安装路径未通过安全校验"
+
+msgid "Install path not writable or insufficient system resources"
+msgstr "安装路径不可写或系统资源不足"
+
+msgid "Install precondition check failed"
+msgstr "安装条件检查未通过"
+
+msgid "Install precondition check passed"
+msgstr "安装条件检查通过"
+
+msgid "Install runtime"
+msgstr "安装运行环境"
+
+msgid "Install task submitted, waiting for output..."
+msgstr "安装任务已提交，等待输出..."
+
+msgid "Installation complete! The service is enabled; refresh the page to see status."
+msgstr "安装完成！服务已自动启用，请刷新页面查看状态。"
+
+msgid "Installed"
+msgstr "已安装"
+
+msgid "Installing WeChat plugin..."
+msgstr "正在安装微信插件..."
+
+msgid "Invalid Bot Token format"
+msgstr "Bot Token 格式无效"
+
+msgid "Invalid Bot Token format (expected like 123456789:ABC...)"
+msgstr "Bot Token 格式无效（应形如 123456789:ABC...）"
+
+msgid "Invalid Node version format"
+msgstr "Node 版本号格式无效"
+
+msgid "Invalid Node version format (e.g. 22.22.3)"
+msgstr "Node 版本号格式无效 (如 22.22.3)"
+
+msgid "Invalid Node version format, enter x.y.z (e.g. 24.17.0)."
+msgstr "Node 版本格式无效，请输入 x.y.z（如 24.17.0）。"
+
+msgid "Invalid Node.js version format"
+msgstr "Node.js 版本号格式无效"
+
+msgid "Invalid Node.js version format, enter x.y.z (e.g. 24.17.0)."
+msgstr "Node.js 版本格式无效，请输入 x.y.z 格式（如 24.17.0）。"
+
+msgid "Invalid QR code text"
+msgstr "二维码文本无效"
+
+msgid "Invalid RPC response"
+msgstr "无效的 RPC 响应"
+
+msgid "Invalid UCI install path"
+msgstr "UCI 安装路径无效"
+
+msgid "Invalid account ID"
+msgstr "账号 ID 无效"
+
+msgid "Invalid backup configuration"
+msgstr "备份配置无效"
+
+msgid "Invalid backup file name"
+msgstr "备份文件名无效"
+
+msgid "Invalid backup path: must be absolute and outside the install directory"
+msgstr "备份路径无效: 需为绝对路径且位于安装目录之外"
+
+msgid "Invalid backup type"
+msgstr "备份类型无效"
+
+msgid "Invalid fallback model ID"
+msgstr "回退模型 ID 无效"
+
+msgid "Invalid fallback model list"
+msgstr "回退模型列表无效"
+
+msgid "Invalid install parameter"
+msgstr "安装参数无效"
+
+msgid "Invalid install path"
+msgstr "安装路径无效"
+
+msgid "Invalid install version"
+msgstr "安装版本无效"
+
+msgid "Invalid model ID"
+msgstr "模型 ID 无效"
+
+msgid "Invalid pairing code format"
+msgstr "配对码格式无效"
+
+msgid "Invalid parameter"
+msgstr "参数无效"
+
+msgid "Invalid service action"
+msgstr "服务操作无效"
+
+msgid "Invalid session scope"
+msgstr "会话作用域无效"
+
+msgid "Invalid task name"
+msgstr "任务名无效"
+
+msgid "Invalid version format"
+msgstr "版本号格式无效"
+
+msgid "Invalid wizard section"
+msgstr "无效的向导分段"
+
+msgid "Isolate per account + channel"
+msgstr "按账号+渠道隔离"
+
+msgid "Isolate per channel"
+msgstr "按渠道隔离"
+
+msgid "Isolate per peer"
+msgstr "按对端隔离"
+
+msgid "Latest (latest)"
+msgstr "最新版 (latest)"
+
+msgid "Lines"
+msgstr "行数"
+
+msgid "Listening on port %s"
+msgstr "监听端口 %s"
+
+msgid "Load log"
+msgstr "加载日志"
+
+msgid "Loading..."
+msgstr "加载中..."
+
+msgid "Log"
+msgstr "日志"
+
+msgid "Log out"
+msgstr "退出"
+
+msgid "Log out this WeChat account?"
+msgstr "确定退出此微信账号？"
+
+msgid "Logged in"
+msgstr "已登录"
+
+msgid "Logged-in accounts"
+msgstr "已登录账号"
+
+msgid "Logging out account..."
+msgstr "正在退出账号..."
+
+msgid "Login failed to start"
+msgstr "登录启动失败"
+
+msgid "Login status"
+msgstr "登录状态"
+
+msgid "Manage the OpenClaw runtime, procd service, upgrades, and backups."
+msgstr "管理 OpenClaw 运行环境、procd 服务、升级和备份。"
+
+msgid "Manual approval"
+msgstr "手动审批"
+
+msgid "Memory"
+msgstr "内存"
+
+msgid "Messaging channels"
+msgstr "消息渠道"
+
+msgid "Messaging channels (official)"
+msgstr "消息渠道（官方）"
+
+msgid "Minimum 1024 MB"
+msgstr "最低 1024 MB"
+
+msgid "Minimum 2 GB"
+msgstr "最低 2 GB"
+
+msgid "Models and providers"
+msgstr "模型与提供商"
+
+msgid "Name"
+msgstr "名称"
+
+msgid "New OpenClaw version %s available (current %s)."
+msgstr "发现 OpenClaw 新版本 %s（当前 %s）。"
+
+msgid "New WeChat plugin version %s available."
+msgstr "发现微信插件新版本 %s。"
+
+msgid "New version %s available (current %s)."
+msgstr "发现新版本 %s（当前 %s）。"
+
+msgid "No"
+msgstr "否"
+
+msgid "No channels configured yet. Use the wizard below to configure."
+msgstr "尚未配置任何渠道，请用下方向导配置。"
+
+msgid "No command output (OpenClaw not installed or secrets unsupported)"
+msgstr "命令无输出 (OpenClaw 未安装或不支持 secrets)"
+
+msgid "No command output (gateway may not be running or OpenClaw not installed)"
+msgstr "命令无输出 (网关可能未运行或 OpenClaw 未安装)"
+
+msgid "No logged-in accounts yet"
+msgstr "暂无已登录账号"
+
+msgid "No logs yet (the gateway may not be running)."
+msgstr "暂无日志（网关可能未运行）。"
+
+msgid "No models available as fallbacks: configure and authorize multiple models under Configure models/providers first (a fallback cannot be the current active model)."
+msgstr "没有可作为回退的模型：需要先在「配置模型/提供商」里配置并授权多个模型（回退模型不能是当前活跃模型）。"
+
+msgid "No models available: configure models under Configure models/providers and complete provider authorization first."
+msgstr "没有可用模型：需要先在「配置模型/提供商」里配置模型并完成提供商授权。"
+
+msgid "No output yet"
+msgstr "暂无输出"
+
+msgid "No plaintext secrets (informational only)."
+msgstr "无明文密钥（仅信息项）。"
+
+msgid "No plaintext secrets found."
+msgstr "未发现明文密钥。"
+
+msgid "No providers configured yet. Click the button below to configure with the official wizard."
+msgstr "尚未配置任何提供商。点击下方按钮用官方向导配置。"
+
+msgid "No running tasks."
+msgstr "暂无运行中的任务。"
+
+msgid "No task output yet"
+msgstr "暂无任务输出"
+
+msgid "Node version"
+msgstr "Node 版本"
+
+msgid "Node.js may be used by other software; leave unchecked to keep it."
+msgstr "Node.js 可供其他用途使用，不勾选则保留。"
+
+msgid "Node.js path"
+msgstr "Node.js 路径"
+
+msgid "Node.js runtime"
+msgstr "Node.js 运行时"
+
+msgid "Node.js runtime kept."
+msgstr "Node.js 运行时已保留。"
+
+msgid "Node.js version"
+msgstr "Node.js 版本"
+
+msgid "None"
+msgstr "无"
+
+msgid "Not configured"
+msgstr "未配置"
+
+msgid "Not configured (save the Bot Token first)"
+msgstr "未配置（请先保存 Bot Token）"
+
+msgid "Not installed"
+msgstr "未安装"
+
+msgid "Not listening"
+msgstr "未监听"
+
+msgid "Not logged in"
+msgstr "未登录"
+
+msgid "Not paired"
+msgstr "未配对"
+
+msgid "Not writable"
+msgstr "不可写"
+
+msgid "Note"
+msgstr "提示"
+
+msgid "Note: when the official wizard configures the WeChat channel, it only installs the openclaw-weixin plugin and does not start QR login. After installation, click QR login in the WeChat channel card below to sign in."
+msgstr "说明：官方向导配置微信渠道时只会安装 openclaw-weixin 插件，不会进入扫码登录。安装完成后，请到下方「微信渠道」卡片点击「扫码登录」完成账号登录。"
+
+msgid "OK"
+msgstr "确定"
+
+msgid "Official setup"
+msgstr "官方配置"
+
+msgid "Official setup wizard"
+msgstr "官方配置向导"
+
+msgid "One-click fix (doctor --fix)"
+msgstr "一键修复 (doctor --fix)"
+
+msgid "Only http(s) links are supported"
+msgstr "仅支持 http(s) 链接"
+
+msgid "Open in new window"
+msgstr "在新窗口打开"
+
+msgid "OpenClaw AI Gateway"
+msgstr "OpenClaw AI 网关"
+
+msgid "OpenClaw Gateway"
+msgstr "OpenClaw 网关"
+
+msgid "OpenClaw core is up to date (%s); plugin/dependency updates are available."
+msgstr "OpenClaw 核心已最新（%s），发现插件/依赖更新可用。"
+
+msgid "OpenClaw is not installed"
+msgstr "OpenClaw 未安装"
+
+msgid "OpenClaw runs as the openclaw user; root-owned leftover files in the install directory cause plugin updates to fail (EACCES). Check and fix ownership here in one click."
+msgstr "OpenClaw 以 openclaw 用户运行；若安装目录里出现 root 属主残留文件，会导致插件更新失败（EACCES）。此处可检查并一键归位。"
+
+msgid "OpenClaw runtime and data"
+msgstr "OpenClaw 运行环境及数据"
+
+msgid "OpenClaw runtime is not installed; install it under Basic Settings first."
+msgstr "OpenClaw 运行环境未安装，请先在「基本设置」中安装运行环境。"
+
+msgid "OpenClaw runtime uninstalled."
+msgstr "OpenClaw 运行环境已卸载。"
+
+msgid "OpenClaw version"
+msgstr "OpenClaw 版本"
+
+msgid "Operation failed"
+msgstr "操作失败"
+
+msgid "Operation submitted"
+msgstr "操作已提交"
+
+msgid "Operation succeeded"
+msgstr "操作成功"
+
+msgid "Operation timed out; refresh later to check."
+msgstr "操作超时，请稍后刷新查看。"
+
+msgid "Operation timed out; the gateway was not ready in time. Refresh later to check."
+msgstr "操作超时，网关未在预期时间内就绪，请稍后刷新查看。"
+
+msgid "Paired users: %s"
+msgstr "已配对用户：%s"
+
+msgid "Pairing (approve the DM initiator)"
+msgstr "配对（审批私信发起者）"
+
+msgid "Pairing approved; the user is now authorized."
+msgstr "配对已审批，该用户已获授权。"
+
+msgid "Pairing code (manual fallback)"
+msgstr "配对码（手动兜底）"
+
+msgid "Pairing complete; helper stopped."
+msgstr "配对完成，助手已停止。"
+
+msgid "Pairing helper"
+msgstr "配对助手"
+
+msgid "Pairing helper running: ask the other party to send the bot a private message..."
+msgstr "配对助手运行中：请让对方给 Bot 发私信…"
+
+msgid "Pairing helper started, waiting for a pairing request... Ask the other party to send any private message to your bot on Telegram."
+msgstr "配对助手已启动，等待配对请求…\\n请让对方用 Telegram 给你的 Bot 发送任意私信。"
+
+msgid "Pairing helper stopped."
+msgstr "配对助手已停止。"
+
+msgid "Pairing helper timed out and stopped (about 5 minutes)."
+msgstr "配对助手已超时停止（约 5 分钟）。"
+
+msgid "Path write permission"
+msgstr "路径写入权限"
+
+msgid "Plaintext secret scan"
+msgstr "密钥明文扫描"
+
+msgid "Plugin installed; click QR login to finish signing in."
+msgstr "插件已安装，请点「扫码登录」完成登录。"
+
+msgid "Plugin upgrade completed."
+msgstr "插件升级完成。"
+
+msgid "Plugin version"
+msgstr "插件版本"
+
+msgid "Probing mount points..."
+msgstr "正在探测挂载点..."
+
+msgid "Processing..."
+msgstr "正在处理..."
+
+msgid "Project home / feedback:"
+msgstr "项目主页 / 反馈："
+
+msgid "Provider"
+msgstr "提供商"
+
+msgid "QR login"
+msgstr "扫码登录"
+
+msgid "Quick actions"
+msgstr "快捷操作"
+
+msgid "Quick guide"
+msgstr "快速指南"
+
+msgid "Ran %s checks, found %s results."
+msgstr "共运行 %s 项检查，发现 %s 条结果。"
+
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "Removing Node.js runtime..."
+msgstr "正在删除 Node.js 运行时..."
+
+msgid "Removing runtime..."
+msgstr "正在删除运行环境..."
+
+msgid "Restart"
+msgstr "重启"
+
+msgid "Restart failed"
+msgstr "重启失败"
+
+msgid "Restart gateway"
+msgstr "重启网关"
+
+msgid "Restart gateway only"
+msgstr "仅重启网关"
+
+msgid "Restart timed out; the gateway was not ready in time. Refresh later to check."
+msgstr "重启超时，网关未在预期时间内就绪，请稍后刷新查看。"
+
+msgid "Restarting gateway, waiting for it to stop..."
+msgstr "正在重启网关，等待停止..."
+
+msgid "Restore"
+msgstr "恢复"
+
+msgid "Restore defaults"
+msgstr "恢复默认"
+
+msgid "Restoring backup..."
+msgstr "正在恢复备份..."
+
+msgid "Restoring default path..."
+msgstr "正在恢复默认路径..."
+
+msgid "Restoring overwrites the current state and restarts the service. Continue?"
+msgstr "恢复会覆盖当前状态并重启服务，确定继续？"
+
+msgid "Run health check"
+msgstr "运行健康检查"
+
+msgid "Run the full official OpenClaw configuration wizard in the embedded terminal (workspace, models, gateway, channels, skills, etc.) to interactively complete first-time or full setup."
+msgstr "在嵌入终端里运行 OpenClaw 官方完整配置向导（工作区、模型、网关、渠道、技能等全部分段），用选项交互完成首次或全面配置。"
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Running health check, please wait..."
+msgstr "正在运行健康检查，请稍候..."
+
+msgid "Running health check..."
+msgstr "正在运行健康检查..."
+
+msgid "Runtime uninstalled."
+msgstr "运行环境已卸载。"
+
+msgid "Runtime upgrade"
+msgstr "环境升级"
+
+msgid "Save"
+msgstr "保存"
+
+msgid "Save and enable"
+msgstr "保存并启用"
+
+msgid "Save path"
+msgstr "保存路径"
+
+msgid "Saved; gateway is restarting."
+msgstr "已保存，网关重启中。"
+
+msgid "Saving and restarting gateway..."
+msgstr "正在保存并重启网关..."
+
+msgid "Saving fallback models..."
+msgstr "正在保存回退模型..."
+
+msgid "Scan failed"
+msgstr "扫描失败"
+
+msgid "Scan for secrets stored in plaintext in openclaw.json and similar files. When OpenClaw backs up to a private git repo, plaintext is committed too. To migrate to SecretRef (references), run openclaw secrets configure in the OpenClaw terminal. The gateway token is injected by this app via environment variables and needs no migration."
+msgstr "扫描 openclaw.json 等文件中以明文存储的密钥。OpenClaw 备份到私有 git 仓库时，明文会一并提交。如需迁移为 SecretRef（引用），请在 OpenClaw 终端运行 openclaw secrets configure。网关令牌由本插件经环境变量注入，无需迁移。"
+
+msgid "Scan plaintext secrets"
+msgstr "扫描明文密钥"
+
+msgid "Scanning plaintext secrets..."
+msgstr "正在扫描明文密钥..."
+
+msgid "Select fallback models tried in order when the active model is unavailable; uncheck all to clear. The gateway hot-reloads after saving. Current active model: %s"
+msgstr "勾选活跃模型不可用时按顺序尝试的回退模型；不勾即清空。保存后网关自动热重载生效。当前活跃模型：%s"
+
+msgid "Select the components to uninstall:"
+msgstr "请选择要卸载的组件："
+
+msgid "Service"
+msgstr "服务"
+
+msgid "Session isolation saved; gateway is restarting."
+msgstr "会话隔离已保存，网关重启中。"
+
+msgid "Session isolation:"
+msgstr "会话隔离："
+
+msgid "Set active model"
+msgstr "设置活跃模型"
+
+msgid "Setting active model..."
+msgstr "正在设置活跃模型..."
+
+msgid "Share all"
+msgstr "全部共享"
+
+msgid "Share all (default)"
+msgstr "全部共享（默认）"
+
+msgid "Size"
+msgstr "大小"
+
+msgid "Source"
+msgstr "来源"
+
+msgid "Stable"
+msgstr "稳定版"
+
+msgid "Stable (%s)"
+msgstr "稳定版 (%s)"
+
+msgid "Start"
+msgstr "启动"
+
+msgid "Start failed"
+msgstr "启动失败"
+
+msgid "Start install"
+msgstr "开始安装"
+
+msgid "Starting"
+msgstr "启动中"
+
+msgid "Starting background install task..."
+msgstr "正在启动后台安装任务..."
+
+msgid "Starting login, please wait..."
+msgstr "正在启动登录，请稍候..."
+
+msgid "Starting openclaw-shell terminal..."
+msgstr "正在启动 openclaw-shell 终端..."
+
+msgid "Starting wizard terminal..."
+msgstr "正在启动配置向导终端..."
+
+msgid "Starting..."
+msgstr "正在启动..."
+
+msgid "Status"
+msgstr "状态"
+
+msgid "Status overview"
+msgstr "状态概览"
+
+msgid "Stop"
+msgstr "停止"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Stopping"
+msgstr "停止中"
+
+msgid "Stopping OpenClaw service..."
+msgstr "正在停止 OpenClaw 服务..."
+
+msgid "Stopping gateway..."
+msgstr "正在停止网关..."
+
+msgid "Switch Node version"
+msgstr "更换 Node 版本"
+
+msgid "Switching the Node version needs no uninstall - use Runtime upgrade > Switch Node version to specify the version directly."
+msgstr "更换 Node 版本无需卸载——请用「环境升级 → 更换 Node 版本」直接指定版本。"
+
+msgid "System memory"
+msgstr "系统内存"
+
+msgid "System resource check passed"
+msgstr "系统资源检测通过"
+
+msgid "System resources do not meet install requirements"
+msgstr "系统资源不满足安装要求"
+
+msgid "System tasks"
+msgstr "系统任务"
+
+msgid "Task completed."
+msgstr "任务已完成。"
+
+msgid "Task failed, exit code: %s"
+msgstr "任务失败，退出码：%s"
+
+msgid "Task running, do not power off the router."
+msgstr "任务正在运行，请不要关闭路由器电源。"
+
+msgid "Task started, waiting for output..."
+msgstr "任务已启动，等待输出..."
+
+msgid "Telegram channel"
+msgstr "Telegram 渠道"
+
+msgid "Telegram channel configured; gateway is restarting."
+msgstr "Telegram 渠道已配置，网关重启中。"
+
+msgid "Terminal failed to start; make sure ttyd is installed (opkg install ttyd)."
+msgstr "终端启动失败，请确认已安装 ttyd (opkg install ttyd)。"
+
+msgid "The installer creates an openclaw directory under the selected mount point. Choose a disk mount with enough space (>=2GB)."
+msgstr "安装程序会在所选挂载点下创建 openclaw 目录。请选择有足够空间（≥2GB）的磁盘挂载点。"
+
+msgid "The official wizard terminal is open below: arrow keys to move, Space/Tab to select, Enter to confirm. When done, click Finish and restart gateway below to apply."
+msgstr "已在下方打开官方配置向导终端：↑↓ 移动、空格/Tab 选中、回车确认。配置完成后点下方「完成并重启网关」生效。"
+
+msgid "The openclaw system user does not exist"
+msgstr "openclaw 系统用户不存在"
+
+msgid "The same peer has separate sessions per channel, with no shared memory."
+msgstr "同一对端在不同渠道各自独立会话，互不串记忆。"
+
+msgid "The same peer is shared across channels; different peers stay separate."
+msgstr "同一对端跨渠道共享，不同对端各自独立。"
+
+msgid "Time / file"
+msgstr "时间/文件"
+
+msgid "Toggle autostart"
+msgstr "切换开机自启"
+
+msgid "Type"
+msgstr "类型"
+
+msgid "Uninstall"
+msgstr "卸载"
+
+msgid "Uninstall app"
+msgstr "卸载插件"
+
+msgid "Uninstall runtime"
+msgstr "卸载环境"
+
+msgid "Uninstall the WeChat plugin?"
+msgstr "确定卸载微信插件？"
+
+msgid "Uninstalling WeChat plugin..."
+msgstr "正在卸载微信插件..."
+
+msgid "Unknown"
+msgstr "未知"
+
+msgid "Unknown RPC action"
+msgstr "未知 RPC 操作"
+
+msgid "Unknown error"
+msgstr "未知错误"
+
+msgid "Unsupported service action"
+msgstr "不支持的服务操作"
+
+msgid "Updating backup path..."
+msgstr "正在更新备份路径..."
+
+msgid "Upgrade LuCI app"
+msgstr "升级 LuCI 插件"
+
+msgid "Upgrade OpenClaw"
+msgstr "升级 OpenClaw"
+
+msgid "Upgrade OpenClaw to latest"
+msgstr "升级 OpenClaw 最新版"
+
+msgid "Upgrade complete, please refresh the page manually."
+msgstr "升级完成，请手动刷新页面。"
+
+msgid "Upgrade complete, reloading backend service..."
+msgstr "升级完成，正在重载后端服务…"
+
+msgid "Upgrade complete, reloading page..."
+msgstr "升级完成，正在刷新页面…"
+
+msgid "Upgrade now"
+msgstr "立即升级"
+
+msgid "Upgrade npm"
+msgstr "升级 npm"
+
+msgid "Upgrade npm to latest"
+msgstr "升级 npm 最新版"
+
+msgid "Upgrade runtime components; the gateway restarts automatically to apply changes. \"Switch Node version\" fully replaces Node with the selected version (including downgrade), no need to uninstall Node first."
+msgstr "升级运行环境组件，变更后自动重启网关生效。「更换 Node 版本」会整体替换为所选版本（含降级），无需先卸载 Node。"
+
+msgid "Upgrading LuCI app..."
+msgstr "正在升级 LuCI 插件..."
+
+msgid "Upgrading WeChat plugin..."
+msgstr "正在升级微信插件..."
+
+msgid "Verify"
+msgstr "验证"
+
+msgid "Verifying backup..."
+msgstr "正在验证备份..."
+
+msgid "Version"
+msgstr "版本"
+
+msgid "Version check failed"
+msgstr "版本检查失败"
+
+msgid "Waiting for output..."
+msgstr "等待输出..."
+
+msgid "Warning"
+msgstr "警告"
+
+msgid "WeChat"
+msgstr "微信"
+
+msgid "WeChat QR login"
+msgstr "微信扫码登录"
+
+msgid "WeChat auth saved; restarting OpenClaw service via procd..."
+msgstr "微信认证已保存，正在通过 procd 重启 OpenClaw 服务..."
+
+msgid "WeChat channel"
+msgstr "微信渠道"
+
+msgid "WeChat plugin"
+msgstr "微信插件"
+
+msgid "WeChat plugin is not installed"
+msgstr "微信插件未安装"
+
+msgid "WeChat plugin uninstalled."
+msgstr "微信插件已卸载。"
+
+msgid "WeChat plugin upgrade completed."
+msgstr "微信插件升级完成。"
+
+msgid "Web Console"
+msgstr "Web 控制台"
+
+msgid "Wizard failed to start"
+msgstr "向导启动失败"
+
+msgid "Wizard failed to start; make sure ttyd is installed (opkg install ttyd)."
+msgstr "向导启动失败，请确认已安装 ttyd (opkg install ttyd)。"
+
+msgid "Writable"
+msgstr "可写"
+
+msgid "Yes"
+msgstr "是"
+
+msgid "npm is not available"
+msgstr "npm 不可用"
+
+msgid "npm is not installed"
+msgstr "npm 未安装"
+
+msgid "openclaw-shell (CLI)"
+msgstr "openclaw-shell（命令行）"
+
+msgid "openclaw-shell is open (running as the openclaw user with the environment ready). Type CLI commands directly, e.g. openclaw configure, openclaw channels add --channel telegram --token <token>, openclaw models, openclaw doctor, etc. After configuration changes, click Restart gateway below to apply. Click Close when finished."
+msgstr "已打开 openclaw-shell（以 openclaw 用户运行，环境已配好）。可直接敲 CLI 命令配置/交互，例如：openclaw configure、openclaw channels add --channel telegram --token <token>、openclaw models、openclaw doctor 等。配置类命令改动后，点下方「重启网关」使其生效。完成后点「关闭」结束终端。"
+
+msgid "qrencode is not installed"
+msgstr "qrencode 未安装"
+
+msgid "ttyd is not installed (opkg install ttyd)"
+msgstr "ttyd 未安装 (opkg install ttyd)"

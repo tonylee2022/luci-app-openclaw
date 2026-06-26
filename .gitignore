@@ -27,3 +27,7 @@ Thumbs.db
 
 # Internal notes (not for release)
 docs/notes/
+
+# Python
+__pycache__/
+*.pyc

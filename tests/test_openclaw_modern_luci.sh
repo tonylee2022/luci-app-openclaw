@@ -29,7 +29,7 @@ grep -q 'ev.preventDefault()' htdocs/luci-static/resources/openclaw/ui.js || fai
 grep -q 'ocui.closeButton' htdocs/luci-static/resources/view/openclaw/overview.js || fail "overview must use shared closeButton from ocui"
 grep -q 'api.setupLog().then' htdocs/luci-static/resources/view/openclaw/overview.js || fail "setup submission recovery check missing"
 grep -q 'showAcceptedTask' htdocs/luci-static/resources/view/openclaw/overview.js || fail "accepted setup must use the persistent task panel"
-if grep -q "button(_('关闭')" htdocs/luci-static/resources/view/openclaw/overview.js; then
+if grep -q "button(_('Close')" htdocs/luci-static/resources/view/openclaw/overview.js; then
 	fail "modal close buttons must not use the asynchronous action wrapper"
 fi
 if grep -q 'showTask:' htdocs/luci-static/resources/view/openclaw/overview.js; then

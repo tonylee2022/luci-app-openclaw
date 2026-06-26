@@ -59,6 +59,18 @@ install_files() {
 	cp "$PKG_DIR/htdocs/luci-static/resources/openclaw/"* "$dest/www/luci-static/resources/openclaw/"
 	cp "$PKG_DIR/htdocs/luci-static/resources/view/openclaw/"*.js "$dest/www/luci-static/resources/view/openclaw/"
 
+	# LuCI i18n 中文语言包: po -> lmo (纯 Python po2lmo, 无需 OpenWrt SDK)。
+	# 文件名用 LuCI 的简体中文别名 zh-cn (对应 po/zh_Hans/, 见 luci.mk LUCI_LC_ALIAS)。
+	if [ -f "$PKG_DIR/po/zh_Hans/openclaw.po" ]; then
+		if command -v python3 >/dev/null 2>&1; then
+			mkdir -p "$dest/usr/lib/lua/luci/i18n"
+			python3 "$PKG_DIR/scripts/po2lmo.py" "$PKG_DIR/po/zh_Hans/openclaw.po" \
+				"$dest/usr/lib/lua/luci/i18n/openclaw.zh-cn.lmo"
+		else
+			echo "警告: 未找到 python3, 跳过中文语言包生成 (界面将仅显示英文)" >&2
+		fi
+	fi
+
 	# LuCI menu and rpcd ucode backend
 	mkdir -p "$dest/usr/share/luci/menu.d" "$dest/usr/share/rpcd/ucode"
 	cp "$PKG_DIR/root/usr/share/luci/menu.d/luci-app-openclaw.json" "$dest/usr/share/luci/menu.d/"

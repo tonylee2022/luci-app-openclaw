@@ -72,6 +72,7 @@ jobs:
           sh tests/test_openclaw_lock.sh
           sh tests/test_openclaw_plugin_policy.sh
           sh tests/test_openclaw_modern_luci.sh
+          sh tests/test_openclaw_i18n.sh
           sh tests/test_openclaw_node.sh
           sh tests/test_openclaw_paths.sh
           sh tests/test_openclaw_workspace.sh

@@ -32,13 +32,13 @@ function run_action(action, args) {
 		command += ' ' + shellquote(arg);
 	let fd = popen(command + " 2>&1; printf '\\n__OPENCLAW_RC__:%s\\n' $?");
 	if (!fd)
-		return reply(false, '无法启动后台操作');
+		return reply(false, 'Failed to start background operation');
 	let output = fd.read('all') || '';
 	fd.close();
 	let marker = match(output, /\n__OPENCLAW_RC__:([0-9]+)\n?$/);
 	let status = +(marker?.[1] ?? 1);
 	output = replace(output, /\n__OPENCLAW_RC__:[0-9]+\n?$/, '');
-	return status == 0 ? reply(true, trim(output) || '操作已提交') : reply(false, trim(output) || '操作失败');
+	return status == 0 ? reply(true, trim(output) || 'Operation submitted') : reply(false, trim(output) || 'Operation failed');
 }
 
 function normalize_base(value) {
@@ -120,7 +120,7 @@ function static_status(p) {
 
 function status() {
 	let p = paths();
-	if (!p) return reply(false, '安装路径无效');
+	if (!p) return reply(false, 'Invalid install path');
 	let port = `${uci_get('port') || '18789'}`;
 	if (!match(port, /^[0-9]+$/)) port = '18789';
 	let gateway = +run(`if command -v ss >/dev/null; then ss -tulnp | grep -c ':${port} '; else netstat -tulnp | grep -c ':${port} '; fi || true`) > 0;
@@ -128,7 +128,7 @@ function status() {
 	let config = {};
 	try { config = json(readfile(p.config)); } catch (e) {}
 	let channels = [];
-	for (let item in [ ['openclaw-weixin', '微信'], ['qqbot', 'QQ'], ['telegram', 'Telegram'], ['discord', 'Discord'], ['feishu', '飞书'], ['slack', 'Slack'] ])
+	for (let item in [ ['openclaw-weixin', 'WeChat'], ['qqbot', 'QQ'], ['telegram', 'Telegram'], ['discord', 'Discord'], ['feishu', 'Feishu'], ['slack', 'Slack'] ])
 		if (config?.channels?.[item[0]]) push(channels, item[1]);
 	let service = {};
 	try { service = json(run("ubus call service list '{\"name\":\"openclaw\"}'")); } catch (e) {}
@@ -155,7 +155,7 @@ function status() {
 
 function system_info(request) {
 	let base = normalize_base(request.args.install_path ?? uci_get('install_path') ?? '/opt');
-	if (!base) return reply(false, '安装路径无效', { path_valid: false, resources_ok: false });
+	if (!base) return reply(false, 'Invalid install path', { path_valid: false, resources_ok: false });
 	let probe = base;
 	while (probe != '/' && !access(probe)) probe = replace(probe, /\/[^\/]+$/, '') || '/';
 	let memory_mb = int(+run("awk '/MemTotal/{print int($2/1024)}' /proc/meminfo"));
@@ -163,7 +163,7 @@ function system_info(request) {
 	let disk_total_mb = int(+run('df -m ' + shellquote(probe) + " | tail -1 | awk '{print $2}'"));
 	let data = { install_path: base, path_valid: true, memory_mb, memory_ok: memory_mb >= 1024, disk_mb, disk_total_mb, disk_ok: disk_mb >= 2048, disk_path: probe, disk_free_str: run('df -h ' + shellquote(probe) + " | tail -1 | awk '{print $4}'"), disk_total_str: run('df -h ' + shellquote(probe) + " | tail -1 | awk '{print $2}'") };
 	data.resources_ok = data.memory_ok && data.disk_ok;
-	return reply(true, data.resources_ok ? '系统资源检测通过' : '系统资源不满足安装要求', data);
+	return reply(true, data.resources_ok ? 'System resource check passed' : 'System resources do not meet install requirements', data);
 }
 
 // 列出可作安装基路径的真实磁盘挂载点(排除 overlay/tmpfs/squashfs/docker 内部/只读系统挂载)。
@@ -201,7 +201,7 @@ function install_path_probe(request) {
 	if (writable) system('rmdir ' + shellquote(test));
 	data.writable_ok = writable;
 	data.pass = data.resources_ok && writable;
-	return reply(data.pass, data.pass ? '安装环境检测通过' : '安装路径不可写或系统资源不足', data);
+	return reply(data.pass, data.pass ? 'Install environment check passed' : 'Install path not writable or insufficient system resources', data);
 }
 
 function update_check() {
@@ -211,13 +211,13 @@ function update_check() {
 	try { release = json(raw); } catch (e) {}
 	let latest = replace(`${release?.tag_name || ''}`, /^v/, '');
 	let body = release?.body || '';
-	if (length(body) > 10000) body = substr(body, 0, 10000) + '\n...(内容过长，已截断)';
-	return reply(!!latest, latest ? '' : '无法获取最新版本', { plugin_current: current, plugin_latest: latest, plugin_has_update: !!latest && current != latest, release_notes: body });
+	if (length(body) > 10000) body = substr(body, 0, 10000) + '\n...(content too long, truncated)';
+	return reply(!!latest, latest ? '' : 'Failed to fetch the latest version', { plugin_current: current, plugin_latest: latest, plugin_has_update: !!latest && current != latest, release_notes: body });
 }
 
 function backup_list() {
 	let p = paths();
-	if (!p) return reply(false, '安装路径无效');
+	if (!p) return reply(false, 'Invalid install path');
 	let output = run('ls -t ' + shellquote(p.backup_dir) + '/*-openclaw-backup.tar.gz 2>/dev/null');
 	let backups = [];
 	for (let file in split(output, '\n')) {
@@ -234,7 +234,7 @@ function gateway_token() {
 
 function wechat_status() {
 	let p = paths();
-	if (!p) return reply(false, '安装路径无效');
+	if (!p) return reply(false, 'Invalid install path');
 	// 注意: busybox find 不支持 -quit, 用 | head -1 取首个匹配
 	let manifest = run('find ' + shellquote(p.state + '/npm/projects') + " -path '*/node_modules/@tencent-weixin/openclaw-weixin/openclaw.plugin.json' 2>/dev/null | head -1");
 	if (!manifest && access(p.state + '/extensions/openclaw-weixin/openclaw.plugin.json')) manifest = p.state + '/extensions/openclaw-weixin/openclaw.plugin.json';
@@ -253,7 +253,7 @@ function wechat_status() {
 function telegram_status(request) {
 	let force = request?.args?.force == '1'; // 「刷新」按钮强制绕过 getMe 缓存重拉。
 	let p = paths();
-	if (!p) return reply(false, '安装路径无效');
+	if (!p) return reply(false, 'Invalid install path');
 	let cfg = {};
 	try { cfg = json(readfile(p.config)); } catch (e) {}
 	let tg = cfg?.channels?.telegram || {};
@@ -314,8 +314,8 @@ function dm_scope() {
 // root 属主残留会导致以 openclaw 身份的插件 update EACCES, 配合 perm_fix 一键归位。
 function perm_check() {
 	let p = paths();
-	if (!p) return reply(false, '安装路径无效');
-	if (!access(p.root)) return reply(false, 'OpenClaw 未安装');
+	if (!p) return reply(false, 'Invalid install path');
+	if (!access(p.root)) return reply(false, 'OpenClaw is not installed');
 	let lines = split(trim(run('/usr/libexec/openclaw-rpc.sh perm-check 2>/dev/null') || ''), '\n');
 	let count = +trim(lines[0] ?? '0');
 	let samples = [];
@@ -328,12 +328,12 @@ function perm_check() {
 // 但 run() 仍捕获 stdout, 故当信息态处理, 不视为失败。
 function secrets_audit() {
 	let p = paths();
-	if (!p) return reply(false, '安装路径无效');
-	if (!access(p.root)) return reply(false, 'OpenClaw 未安装');
+	if (!p) return reply(false, 'Invalid install path');
+	if (!access(p.root)) return reply(false, 'OpenClaw is not installed');
 	let out = run('/usr/bin/openclaw secrets audit --json 2>/dev/null');
 	let j;
-	try { j = json(out); } catch (e) { return reply(false, '无法解析 secrets audit 输出', {}); }
-	if (type(j) != 'object') return reply(false, '命令无输出 (OpenClaw 未安装或不支持 secrets)', {});
+	try { j = json(out); } catch (e) { return reply(false, 'Failed to parse secrets audit output', {}); }
+	if (type(j) != 'object') return reply(false, 'No command output (OpenClaw not installed or secrets unsupported)', {});
 	let findings = [];
 	for (let f in (j.findings || []))
 		push(findings, { code: `${f.code || ''}`, severity: `${f.severity || ''}`, file: `${f.file || ''}`, path: `${f.jsonPath || ''}`, message: `${f.message || ''}` });
@@ -352,9 +352,9 @@ function secrets_audit() {
 
 function env_upgrade_check() {
 	let p = paths();
-	if (!p) return reply(false, '安装路径无效');
+	if (!p) return reply(false, 'Invalid install path');
 	let current = package_version(p.root);
-	if (!current) return reply(false, 'OpenClaw 未安装');
+	if (!current) return reply(false, 'OpenClaw is not installed');
 	// 综合判断: 核心(官方 update dry-run 的 target vs current) + 插件(plugins update --all --dry-run)。
 	// 这样核心已最新但插件/依赖有更新时也能升, 与官方 openclaw update 的覆盖一致。
 	let latest = current, core_update = false, queried = false;
@@ -362,7 +362,7 @@ function env_upgrade_check() {
 		let j = json(run('/usr/bin/openclaw update --dry-run --yes --json 2>/dev/null'));
 		if (j?.targetVersion) { queried = true; latest = `${j.targetVersion}`; core_update = `${j.currentVersion}` != latest; }
 	} catch (e) {}
-	if (!queried) return reply(false, '无法查询更新（请检查网络）');
+	if (!queried) return reply(false, 'Failed to check for updates (check your network)');
 	let plugin_update = false;
 	for (let line in split(run('/usr/bin/openclaw plugins update --all --dry-run 2>/dev/null') || '', '\n')) {
 		line = trim(line);
@@ -373,23 +373,23 @@ function env_upgrade_check() {
 
 function env_npm_check() {
 	let p = paths();
-	if (!p) return reply(false, '安装路径无效');
-	if (!access(p.node + '/bin/npm')) return reply(false, 'npm 不可用');
+	if (!p) return reply(false, 'Invalid install path');
+	if (!access(p.node + '/bin/npm')) return reply(false, 'npm is not available');
 	let current = trim(run(shellquote(p.node + '/bin/npm') + ' --version 2>/dev/null') || '');
-	if (!current) return reply(false, 'npm 未安装');
+	if (!current) return reply(false, 'npm is not installed');
 	let latest = trim(run(shellquote(p.node + '/bin/npm') + ' view npm version --no-update-notifier 2>/dev/null') || '');
-	if (!latest) return reply(false, '无法查询 npm 版本（请检查网络）');
+	if (!latest) return reply(false, 'Failed to query npm version (check your network)');
 	return reply(true, '', { current, latest, has_update: latest != current });
 }
 
 function wechat_update_check() {
 	let state = wechat_status().data;
 	let current = state.plugin_version || '';
-	if (!state.plugin_installed) return reply(false, '微信插件未安装');
+	if (!state.plugin_installed) return reply(false, 'WeChat plugin is not installed');
 	// 走 OpenClaw 官方逻辑(plugins update --dry-run)解析可更新版本, 与「升级」实际行为同源,
 	// 不取 npm raw latest(OpenClaw 经 ClawHub/兼容解析, 可能不等于 npm 的 latest)。
 	let out = trim(run("/usr/bin/openclaw plugins update openclaw-weixin --dry-run 2>&1") || '');
-	if (!length(out)) return reply(false, '无法查询插件版本（请检查网络）');
+	if (!length(out)) return reply(false, 'Failed to query plugin version (check your network)');
 	let up_to_date = match(out, /up[ -]?to[ -]?date|already|最新/i) != null;
 	// 取最后一个"插件版本号"(形如 2.4.x)作为目标版本; 排除宿主版本(2026.x)避免误匹配 banner。
 	let target = '';
@@ -401,9 +401,9 @@ function wechat_update_check() {
 // ── OpenClaw CLI 诊断/查询 (供配置管理页) ──
 function cli_json(action) {
 	let out = run('/usr/libexec/openclaw-rpc.sh ' + action);
-	if (!length(out)) return reply(false, '命令无输出 (网关可能未运行或 OpenClaw 未安装)', {});
+	if (!length(out)) return reply(false, 'No command output (gateway may not be running or OpenClaw not installed)', {});
 	try { return reply(true, '', json(out)); }
-	catch (e) { return reply(false, '解析输出失败', { raw: out }); }
+	catch (e) { return reply(false, 'Failed to parse output', { raw: out }); }
 }
 
 // channels list 的 accounts 是配置层面的账号槽位, 登出后仍保留;
@@ -412,7 +412,7 @@ function channels_list() {
 	// 提速: 渠道清单/origin 从配置文件取(瞬时), 实时登录态只跑一次 `channels status`;
 	// 弃用慢的 `channels list`(~5.4s), 整体 9.3s → ~3.9s。无缓存, 每次实时。
 	let p = paths();
-	if (!p) return reply(false, '安装路径无效');
+	if (!p) return reply(false, 'Invalid install path');
 	let cfgChannels = {};
 	try { cfgChannels = json(readfile(p.config))?.channels || {}; } catch (e) {}
 	let active = {};
@@ -423,7 +423,7 @@ function channels_list() {
 		chat[name] = { accounts: (type(active[name]) == 'array' ? active[name] : []), origin: 'configured', installed: true };
 	for (let name in active)
 		if (!(name in chat)) chat[name] = { accounts: (type(active[name]) == 'array' ? active[name] : []), origin: 'configured', installed: true };
-	if (!length(chat) && !length(statusOut)) return reply(false, '命令无输出 (网关可能未运行或 OpenClaw 未安装)', {});
+	if (!length(chat) && !length(statusOut)) return reply(false, 'No command output (gateway may not be running or OpenClaw not installed)', {});
 	return reply(true, '', { chat });
 }
 
@@ -446,7 +446,7 @@ function logs_tail(request) {
 
 function config_summary() {
 	let p = paths();
-	if (!p) return reply(false, '安装路径无效');
+	if (!p) return reply(false, 'Invalid install path');
 	let config = {};
 	try { config = json(readfile(p.config)); } catch (e) {}
 
@@ -481,7 +481,7 @@ function config_summary() {
 		push(allowed_models, { key: m, alias: selmodels[m]?.alias || '', provider: prov, auth: provider_auth(prov), primary: m == primary });
 	}
 	let channels = [];
-	for (let item in [ ['openclaw-weixin','微信'], ['qqbot','QQ'], ['telegram','Telegram'], ['discord','Discord'], ['feishu','飞书'], ['slack','Slack'] ])
+	for (let item in [ ['openclaw-weixin','WeChat'], ['qqbot','QQ'], ['telegram','Telegram'], ['discord','Discord'], ['feishu','Feishu'], ['slack','Slack'] ])
 		if (config?.channels?.[item[0]]) push(channels, { id: item[0], name: item[1] });
 	let fallbacks = config?.agents?.defaults?.model?.fallbacks;
 	if (type(fallbacks) != 'array') fallbacks = [];
@@ -496,11 +496,11 @@ function config_summary() {
 // 用 qrencode 把链接生成可扫的二维码 SVG。仅接受 http(s) 链接; shellquote 防注入。
 function qr_encode(req) {
 	let text = `${req?.args?.text ?? ''}`;
-	if (!length(text) || length(text) > 1024) return reply(false, '二维码文本无效');
-	if (!match(text, /^https?:\/\/[!-~]+$/)) return reply(false, '仅支持 http(s) 链接');
-	if (!access('/usr/bin/qrencode')) return reply(false, 'qrencode 未安装');
+	if (!length(text) || length(text) > 1024) return reply(false, 'Invalid QR code text');
+	if (!match(text, /^https?:\/\/[!-~]+$/)) return reply(false, 'Only http(s) links are supported');
+	if (!access('/usr/bin/qrencode')) return reply(false, 'qrencode is not installed');
 	let svg = run('printf %s ' + shellquote(text) + ' | /usr/bin/qrencode -t SVG -o - -m 2 -s 6');
-	if (!length(svg) || !match(svg, /<svg/)) return reply(false, '二维码生成失败');
+	if (!length(svg) || !match(svg, /<svg/)) return reply(false, 'Failed to generate QR code');
 	return reply(true, '', { svg });
 }
 
@@ -517,35 +517,35 @@ const methods = {
 	upgrade_log: { call: () => reply(true, '', task_status('/tmp/openclaw-plugin-upgrade')) },
 	env_upgrade_openclaw: { call: () => run_action('env-upgrade-openclaw') },
 	env_upgrade_npm: { call: () => run_action('env-upgrade-npm') },
-	env_upgrade_node: { args: { version: '' }, call: (r) => match(r.args.version, /^[0-9]+\.[0-9]+\.[0-9]+$/) ? run_action('env-upgrade-node', [r.args.version]) : reply(false, 'Node 版本号格式无效') },
+	env_upgrade_node: { args: { version: '' }, call: (r) => match(r.args.version, /^[0-9]+\.[0-9]+\.[0-9]+$/) ? run_action('env-upgrade-node', [r.args.version]) : reply(false, 'Invalid Node version format') },
 	env_upgrade_log: { call: () => reply(true, '', task_status('/tmp/openclaw-env-upgrade')) },
 	backup_list: { call: backup_list },
-	backup_path_set: { args: { path: '' }, call: (r) => { let v = trim(`${r.args.path ?? ''}`); let root = paths()?.root; if (length(v) && root && !normalize_backup_dir(v, root)) return reply(false, '备份路径无效: 需为绝对路径且位于安装目录之外'); return run_action('backup-path-set', [v]); } },
+	backup_path_set: { args: { path: '' }, call: (r) => { let v = trim(`${r.args.path ?? ''}`); let root = paths()?.root; if (length(v) && root && !normalize_backup_dir(v, root)) return reply(false, 'Invalid backup path: must be absolute and outside the install directory'); return run_action('backup-path-set', [v]); } },
 	backup_verify: { args: { file: '' }, call: (r) => run_action('backup-verify', [r.args.file || '']) },
 	gateway_token: { call: gateway_token },
 	wechat_status: { call: wechat_status },
 	telegram_status: { args: { force: '' }, call: telegram_status },
 	dm_scope: { call: dm_scope },
-	dm_scope_set: { args: { scope: '' }, call: (r) => match(r.args.scope, /^(main|per-peer|per-channel-peer|per-account-channel-peer)$/) ? run_action('dm-scope-set', [ r.args.scope ]) : reply(false, '会话作用域无效') },
+	dm_scope_set: { args: { scope: '' }, call: (r) => match(r.args.scope, /^(main|per-peer|per-channel-peer|per-account-channel-peer)$/) ? run_action('dm-scope-set', [ r.args.scope ]) : reply(false, 'Invalid session scope') },
 	perm_check: { call: perm_check },
 	perm_fix: { call: () => run_action('perm-fix') },
 	secrets_audit: { call: secrets_audit },
 	wechat_install_log: { call: () => reply(true, '', task_status('/tmp/openclaw-wechat-install')) },
 	wechat_login_status: { call: () => { let data = task_status('/tmp/openclaw-wechat-login', '/tmp/openclaw-wechat-qrcode.txt'); data.qrcode = data.log; data.qrcode_url = match(data.log, /https?:\/\/[A-Za-z0-9._~:\/?#@!$&'()*+,;=%-]+/g)?.[-1]?.[0] || ''; data.logged_in = match(data.log, /(登录成功|成功登录|Login success|Logged in|Local login saved auth)/) != null; if (data.logged_in) data.state = 'success'; else if (data.running && data.qrcode_url) data.state = 'qrcode'; else if (data.running) data.state = 'starting'; return reply(true, '', data); } },
 	wechat_update_check: { call: wechat_update_check },
-	service_action: { args: { action: '' }, call: (r) => match(r.args.action, /^(start|stop|restart|enable|disable|restart_gateway)$/) ? run_action('service', [r.args.action]) : reply(false, '服务操作无效') },
-	autostart_set: { args: { enabled: '' }, call: (r) => match(r.args.enabled, /^[01]$/) ? run_action('autostart', [r.args.enabled]) : reply(false, '参数无效') },
+	service_action: { args: { action: '' }, call: (r) => match(r.args.action, /^(start|stop|restart|enable|disable|restart_gateway)$/) ? run_action('service', [r.args.action]) : reply(false, 'Invalid service action') },
+	autostart_set: { args: { enabled: '' }, call: (r) => match(r.args.enabled, /^[01]$/) ? run_action('autostart', [r.args.enabled]) : reply(false, 'Invalid parameter') },
 	setup: { args: { version: '', install_path: '/opt', node_version: '' }, call: (r) => {
-		if (!match(r.args.version, /^(stable|latest)$/) || !normalize_base(r.args.install_path)) return reply(false, '安装参数无效');
+		if (!match(r.args.version, /^(stable|latest)$/) || !normalize_base(r.args.install_path)) return reply(false, 'Invalid install parameter');
 		let nv = trim(`${r.args.node_version ?? ''}`);
-		if (length(nv) && !match(nv, /^[0-9]+\.[0-9]+\.[0-9]+$/)) return reply(false, 'Node.js 版本号格式无效');
+		if (length(nv) && !match(nv, /^[0-9]+\.[0-9]+\.[0-9]+$/)) return reply(false, 'Invalid Node.js version format');
 		return run_action('setup', [r.args.version, normalize_base(r.args.install_path), nv]);
 	} },
 	uninstall: { args: { also_remove_node: false }, call: (r) => run_action('uninstall', [r.args.also_remove_node === true ? '1' : '0']) },
-	upgrade: { args: { version: '' }, call: (r) => match(r.args.version, /^[0-9]+\.[0-9]+\.[0-9]+$/) ? run_action('upgrade', [r.args.version]) : reply(false, '版本号格式无效') },
+	upgrade: { args: { version: '' }, call: (r) => match(r.args.version, /^[0-9]+\.[0-9]+\.[0-9]+$/) ? run_action('upgrade', [r.args.version]) : reply(false, 'Invalid version format') },
 	backup_create: { args: { only_config: true }, call: (r) => run_action('backup-create', [r.args.only_config === false ? '0' : '1']) },
-	backup_restore: { args: { file: '' }, call: (r) => match(r.args.file, /^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$/) ? run_action('backup-restore', [r.args.file]) : reply(false, '备份文件名无效') },
-	backup_delete: { args: { file: '' }, call: (r) => match(r.args.file, /^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$/) ? run_action('backup-delete', [r.args.file]) : reply(false, '备份文件名无效') },
+	backup_restore: { args: { file: '' }, call: (r) => match(r.args.file, /^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$/) ? run_action('backup-restore', [r.args.file]) : reply(false, 'Invalid backup file name') },
+	backup_delete: { args: { file: '' }, call: (r) => match(r.args.file, /^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$/) ? run_action('backup-delete', [r.args.file]) : reply(false, 'Invalid backup file name') },
 	wechat_install: { call: () => run_action('wechat-install') },
 	wechat_login: { call: () => run_action('wechat-login') },
 	wechat_login_cancel: { call: () => run_action('wechat-login-cancel') },
@@ -557,23 +557,23 @@ const methods = {
 	channels_status: { call: () => cli_json('cli-channels-status') },
 	logs_tail: { args: { lines: 200 }, call: logs_tail },
 	config_summary: { call: config_summary },
-	model_set: { args: { model: '' }, call: (r) => match(r.args.model, /^[A-Za-z0-9_.\/-]+$/) ? run_action('cli-models-set', [r.args.model]) : reply(false, '模型 ID 无效') },
-	model_fallbacks_set: { args: { models: '' }, call: (r) => { let v = trim(`${r.args.models ?? ''}`); if (length(v) && !match(v, /^[A-Za-z0-9_.\/-]+(,[A-Za-z0-9_.\/-]+)*$/)) return reply(false, '回退模型列表无效'); return run_action('cli-models-fallbacks-set', [v]); } },
+	model_set: { args: { model: '' }, call: (r) => match(r.args.model, /^[A-Za-z0-9_.\/-]+$/) ? run_action('cli-models-set', [r.args.model]) : reply(false, 'Invalid model ID') },
+	model_fallbacks_set: { args: { models: '' }, call: (r) => { let v = trim(`${r.args.models ?? ''}`); if (length(v) && !match(v, /^[A-Za-z0-9_.\/-]+(,[A-Za-z0-9_.\/-]+)*$/)) return reply(false, 'Invalid fallback model list'); return run_action('cli-models-fallbacks-set', [v]); } },
 	qr_encode: { args: { text: '' }, call: qr_encode },
-	task_cancel: { args: { name: '' }, call: (r) => match(r.args.name, /^[A-Za-z0-9-]+$/) ? run_action('task-cancel', [r.args.name]) : reply(false, '任务名无效') },
+	task_cancel: { args: { name: '' }, call: (r) => match(r.args.name, /^[A-Za-z0-9-]+$/) ? run_action('task-cancel', [r.args.name]) : reply(false, 'Invalid task name') },
 	wizard_status: { call: () => reply(true, '', { available: access('/usr/bin/ttyd') }) },
 	wizard_start: { args: { section: 'full' }, call: (r) => {
-		if (!match(r.args.section, /^(model|channels|full|shell)$/)) return reply(false, '无效的向导分段');
+		if (!match(r.args.section, /^(model|channels|full|shell)$/)) return reply(false, 'Invalid wizard section');
 		let res = run_action('wizard-start', [ r.args.section ]);
 		let port = trim(`${res.message || ''}`);
 		if (res.ok && match(port, /^[0-9]{4,5}$/)) return reply(true, '', { port: int(port) });
-		return reply(false, res.message || '向导启动失败');
+		return reply(false, res.message || 'Wizard failed to start');
 	} },
 	wizard_stop: { call: () => run_action('wizard-stop') },
-	wechat_logout: { args: { account: '' }, call: (r) => match(r.args.account, /^[A-Za-z0-9_.-]+$/) ? run_action('wechat-logout', [r.args.account]) : reply(false, '账号 ID 无效') },
-	telegram_add: { args: { token: '' }, call: (r) => match(r.args.token, /^[0-9]+:[A-Za-z0-9_-]+$/) ? run_action('telegram-add', [r.args.token]) : reply(false, 'Bot Token 格式无效') },
+	wechat_logout: { args: { account: '' }, call: (r) => match(r.args.account, /^[A-Za-z0-9_.-]+$/) ? run_action('wechat-logout', [r.args.account]) : reply(false, 'Invalid account ID') },
+	telegram_add: { args: { token: '' }, call: (r) => match(r.args.token, /^[0-9]+:[A-Za-z0-9_-]+$/) ? run_action('telegram-add', [r.args.token]) : reply(false, 'Invalid Bot Token format') },
 	telegram_add_log: { call: () => reply(true, '', task_status('/tmp/openclaw-telegram-add')) },
-	telegram_pair: { args: { code: '' }, call: (r) => match(r.args.code, /^[A-Za-z0-9]{4,16}$/) ? run_action('telegram-pair', [r.args.code]) : reply(false, '配对码格式无效') },
+	telegram_pair: { args: { code: '' }, call: (r) => match(r.args.code, /^[A-Za-z0-9]{4,16}$/) ? run_action('telegram-pair', [r.args.code]) : reply(false, 'Invalid pairing code format') },
 	telegram_pairing_list: { call: () => cli_json('telegram-pairing-list') },
 	wechat_upgrade: { call: () => run_action('wechat-upgrade') },
 	wechat_uninstall: { call: () => run_action('wechat-uninstall') },

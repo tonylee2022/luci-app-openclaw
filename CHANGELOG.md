@@ -1,5 +1,9 @@
 ﻿# 更新记录
 
+## [1.1.9]
+
+- **新增中英双语界面（i18n）**：恢复标准 LuCI 多语言机制。前端文案、菜单标题、操作反馈与后端返回 UI 的消息统一以英文作为翻译键，新增简体中文语言包 `po/zh_Hans/openclaw.po`，随包编译为 `usr/lib/lua/luci/i18n/openclaw.zh-cn.lmo`。LuCI 界面语言设为 English 显示英文、设为简体中文显示中文，自动跟随切换。新增纯 Python 的 `scripts/po2lmo.py`（字节级对齐 LuCI 官方 `po2lmo`，无需 OpenWrt SDK 即可在本地/CI 把 po 编译为 lmo），并接入 `build_ipk.sh` / `build_run.sh`；新增 `tests/test_openclaw_i18n.sh` 做漏译与编译校验。注：网页内嵌终端（配置向导 / openclaw-shell）由 ttyd 运行、不经 LuCI 渲染层，其输出仍为中文。
+
 ## [1.1.8]
 
 - **彻底改用 `.tar.gz`、不再依赖 `xz`**：1.1.7 用「gz 优先 + xz 回退 + xz 依赖兜底」。现进一步**只下载 `.tar.gz`**（gzip 为 busybox tar 内置，零外部命令），移除 `.tar.xz` 回退与 `xz`/`xzcat` 解压代码，并从 Makefile/build_ipk/build_run 的依赖中**移除 `xz`**。离线安装也只接受 `node.tar.gz`。无 `xz` 机器实测：下载 `.tar.gz`、解压安装成功。

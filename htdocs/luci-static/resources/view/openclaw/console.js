@@ -11,20 +11,20 @@ return view.extend({
 		var body;
 		if (!status.gateway_running) {
 			body = E('div', { 'class': 'oc-card-body' }, [
-				E('span', { 'class': status.gateway_starting ? 'oc-badge oc-warn' : 'oc-badge oc-error' }, status.gateway_starting ? _('网关正在启动') : _('网关未运行'))
+				E('span', { 'class': status.gateway_starting ? 'oc-badge oc-warn' : 'oc-badge oc-error' }, status.gateway_starting ? _('Gateway is starting') : _('Gateway not running'))
 			]);
 		} else {
 			var url = 'http://' + window.location.hostname + ':' + status.port + '/';
 			if (token.token) url += '#token=' + encodeURIComponent(token.token);
 			body = E('div', { 'class': 'oc-card-body' }, [
-				E('p', {}, [ E('a', { href: url, target: '_blank', rel: 'noopener' }, _('在新窗口打开')) ]),
+				E('p', {}, [ E('a', { href: url, target: '_blank', rel: 'noopener' }, _('Open in new window')) ]),
 				E('iframe', { 'class': 'oc-iframe', src: url, allowfullscreen: 'true' })
 			]);
 		}
 		return E('div', {}, [
 			E('link', { rel: 'stylesheet', href: L.resource('openclaw/openclaw.css') }),
-			E('div', { 'class': 'oc-header' }, [ E('h2', {}, _('Web 控制台')), E('p', { 'class': 'oc-muted' }, _('嵌入 OpenClaw 官方管理界面。')) ]),
-			E('div', { 'class': 'oc-card' }, [ E('div', { 'class': 'oc-card-title' }, status.active_model ? _('活跃模型：%s').format(status.active_model) : _('OpenClaw Gateway')), body ])
+			E('div', { 'class': 'oc-header' }, [ E('h2', {}, _('Web Console')), E('p', { 'class': 'oc-muted' }, _('Embeds the official OpenClaw admin interface.')) ]),
+			E('div', { 'class': 'oc-card' }, [ E('div', { 'class': 'oc-card-title' }, status.active_model ? _('Active model: %s').format(status.active_model) : _('OpenClaw Gateway')), body ])
 		]);
 	},
 	handleSaveApply: null,

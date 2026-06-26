@@ -7,7 +7,7 @@ function call(method, params) {
 		object: 'luci.openclaw',
 		method: method,
 		params: params || [],
-		expect: { '': { ok: false, message: _('无效的 RPC 响应'), data: {} } }
+		expect: { '': { ok: false, message: _('Invalid RPC response'), data: {} } }
 	});
 }
 

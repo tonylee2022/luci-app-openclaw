@@ -66,13 +66,13 @@ return baseclass.extend({
 		// 显示「运行中」并在可关闭时附加「关闭」按钮。
 		function running(text) {
 			if (closed) return;
-			self.setStatus(el, 'running', text || opts.running || _('正在处理...'));
+			self.setStatus(el, 'running', text || opts.running || _('Processing...'));
 			if (opts.cancel && el) {
 				var b = document.createElement('button');
 				b.className = 'cbi-button';
 				b.style.marginLeft = '.6rem';
 				b.style.padding = '0 .6rem';
-				b.textContent = _('关闭');
+				b.textContent = _('Close');
 				b.addEventListener('click', doClose);
 				el.appendChild(b);
 			}
@@ -81,11 +81,11 @@ return baseclass.extend({
 		return Promise.resolve().then(function() { return opts.submit(); }).then(function(r) {
 			if (closed) return;
 			if (r && r.ok === false) {
-				self.setStatus(el, 'error', r.message || _('操作失败'));
+				self.setStatus(el, 'error', _(r.message || 'Operation failed'));
 				return;
 			}
 			if (!opts.pollLog) {
-				self.setStatus(el, 'success', opts.success || _('操作成功'));
+				self.setStatus(el, 'success', opts.success || _('Operation succeeded'));
 				self.hideStatusLater(el);
 				if (opts.onDone) opts.onDone(true, r);
 				return;
@@ -100,19 +100,19 @@ return baseclass.extend({
 						if (opts.onLog) opts.onLog(d);
 						if (d.done) {
 							if (d.exit_code === 130) {
-								self.setStatus(el, 'error', _('已关闭'));
+								self.setStatus(el, 'error', _('Closed'));
 								self.hideStatusLater(el);
 								if (opts.onDone) opts.onDone(false, d);
 								return resolve();
 							}
 							var ok = (d.exit_code === 0);
-							self.setStatus(el, ok ? 'success' : 'error', ok ? (opts.success || _('操作成功')) : _('失败，退出码：%s').format(d.exit_code));
+							self.setStatus(el, ok ? 'success' : 'error', ok ? (opts.success || _('Operation succeeded')) : _('Failed, exit code: %s').format(d.exit_code));
 							if (ok) self.hideStatusLater(el);
 							if (opts.onDone) opts.onDone(ok, d);
 							return resolve();
 						}
 						if (Date.now() - start > to) {
-							self.setStatus(el, 'error', _('操作超时，请稍后刷新查看。'));
+							self.setStatus(el, 'error', _('Operation timed out; refresh later to check.'));
 							return resolve();
 						}
 						running();
@@ -121,7 +121,7 @@ return baseclass.extend({
 				})();
 			});
 		}).catch(function(err) {
-			if (!closed) self.setStatus(el, 'error', String((err && err.message) || err || _('操作失败')));
+			if (!closed) self.setStatus(el, 'error', _(String((err && err.message) || err || 'Operation failed')));
 		});
 	},
 
@@ -160,9 +160,9 @@ return baseclass.extend({
 				if (ev.key === 'Escape') { ev.stopPropagation(); done(false); }
 				else if (ev.key === 'Enter') { ev.stopPropagation(); done(true); }
 			}
-			var okBtn = E('button', { 'type': 'button', 'class': 'cbi-button ' + (opts.danger ? 'cbi-button-negative' : 'cbi-button-action') }, opts.confirmLabel || _('确定'));
+			var okBtn = E('button', { 'type': 'button', 'class': 'cbi-button ' + (opts.danger ? 'cbi-button-negative' : 'cbi-button-action') }, opts.confirmLabel || _('OK'));
 			okBtn.addEventListener('click', function() { done(true); });
-			var cancelBtn = E('button', { 'type': 'button', 'class': 'cbi-button' }, opts.cancelLabel || _('取消'));
+			var cancelBtn = E('button', { 'type': 'button', 'class': 'cbi-button' }, opts.cancelLabel || _('Cancel'));
 			cancelBtn.addEventListener('click', function() { done(false); });
 			overlay = E('div', { 'class': 'oc-confirm-overlay' }, [
 				E('div', { 'class': 'oc-confirm-box' }, [
