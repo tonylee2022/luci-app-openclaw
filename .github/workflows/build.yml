@@ -2,6 +2,8 @@ name: Build & Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'          # 推送 v 版本标签 (如 v1.0.0) 自动构建并发布 Release
   workflow_dispatch:
@@ -44,6 +46,19 @@ jobs:
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "tag=v$VER" >> "$GITHUB_OUTPUT"
           echo "Version: $VER"
+
+          # 通过 GitHub API 检查此版本的 Release 是否已存在
+          TAG="v$VER"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${TAG}")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "release_exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists."
+          else
+            echo "release_exists=false" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG does not exist."
+          fi
 
       - name: Extract build versions from source
         id: build_versions
@@ -118,7 +133,7 @@ jobs:
           compression-level: 0
 
       - name: Create Release
-        if: github.ref_type == 'tag' || github.event.inputs.create_release == 'true'
+        if: github.ref_type == 'tag' || github.event.inputs.create_release == 'true' || (github.event_name == 'push' && github.ref_name == 'main' && steps.version.outputs.release_exists != 'true')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
