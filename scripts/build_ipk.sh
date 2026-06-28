@@ -120,6 +120,10 @@ cat > "$CTRL_DIR/postinst" << 'EOF'
 	
 	OLD_CONFIG="/etc/config/openclaw"
 	NEW_CONFIG="/etc/config/openclaw-opkg"
+
+	restore_option() {
+		[ -z "$2" ] || uci set "openclaw.main.$1=$2"
+	}
 	
 	if [ -f "$NEW_CONFIG" ]; then
 		echo "检测到配置文件冲突，正在智能合并..."
@@ -140,17 +144,36 @@ cat > "$CTRL_DIR/postinst" << 'EOF'
 		mv "$NEW_CONFIG" "$OLD_CONFIG" 2>/dev/null || cp "$NEW_CONFIG" "$OLD_CONFIG" 2>/dev/null || true
 		rm -f "$NEW_CONFIG" 2>/dev/null || true
 		
-		# 步骤4: 合并用户设置到新配置
-		# 直接使用 sed 修改配置文件，兼容性更好
-		[ -n "$USER_ENABLED" ] && sed -i "s/^\(\s*option\s\+enabled\s\+\).*/\\1'$USER_ENABLED'/" "$OLD_CONFIG" 2>/dev/null || true
-		[ -n "$USER_PORT" ] && sed -i "s/^\(\s*option\s\+port\s\+\).*/\\1'$USER_PORT'/" "$OLD_CONFIG" 2>/dev/null || true
-		[ -n "$USER_BIND" ] && sed -i "s/^\(\s*option\s\+bind\s\+\).*/\\1'$USER_BIND'/" "$OLD_CONFIG" 2>/dev/null || true
-		[ -n "$USER_TOKEN" ] && sed -i "s/^\(\s*option\s\+token\s\+\).*/\\1'$USER_TOKEN'/" "$OLD_CONFIG" 2>/dev/null || true
-		[ -n "$USER_INSTALL_PATH" ] && sed -i "s/^\(\s*option\s\+install_path\s\+\).*/\\1'$USER_INSTALL_PATH'/" "$OLD_CONFIG" 2>/dev/null || true
+		# 步骤4: 合并用户设置到新配置。通过 uci 传值，避免 token 等值中的
+		# '&'、反斜杠或引号被当作 sed 替换语法。
+		restore_option enabled "$USER_ENABLED"
+		restore_option port "$USER_PORT"
+		restore_option bind "$USER_BIND"
+		restore_option token "$USER_TOKEN"
+		restore_option install_path "$USER_INSTALL_PATH"
+		uci commit openclaw
 		
 		echo "配置合并完成，用户设置已保留"
+	elif [ -f /etc/config/openclaw.pre-upgrade.bak ]; then
+		# opkg --force-reinstall(插件升级走此路径)会直接用包内默认覆盖 conffile, 不生成 -opkg。
+		# 从 prerm 在本次升级开始时所备份的 .pre-upgrade.bak 还原用户设置, 避免 install_path/token 等丢失。
+		BAK="/etc/config/openclaw.pre-upgrade.bak"
+		B_ENABLED=$(sed -n "s/^\s*option\s\+enabled\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$BAK" 2>/dev/null | tail -1)
+		B_PORT=$(sed -n "s/^\s*option\s\+port\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$BAK" 2>/dev/null | tail -1)
+		B_BIND=$(sed -n "s/^\s*option\s\+bind\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$BAK" 2>/dev/null | tail -1)
+		B_TOKEN=$(sed -n "s/^\s*option\s\+token\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$BAK" 2>/dev/null | tail -1)
+		B_INSTALL_PATH=$(sed -n "s/^\s*option\s\+install_path\s\+['\"]\\?\\([^'\"]*\\)['\"]\\?.*/\\1/p" "$BAK" 2>/dev/null | tail -1)
+		restore_option enabled "$B_ENABLED"
+		restore_option port "$B_PORT"
+		restore_option bind "$B_BIND"
+		restore_option token "$B_TOKEN"
+		restore_option install_path "$B_INSTALL_PATH"
+		uci commit openclaw
+		echo "已从升级前备份还原用户配置(install_path 等)"
 	fi
-	
+	# 消费掉本次升级备份, 避免下次非升级安装误用陈旧值。
+	rm -f /etc/config/openclaw.pre-upgrade.bak 2>/dev/null || true
+
 	# 执行 uci-defaults 初始化脚本
 	if [ -f /etc/uci-defaults/99-openclaw ]; then
 		( . /etc/uci-defaults/99-openclaw ) && rm -f /etc/uci-defaults/99-openclaw

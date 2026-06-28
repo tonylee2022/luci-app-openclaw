@@ -247,7 +247,24 @@ case "${1:-}" in
 		version="${2:-}"
 		echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Invalid version format"
 		url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-app-openclaw_${version}-1_all.ipk"
-		cmd="curl -fsSL --connect-timeout 15 --max-time 120 -o /tmp/luci-app-openclaw-update.ipk $(oc_quote "$url"); rc=\$?; if [ \$rc -ne 0 ]; then echo 'Download failed'; exit \$rc; fi; opkg install --force-reinstall /tmp/luci-app-openclaw-update.ipk; rc=\$?; rm -f /tmp/luci-app-openclaw-update.ipk; exit \$rc"
+		# opkg --force-reinstall 会用包内默认值覆盖 conffile /etc/config/openclaw(install_path/port/bind/token/enabled),
+		# 故升级前抓取用户当前配置, 在 opkg(含 postinst)之后还原, 避免设置丢失。配置不可读时(oip 为空)跳过还原以免清空。
+		oip=$(uci -q get openclaw.main.install_path || true)
+		oport=$(uci -q get openclaw.main.port || true)
+		obind=$(uci -q get openclaw.main.bind || true)
+		otok=$(uci -q get openclaw.main.token || true)
+		oen=$(uci -q get openclaw.main.enabled || true)
+		restore=""
+		if [ -n "$oip" ]; then
+			restore="uci set openclaw.main.install_path=$(oc_quote "$oip");"
+			[ -z "$oport" ] || restore="$restore uci set openclaw.main.port=$(oc_quote "$oport");"
+			[ -z "$obind" ] || restore="$restore uci set openclaw.main.bind=$(oc_quote "$obind");"
+			# 空 token 交给新包的 uci-defaults 生成，不把生成结果重新清空。
+			[ -z "$otok" ] || restore="$restore uci set openclaw.main.token=$(oc_quote "$otok");"
+			[ -z "$oen" ] || restore="$restore uci set openclaw.main.enabled=$(oc_quote "$oen");"
+			restore="$restore uci commit openclaw;"
+		fi
+		cmd="curl -fsSL --connect-timeout 15 --max-time 120 -o /tmp/luci-app-openclaw-update.ipk $(oc_quote "$url"); rc=\$?; if [ \$rc -ne 0 ]; then echo 'Download failed'; exit \$rc; fi; opkg install --force-reinstall /tmp/luci-app-openclaw-update.ipk; rc=\$?; rm -f /tmp/luci-app-openclaw-update.ipk; ${restore} exit \$rc"
 		start_task /tmp/openclaw-plugin-upgrade "$cmd"
 		;;
 	cli-doctor-lint)

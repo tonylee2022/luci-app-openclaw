@@ -111,81 +111,6 @@ msgstr "已更新开机自启"
 msgid "Available"
 msgstr "可用"
 
-msgid "Backup / Restore"
-msgstr "备份/恢复"
-
-msgid "Backup and restore"
-msgstr "备份与恢复"
-
-msgid "Backup contains unsafe paths, links, or non-state content"
-msgstr "备份包含不安全路径、链接或非状态目录内容"
-
-msgid "Backup deleted."
-msgstr "备份已删除。"
-
-msgid "Backup directory (outside the install directory; not removed when uninstalling the runtime):"
-msgstr "备份保存目录（位于安装目录之外，卸载环境不会删除）："
-
-msgid "Backup file does not exist"
-msgstr "备份文件不存在"
-
-msgid "Backup is missing openclaw.json"
-msgstr "备份中缺少 openclaw.json"
-
-msgid "Download"
-msgstr "下载"
-
-msgid "Import backup"
-msgstr "导入备份"
-
-msgid "Import from path"
-msgstr "从路径导入"
-
-msgid "Importing backup..."
-msgstr "正在导入备份..."
-
-msgid "Path to a backup file on the device (e.g. /mnt/sda1/xxx.tar.gz)"
-msgstr "设备上备份文件的路径（如 /mnt/sda1/xxx.tar.gz）"
-
-msgid "Invalid import path"
-msgstr "导入路径无效"
-
-msgid "Import file does not exist"
-msgstr "导入文件不存在"
-
-msgid "Backup imported."
-msgstr "备份已导入。"
-
-msgid "Import failed"
-msgstr "导入失败"
-
-msgid "No uploaded backup file found"
-msgstr "未找到上传的备份文件"
-
-msgid "Invalid upload path"
-msgstr "上传路径无效"
-
-msgid "Failed to create import temp directory"
-msgstr "创建导入临时目录失败"
-
-msgid "Failed to store imported backup"
-msgstr "保存导入的备份失败"
-
-msgid "Failed to download backup: %s"
-msgstr "下载备份失败：%s"
-
-msgid "Failed to import backup: %s"
-msgstr "导入备份失败：%s"
-
-msgid "Backup path updated."
-msgstr "备份路径已更新。"
-
-msgid "Backup restored; service is restarting."
-msgstr "备份已恢复，服务重启中。"
-
-msgid "Backup verified."
-msgstr "备份验证通过。"
-
 msgid "Basic Settings"
 msgstr "基本设置"
 
@@ -261,12 +186,6 @@ msgstr "关闭"
 msgid "Closed"
 msgstr "已关闭"
 
-msgid "Config backup created."
-msgstr "配置备份已创建。"
-
-msgid "Config only"
-msgstr "仅配置"
-
 msgid "Configuration"
 msgstr "配置管理"
 
@@ -294,35 +213,11 @@ msgstr "已配置提供商"
 msgid "Confirm uninstall"
 msgstr "确认卸载"
 
-msgid "Create config backup"
-msgstr "创建配置备份"
-
-msgid "Create full backup"
-msgstr "创建完整备份"
-
-msgid "Creating config backup..."
-msgstr "正在创建配置备份..."
-
-msgid "Creating full backup..."
-msgstr "正在创建完整备份..."
-
 msgid "Custom path"
 msgstr "自定义路径"
 
 msgid "Custom version..."
 msgstr "自定义版本…"
-
-msgid "Default backup path restored."
-msgstr "已恢复默认备份路径。"
-
-msgid "Delete"
-msgstr "删除"
-
-msgid "Delete this backup?"
-msgstr "确定删除此备份？"
-
-msgid "Deleting backup..."
-msgstr "正在删除备份..."
 
 msgid "Detect mount points"
 msgstr "检测挂载点"
@@ -362,12 +257,6 @@ msgstr "错误"
 
 msgid "Failed to check for updates (check your network)"
 msgstr "无法查询更新（请检查网络）"
-
-msgid "Failed to create backup directory"
-msgstr "无法创建备份目录"
-
-msgid "Failed to create restore temp directory"
-msgstr "无法创建恢复临时目录"
 
 msgid "Failed to fetch the latest version"
 msgstr "无法获取最新版本"
@@ -464,12 +353,6 @@ msgstr "发现 %s 处明文密钥；可在 OpenClaw 终端运行 openclaw secret
 
 msgid "Free space"
 msgstr "剩余空间"
-
-msgid "Full"
-msgstr "完整"
-
-msgid "Full backup created."
-msgstr "完整备份已创建。"
 
 msgid "Gateway"
 msgstr "网关"
@@ -599,18 +482,6 @@ msgstr "UCI 安装路径无效"
 
 msgid "Invalid account ID"
 msgstr "账号 ID 无效"
-
-msgid "Invalid backup configuration"
-msgstr "备份配置无效"
-
-msgid "Invalid backup file name"
-msgstr "备份文件名无效"
-
-msgid "Invalid backup path: must be absolute and outside the install directory"
-msgstr "备份路径无效: 需为绝对路径且位于安装目录之外"
-
-msgid "Invalid backup type"
-msgstr "备份类型无效"
 
 msgid "Invalid fallback model ID"
 msgstr "回退模型 ID 无效"
@@ -987,21 +858,6 @@ msgstr "重启超时，网关未在预期时间内就绪，请稍后刷新查看
 msgid "Restarting gateway, waiting for it to stop..."
 msgstr "正在重启网关，等待停止..."
 
-msgid "Restore"
-msgstr "恢复"
-
-msgid "Restore defaults"
-msgstr "恢复默认"
-
-msgid "Restoring backup..."
-msgstr "正在恢复备份..."
-
-msgid "Restoring default path..."
-msgstr "正在恢复默认路径..."
-
-msgid "Restoring overwrites the current state and restarts the service. Continue?"
-msgstr "恢复会覆盖当前状态并重启服务，确定继续？"
-
 msgid "Run health check"
 msgstr "运行健康检查"
 
@@ -1230,9 +1086,6 @@ msgstr "未知错误"
 msgid "Unsupported service action"
 msgstr "不支持的服务操作"
 
-msgid "Updating backup path..."
-msgstr "正在更新备份路径..."
-
 msgid "Upgrade LuCI app"
 msgstr "升级 LuCI 插件"
 
@@ -1268,12 +1121,6 @@ msgstr "正在升级 LuCI 插件..."
 
 msgid "Upgrading WeChat plugin..."
 msgstr "正在升级微信插件..."
-
-msgid "Verify"
-msgstr "验证"
-
-msgid "Verifying backup..."
-msgstr "正在验证备份..."
 
 msgid "Version"
 msgstr "版本"

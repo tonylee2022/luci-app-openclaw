@@ -150,7 +150,7 @@ return baseclass.extend({
 		return btn;
 	},
 
-	// 主题化确认框: 替代原生 confirm()。用独立 overlay(不占用 LuCI 单例 modalDiv), 故可叠加在已打开的模态(如备份列表)之上。
+	// 主题化确认框: 替代原生 confirm()。用独立 overlay(不占用 LuCI 单例 modalDiv), 可叠加在已打开的表单模态之上。
 	// 返回 Promise<boolean>。opts: { title, confirmLabel, cancelLabel, danger }
 	confirm: function(message, opts) {
 		opts = opts || {};

@@ -31,6 +31,16 @@ with open('po/zh_Hans/openclaw.po', encoding='utf-8') as f:
         if line.startswith('msgid "') and line.strip() != 'msgid ""':
             po_ids.add(unq(line[6:]))
 
+# 已退役的备份/恢复界面不得继续占用语言包；OpenClaw 自身的 Git 备份说明不在此列。
+retired_backup_ids = {
+    'Backup / Restore', 'Backup and restore', 'Create config backup',
+    'Create full backup', 'Import backup', 'Restoring backup...',
+    'Verifying backup...'
+}
+stale = retired_backup_ids & po_ids
+if stale:
+    die("语言包仍含已退役的备份/恢复文案:\n  " + "\n  ".join(sorted(stale)))
+
 # 2) 提取前端 _() msgid
 pat = re.compile(r"""(?<![\w$])_\(\s*('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")""")
 def unesc(l):

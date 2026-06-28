@@ -70,55 +70,9 @@ oc_load_paths() {
 	OC_NPM_CACHE="${OC_HOME}/.npm"
 	OC_TMP="${OC_HOME}/.tmp"
 	CONFIG_FILE="${OC_STATE_DIR}/openclaw.json"
-	# 备份目录默认放在安装根目录之外(同级)，这样卸载环境(rm -rf $OC_ROOT)
-	# 不会把备份一并删除，备份才有意义。用户可经 oc_normalize_backup_dir 覆盖。
-	if [ "$OPENCLAW_INSTALL_PATH" = "/" ]; then
-		OC_BACKUP_DIR_DEFAULT="/openclaw-backups"
-	else
-		OC_BACKUP_DIR_DEFAULT="${OPENCLAW_INSTALL_PATH}/openclaw-backups"
-	fi
-	OC_BACKUP_DIR="$OC_BACKUP_DIR_DEFAULT"
 
 	export OPENCLAW_INSTALL_PATH OC_ROOT OC_HOME NODE_BASE OC_GLOBAL OC_DATA
-	export OC_STATE_DIR OC_NPM_CACHE OC_TMP CONFIG_FILE OC_BACKUP_DIR OC_BACKUP_DIR_DEFAULT
-}
-
-# 校验用户自定义备份目录。
-#   入参: $1=候选路径; 依赖已设置的 OC_ROOT(调用前需先 oc_load_paths)。
-#   规则: 绝对路径、无 shell 危险字符、非系统目录、且必须在安装根目录之外
-#         (否则卸载会一并删除，违背"备份到安装路径外"的原则)。
-#   成功打印规范化路径并 return 0；非法 return 1(调用方应回退到默认 OC_BACKUP_DIR)。
-oc_normalize_backup_dir() {
-	local raw="${1:-}"
-
-	raw=$(printf '%s' "$raw" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//;s:/*$::')
-	[ -n "$raw" ] || return 1
-
-	case "$raw" in
-		/*) ;;
-		*) return 1 ;;
-	esac
-
-	case "$raw" in
-		*[\ \	]*|*\'*|*\"*|*\`*|*\$*|*\;*|*\&*|*\|*|*\<*|*\>*|*\(*|*\)*)
-			return 1
-			;;
-	esac
-
-	case "$raw" in
-		/|/proc|/proc/*|/sys|/sys/*|/dev|/dev/*|/tmp|/tmp/*|/var|/var/*|/etc|/etc/*|/usr|/usr/*|/bin|/bin/*|/sbin|/sbin/*|/lib|/lib/*|/rom|/rom/*|/overlay|/overlay/*)
-			return 1
-			;;
-	esac
-
-	# 必须在安装根目录之外。
-	case "$raw" in
-		"$OC_ROOT"|"$OC_ROOT"/*)
-			return 1
-			;;
-	esac
-
-	printf '%s\n' "$raw"
+	export OC_STATE_DIR OC_NPM_CACHE OC_TMP CONFIG_FILE
 }
 
 oc_find_existing_path() {
