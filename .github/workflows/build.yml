@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (留空则读取 VERSION 文件)'
+        description: '版本号 (留空则读取 Makefile 中的 PKG_VERSION)'
         required: false
         type: string
         default: ''
@@ -38,27 +38,16 @@ jobs:
           elif [ "${{ github.ref_type }}" = "tag" ]; then
             # 标签触发: 取标签名并去掉前导 v (v1.0.0 -> 1.0.0)
             VER="${GITHUB_REF_NAME#v}"
-          elif [ -f VERSION ]; then
-            VER="$(cat VERSION | tr -d '[:space:]')"
           else
+            # 非标签构建: 从 Makefile 读取版本号 (唯一来源)
+            VER="$(sed -n 's/^PKG_VERSION:=[[:space:]]*//p' Makefile | tr -d '[:space:]')"
+          fi
+          if [ -z "$VER" ]; then
             VER="$(date -u +%Y.%m.%d)"
           fi
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "tag=v$VER" >> "$GITHUB_OUTPUT"
           echo "Version: $VER"
-
-          # 通过 GitHub API 检查此版本的 Release 是否已存在
-          TAG="v$VER"
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${TAG}")
-          if [ "$HTTP_STATUS" = "200" ]; then
-            echo "release_exists=true" >> "$GITHUB_OUTPUT"
-            echo "Release $TAG already exists."
-          else
-            echo "release_exists=false" >> "$GITHUB_OUTPUT"
-            echo "Release $TAG does not exist."
-          fi
 
       - name: Extract build versions from source
         id: build_versions
@@ -75,8 +64,7 @@ jobs:
       - name: Inject version
         run: |
           VER="${{ steps.version.outputs.version }}"
-          echo "$VER" > VERSION
-          # 同步到 Makefile
+          # 写入版本号唯一来源 Makefile (标签/手动构建时覆盖)
           sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$VER/" Makefile
 
       - name: Validate source
@@ -133,7 +121,7 @@ jobs:
           compression-level: 0
 
       - name: Create Release
-        if: github.ref_type == 'tag' || github.event.inputs.create_release == 'true' || (github.event_name == 'push' && github.ref_name == 'main' && steps.version.outputs.release_exists != 'true')
+        if: github.ref_type == 'tag' || github.event.inputs.create_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}

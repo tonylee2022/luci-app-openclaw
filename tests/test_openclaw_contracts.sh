@@ -9,16 +9,19 @@ fail() {
 grep -Fq ') </dev/null >/dev/null 2>&1 &' root/usr/libexec/openclaw-rpc.sh || fail "background task shell must detach from rpcd stdio"
 grep -Fq 'rm -f "${prefix}.pid"' root/usr/libexec/openclaw-rpc.sh || fail "completed and stale task PID files must be removed"
 
-# 从 VERSION.json 读取期望版本号（单一真相来源）
-[ -f VERSION.json ] || fail "VERSION.json must exist as the canonical version source"
-_OC_VER=$(grep '"oc_tested_version"' VERSION.json | sed 's/.*"oc_tested_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
-_NODE_VER=$(grep '"node_version"' VERSION.json | sed 's/.*"node_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
-_NODE_MIN_VER=$(grep '"node_min_version"' VERSION.json | sed 's/.*"node_min_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
-[ -n "$_OC_VER" ] || fail "VERSION.json must contain oc_tested_version"
-[ -n "$_NODE_VER" ] || fail "VERSION.json must contain node_version"
-[ -n "$_NODE_MIN_VER" ] || fail "VERSION.json must contain node_min_version"
+# 插件版本号唯一来源: Makefile PKG_VERSION (LuCI 惯例)。运行时 VERSION 文件由构建生成, 不入仓库。
+_PKG_VER_MK=$(sed -n 's/^PKG_VERSION:=[[:space:]]*//p' Makefile | tr -d '[:space:]')
+[ -n "$_PKG_VER_MK" ] || fail "Makefile must declare a non-empty PKG_VERSION"
 
-grep -q "OC_TESTED_VERSION=\"${_OC_VER}\"" root/usr/bin/openclaw-env || fail "tested OpenClaw version not pinned (expected ${_OC_VER} per VERSION.json)"
+# 运行时版本号唯一来源: root/usr/bin/openclaw-env (值随脚本声明; CI 与 ucode 后端均直接从此处取值, 故无独立清单文件)。
+[ -f root/usr/bin/openclaw-env ] || fail "openclaw-env must exist as the canonical runtime-version source"
+_OC_VER=$(sed -n 's/^OC_TESTED_VERSION="\([^"]*\)".*/\1/p' root/usr/bin/openclaw-env)
+_NODE_VER=$(sed -n 's/^NODE_VERSION_V2="\([^"]*\)".*/\1/p' root/usr/bin/openclaw-env)
+_NODE_MIN_VER=$(sed -n 's/^OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-\([0-9.]*\)}".*/\1/p' root/usr/bin/openclaw-env)
+[ -n "$_OC_VER" ] || fail "openclaw-env must pin OC_TESTED_VERSION"
+[ -n "$_NODE_VER" ] || fail "openclaw-env must pin NODE_VERSION_V2"
+[ -n "$_NODE_MIN_VER" ] || fail "openclaw-env must pin OC_NODE_MIN_VERSION default"
+
 grep -q 'prefix="OC_VERSION=$(oc_quote "$version")' root/usr/libexec/openclaw-rpc.sh || fail "RPC setup must pass stable/latest through unchanged"
 if grep -q 'OC_VERSION=$(oc_quote "$ver")' root/usr/libexec/openclaw-rpc.sh; then
 	fail "RPC setup must not pass a concrete version to the stable/latest installer interface"
@@ -34,9 +37,8 @@ if grep -R -n -E --exclude='*.min.js' \
 	| grep -v 'openclaw-weixin' | grep -q .; then
 	fail "project must not modify OpenClaw plugin enablement or security policy (except the user-driven openclaw-weixin channel)"
 fi
-grep -q "NODE_VERSION_V2=\"${_NODE_VER}\"" root/usr/bin/openclaw-env || fail "default Node.js version not pinned (expected ${_NODE_VER} per VERSION.json)"
-grep -q "OC_NODE_MIN_VERSION=\"\${OC_NODE_MIN_VERSION:-${_NODE_MIN_VER}}\"" root/usr/bin/openclaw-env || fail "minimum Node.js version not pinned (expected ${_NODE_MIN_VER} per VERSION.json)"
-grep -q "OC_NODE_MIN_VERSION=\"\${OC_NODE_MIN_VERSION:-${_NODE_MIN_VER}}\"" root/etc/init.d/openclaw || fail "service minimum Node.js version not aligned (expected ${_NODE_MIN_VER} per VERSION.json)"
+# 唯一真实的跨文件重复: init.d 的最低 Node.js 版本默认值必须与 openclaw-env 一致。
+grep -q "OC_NODE_MIN_VERSION=\"\${OC_NODE_MIN_VERSION:-${_NODE_MIN_VER}}\"" root/etc/init.d/openclaw || fail "service minimum Node.js version (init.d) not aligned with openclaw-env (expected ${_NODE_MIN_VER})"
 grep -q "oc_assert_node_min_version" root/usr/bin/openclaw-env || fail "Node.js minimum version check missing"
 grep -A5 '# Node.js' root/usr/bin/openclaw-env | grep -q 'assert_node_runtime' || fail "environment check must validate Node.js version"
 if grep -q 'NODE_VERSION_V1\|v1_tarball' root/usr/bin/openclaw-env; then

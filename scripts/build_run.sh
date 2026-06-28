@@ -15,7 +15,8 @@ case "$OUT_DIR" in
 esac
 mkdir -p "$OUT_DIR"
 PKG_NAME="luci-app-openclaw"
-PKG_VERSION=$(cat "$PKG_DIR/VERSION" 2>/dev/null | tr -d '[:space:]' || echo "1.0.0")
+PKG_VERSION=$(sed -n 's/^PKG_VERSION:=[[:space:]]*//p' "$PKG_DIR/Makefile" | tr -d '[:space:]')
+[ -n "$PKG_VERSION" ] || PKG_VERSION="1.0.0"
 
 echo "=== 构建 iStoreOS .run 安装包 ==="
 echo "源目录: $PKG_DIR"
@@ -81,9 +82,9 @@ install_files() {
 	mkdir -p "$dest/usr/share/rpcd/acl.d"
 	cp "$PKG_DIR/root/usr/share/rpcd/acl.d/"*.json "$dest/usr/share/rpcd/acl.d/"
 
-	# openclaw 共享资源 (仅 VERSION; web-pty/oc-config 配置菜单已退役)
+	# openclaw 共享资源 (运行时版本文件, 由 PKG_VERSION 生成; web-pty/oc-config 配置菜单已退役)
 	mkdir -p "$dest/usr/share/openclaw"
-	cp "$PKG_DIR/VERSION" "$dest/usr/share/openclaw/VERSION"
+	printf '%s\n' "$PKG_VERSION" > "$dest/usr/share/openclaw/VERSION"
 }
 
 # 创建安装器脚本头部
