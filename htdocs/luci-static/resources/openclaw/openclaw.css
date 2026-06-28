@@ -3,10 +3,12 @@
 .oc-muted { color: #667; }
 .oc-card { border: 1px solid #d5d8dc; border-radius: .5rem; margin-bottom: 1rem; overflow: hidden; background: var(--background-color-high, #fff); }
 .oc-card-title { padding: .7rem 1rem; font-weight: 600; background: var(--background-color-medium, #f4f6f8); }
+.oc-card-title-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.oc-card-title-row a.cbi-button { text-decoration: none; }
 .oc-card-body { padding: 1rem; }
 .oc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .7rem 1.2rem; }
 .oc-field { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid #eee; padding: .45rem 0; }
-.oc-field span:first-child { color: #667; }
+.oc-field > span:first-child { color: #667; }
 .oc-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .oc-badge { display: inline-block; border-radius: 1rem; padding: .15rem .7rem; font-weight: 600; }
 .oc-ok { color: #137333; background: #e6f4ea; }
@@ -19,8 +21,8 @@
 .oc-badge.oc-error { background: #b22222; box-shadow: 0 0 0 2px rgba(178,34,34,.28); }
 .oc-log { min-height: 12rem; max-height: 28rem; overflow: auto; white-space: pre-wrap; background: #161b22; color: #c9d1d9; padding: .9rem; border-radius: .4rem; }
 .oc-table { width: 100%; border-collapse: collapse; }
-.oc-table th, .oc-table td { padding: .5rem; border-bottom: 1px solid #ddd; text-align: left; }
-.oc-table-actions { display: flex; gap: .35rem; }
+.oc-table th, .oc-table td { padding: .5rem; border-bottom: 1px solid #ddd; text-align: left; vertical-align: middle; word-break: break-word; }
+.oc-table-actions { display: flex; gap: .35rem; white-space: nowrap; }
 .oc-iframe { width: 100%; min-height: 70vh; border: 1px solid #d5d8dc; border-radius: .5rem; background: #fff; }
 .oc-input { width: 100%; box-sizing: border-box; }
 .oc-form-row { display: grid; grid-template-columns: 7rem minmax(0, 1fr); align-items: center; gap: .75rem; margin: .75rem 0; }
@@ -66,7 +68,7 @@
 .oc-dark .oc-card { background: #252525; border-color: #3a3a3a; }
 .oc-dark .oc-card-title { background: #2e2e2e; }
 .oc-dark .oc-field { border-bottom-color: #3a3a3a; }
-.oc-dark .oc-field span:first-child { color: #888; }
+.oc-dark .oc-field > span:first-child { color: #888; }
 .oc-dark .oc-muted { color: #888; }
 .oc-dark .oc-section-label { color: #777; }
 .oc-dark .oc-tabs { border-bottom-color: #3a3a3a; }

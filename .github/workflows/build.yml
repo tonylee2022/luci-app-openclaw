@@ -71,7 +71,6 @@ jobs:
         run: |
           find root scripts tests -type f \( -name '*.sh' -o -path 'root/usr/bin/*' -o -path 'root/etc/init.d/*' -o -path 'root/etc/uci-defaults/*' \) -exec sh -n {} +
           sh tests/test_openclaw_contracts.sh
-          sh tests/test_openclaw_backup.sh
           sh tests/test_openclaw_lock.sh
           sh tests/test_openclaw_plugin_policy.sh
           sh tests/test_openclaw_modern_luci.sh

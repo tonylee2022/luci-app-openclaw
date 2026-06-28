@@ -132,6 +132,51 @@ msgstr "备份文件不存在"
 msgid "Backup is missing openclaw.json"
 msgstr "备份中缺少 openclaw.json"
 
+msgid "Download"
+msgstr "下载"
+
+msgid "Import backup"
+msgstr "导入备份"
+
+msgid "Import from path"
+msgstr "从路径导入"
+
+msgid "Importing backup..."
+msgstr "正在导入备份..."
+
+msgid "Path to a backup file on the device (e.g. /mnt/sda1/xxx.tar.gz)"
+msgstr "设备上备份文件的路径（如 /mnt/sda1/xxx.tar.gz）"
+
+msgid "Invalid import path"
+msgstr "导入路径无效"
+
+msgid "Import file does not exist"
+msgstr "导入文件不存在"
+
+msgid "Backup imported."
+msgstr "备份已导入。"
+
+msgid "Import failed"
+msgstr "导入失败"
+
+msgid "No uploaded backup file found"
+msgstr "未找到上传的备份文件"
+
+msgid "Invalid upload path"
+msgstr "上传路径无效"
+
+msgid "Failed to create import temp directory"
+msgstr "创建导入临时目录失败"
+
+msgid "Failed to store imported backup"
+msgstr "保存导入的备份失败"
+
+msgid "Failed to download backup: %s"
+msgstr "下载备份失败：%s"
+
+msgid "Failed to import backup: %s"
+msgstr "导入备份失败：%s"
+
 msgid "Backup path updated."
 msgstr "备份路径已更新。"
 
@@ -654,8 +699,8 @@ msgstr "登录启动失败"
 msgid "Login status"
 msgstr "登录状态"
 
-msgid "Manage the OpenClaw runtime, procd service, upgrades, and backups."
-msgstr "管理 OpenClaw 运行环境、procd 服务、升级和备份。"
+msgid "Manage the OpenClaw runtime, procd service, and upgrades."
+msgstr "管理 OpenClaw 运行环境、procd 服务和升级。"
 
 msgid "Manual approval"
 msgstr "手动审批"
@@ -840,8 +885,11 @@ msgstr "操作超时，请稍后刷新查看。"
 msgid "Operation timed out; the gateway was not ready in time. Refresh later to check."
 msgstr "操作超时，网关未在预期时间内就绪，请稍后刷新查看。"
 
-msgid "Paired users: %s"
-msgstr "已配对用户：%s"
+msgid "Paired"
+msgstr "已配对"
+
+msgid "Users: %s"
+msgstr "用户：%s"
 
 msgid "Pairing (approve the DM initiator)"
 msgstr "配对（审批私信发起者）"
@@ -878,6 +926,9 @@ msgstr "密钥明文扫描"
 
 msgid "Plugin installed; click QR login to finish signing in."
 msgstr "插件已安装，请点「扫码登录」完成登录。"
+
+msgid "Plugin upgrade"
+msgstr "插件升级"
 
 msgid "Plugin upgrade completed."
 msgstr "插件升级完成。"

@@ -97,9 +97,15 @@ done
 if find luasrc -type f 2>/dev/null | grep -q .; then fail "legacy luasrc files must be removed"; fi
 grep -Fq "return { 'luci.openclaw': methods };" root/usr/share/rpcd/ucode/luci.openclaw || fail "ubus object export missing"
 grep -Fq 'node: base + ' root/usr/share/rpcd/ucode/luci.openclaw || fail "ucode paths() must place node under base (not root) to match shell-side NODE_BASE"
-for method in status system_info install_path_probe update_check setup_log upgrade_log backup_list backup_verify gateway_token wechat_status wechat_install_log wechat_login_status wechat_update_check service_action setup uninstall upgrade backup_create backup_restore backup_delete wechat_install wechat_login wechat_logout wechat_upgrade wechat_uninstall secrets_audit; do
+for method in status system_info install_path_probe update_check setup_log upgrade_log gateway_token wechat_status wechat_install_log wechat_login_status wechat_update_check service_action setup uninstall upgrade wechat_install wechat_login wechat_logout wechat_upgrade wechat_uninstall secrets_audit; do
 	grep -q "${method}:" root/usr/share/rpcd/ucode/luci.openclaw || fail "missing rpc method: $method"
 done
+
+# 备份恢复功能已整体移除: 不得有任何 backup action/方法/helper 残留。
+if grep -qi 'backup' root/usr/libexec/openclaw-rpc.sh root/usr/share/rpcd/ucode/luci.openclaw root/usr/share/rpcd/acl.d/luci-app-openclaw.json htdocs/luci-static/resources/openclaw/api.js htdocs/luci-static/resources/view/openclaw/overview.js; then
+	fail "backup/restore feature must be fully removed (no backup references should remain)"
+fi
+[ ! -e root/usr/libexec/openclaw-backup.sh ] || fail "backup helper must be removed"
 if grep -q 'system_check:' root/usr/share/rpcd/ucode/luci.openclaw; then fail "write probe must not remain in legacy system_check"; fi
 grep -Eq '\^\(start\|stop\|restart\|enable\|disable\|restart_gateway\)\$' root/usr/share/rpcd/ucode/luci.openclaw || fail "service action allowlist missing"
 grep -Fq -- "-1_all.ipk" root/usr/libexec/openclaw-rpc.sh || fail "upgrade must download ipk package"
@@ -151,8 +157,6 @@ grep -q 'start_task /tmp/openclaw-wechat-login "$cmd" /tmp/openclaw-wechat-qrcod
 if grep -q 'mv /tmp/openclaw-wechat-login.log' root/usr/libexec/openclaw-rpc.sh; then fail "Weixin login log must not be moved after task startup"; fi
 grep -q 'OC_ACCOUNT_ID' root/usr/libexec/openclaw-rpc.sh || fail "wechat logout must pass selected account safely"
 grep -q 'OPENCLAW_OPERATION_LOCK:-/var/lock/openclaw-operation.lock' root/usr/libexec/openclaw-rpc.sh || fail "global operation lock missing"
-grep -q 'oc_prepare_backup_restore' root/usr/libexec/openclaw-rpc.sh || fail "safe staged backup restore missing"
-if grep -q 'tar -xzf .* -C /' root/usr/libexec/openclaw-rpc.sh; then fail "backup restore must not extract directly to root"; fi
 grep -q 'poll.add(L.bind(this.updateStatus, this), 10)' htdocs/luci-static/resources/view/openclaw/overview.js || fail "status polling must use the reduced frequency"
 grep -q 'luci-openclaw-status' root/usr/share/rpcd/ucode/luci.openclaw || fail "static status cache missing"
 read_acl=$(sed -n '/"read"/,/"write"/p' root/usr/share/rpcd/acl.d/luci-app-openclaw.json)
@@ -188,7 +192,6 @@ grep -q 'PKG_UPGRADE' scripts/build_ipk.sh || fail "ipk postrm must use PKG_UPGR
 if grep -A12 'uninstall-task)' root/usr/libexec/openclaw-rpc.sh | grep -q 'rm -f /etc/config/openclaw'; then fail "uninstall-task must keep /etc/config/openclaw (env uninstall only removes runtime)"; fi
 grep -A12 'uninstall-task)' root/usr/libexec/openclaw-rpc.sh | grep -q "openclaw.main.enabled='0'" || fail "uninstall-task must disable autostart while keeping config"
 grep -q "openclaw-workspace.sh" Makefile || fail "workspace helper must be packaged"
-grep -q "openclaw-backup.sh" Makefile || fail "backup safety helper must be packaged"
 grep -q "oc_sync_workspace_tools" root/usr/bin/openclaw-env || fail "setup and upgrade must sync workspace guidance"
 grep -q "luci-app-openclaw:openwrt-runtime:start" root/usr/libexec/openclaw-workspace.sh || fail "workspace guidance must use a managed block"
 grep -q 'OC_OPERATING_FILE' root/usr/libexec/openclaw-workspace.sh || fail "workspace guidance must inject into OPERATING.md"

@@ -5,10 +5,9 @@ TEST_ROOT=$(mktemp -d)
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
 OPENCLAW_PATHS_HELPER=./root/usr/libexec/openclaw-paths.sh
-OPENCLAW_BACKUP_HELPER=./root/usr/libexec/openclaw-backup.sh
 OPENCLAW_OPERATION_LOCK="$TEST_ROOT/operation.lock"
 OPENCLAW_RPC_LIBRARY_ONLY=1
-export OPENCLAW_PATHS_HELPER OPENCLAW_BACKUP_HELPER OPENCLAW_OPERATION_LOCK OPENCLAW_RPC_LIBRARY_ONLY
+export OPENCLAW_PATHS_HELPER OPENCLAW_OPERATION_LOCK OPENCLAW_RPC_LIBRARY_ONLY
 . ./root/usr/libexec/openclaw-rpc.sh
 
 fail_test() { echo "FAIL: $1" >&2; exit 1; }

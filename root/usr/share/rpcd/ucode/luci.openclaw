@@ -52,24 +52,11 @@ function normalize_base(value) {
 	return length(raw) ? raw : null;
 }
 
-// 校验自定义备份目录: 绝对、无危险字符、非系统目录、且在安装根目录之外。
-// 非法返回 null, 调用方回退到默认 <base>/openclaw-backups。
-function normalize_backup_dir(value, root) {
-	let raw = trim(`${value ?? ''}`);
-	raw = replace(raw, /\/+$/, '');
-	if (!length(raw) || substr(raw, 0, 1) != '/' || match(raw, /[[:space:]'"`$;&|<>()]/)) return null;
-	if (raw == '/' || match(raw, /^\/(proc|sys|dev|tmp|var|etc|usr|bin|sbin|lib|rom|overlay)(\/|$)/)) return null;
-	if (raw == root || substr(raw, 0, length(root) + 1) == root + '/') return null;
-	return raw;
-}
-
 function paths(input) {
 	let base = normalize_base(input ?? uci_get('install_path') ?? '/opt');
 	if (!base) return null;
 	let root = base + '/openclaw';
-	// 备份目录默认在安装根目录之外(同级), 卸载环境不会删除; 可经 UCI backup_path 覆盖。
-	let backup_dir = normalize_backup_dir(uci_get('backup_path'), root) || (base + '/openclaw-backups');
-	return { base, root, node: base + '/node', global: root + '/.npm-global', state: root + '/.openclaw', cache: root + '/.npm', tmp: root + '/.tmp', config: root + '/.openclaw/openclaw.json', backup_dir };
+	return { base, root, node: base + '/node', global: root + '/.npm-global', state: root + '/.openclaw', cache: root + '/.npm', tmp: root + '/.tmp', config: root + '/.openclaw/openclaw.json' };
 }
 
 function task_status(prefix, log_path) {
@@ -213,19 +200,6 @@ function update_check() {
 	let body = release?.body || '';
 	if (length(body) > 10000) body = substr(body, 0, 10000) + '\n...(content too long, truncated)';
 	return reply(!!latest, latest ? '' : 'Failed to fetch the latest version', { plugin_current: current, plugin_latest: latest, plugin_has_update: !!latest && current != latest, release_notes: body });
-}
-
-function backup_list() {
-	let p = paths();
-	if (!p) return reply(false, 'Invalid install path');
-	let output = run('ls -t ' + shellquote(p.backup_dir) + '/*-openclaw-backup.tar.gz 2>/dev/null');
-	let backups = [];
-	for (let file in split(output, '\n')) {
-		if (!length(file) || length(backups) >= 20) continue;
-		let info = stat(file), name = replace(file, /^.*\//, ''), size = info?.size || 0;
-		push(backups, { filename: name, size, size_str: size >= 1048576 ? sprintf('%.1f MB', size / 1048576) : sprintf('%.1f KB', size / 1024), time: replace(replace(match(name, /^[0-9-]+T[0-9.-]+Z/)?.[0] || '', 'T', ' '), /Z$/, ''), backup_type: size < 50000 ? 'config' : 'full' });
-	}
-	return reply(true, '', { backups, backup_dir: p.backup_dir, backup_default: p.base + '/openclaw-backups', backup_custom: !!normalize_backup_dir(uci_get('backup_path'), p.root) });
 }
 
 function gateway_token() {
@@ -519,9 +493,6 @@ const methods = {
 	env_upgrade_npm: { call: () => run_action('env-upgrade-npm') },
 	env_upgrade_node: { args: { version: '' }, call: (r) => match(r.args.version, /^[0-9]+\.[0-9]+\.[0-9]+$/) ? run_action('env-upgrade-node', [r.args.version]) : reply(false, 'Invalid Node version format') },
 	env_upgrade_log: { call: () => reply(true, '', task_status('/tmp/openclaw-env-upgrade')) },
-	backup_list: { call: backup_list },
-	backup_path_set: { args: { path: '' }, call: (r) => { let v = trim(`${r.args.path ?? ''}`); let root = paths()?.root; if (length(v) && root && !normalize_backup_dir(v, root)) return reply(false, 'Invalid backup path: must be absolute and outside the install directory'); return run_action('backup-path-set', [v]); } },
-	backup_verify: { args: { file: '' }, call: (r) => run_action('backup-verify', [r.args.file || '']) },
 	gateway_token: { call: gateway_token },
 	wechat_status: { call: wechat_status },
 	telegram_status: { args: { force: '' }, call: telegram_status },
@@ -543,9 +514,6 @@ const methods = {
 	} },
 	uninstall: { args: { also_remove_node: false }, call: (r) => run_action('uninstall', [r.args.also_remove_node === true ? '1' : '0']) },
 	upgrade: { args: { version: '' }, call: (r) => match(r.args.version, /^[0-9]+\.[0-9]+\.[0-9]+$/) ? run_action('upgrade', [r.args.version]) : reply(false, 'Invalid version format') },
-	backup_create: { args: { only_config: true }, call: (r) => run_action('backup-create', [r.args.only_config === false ? '0' : '1']) },
-	backup_restore: { args: { file: '' }, call: (r) => match(r.args.file, /^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$/) ? run_action('backup-restore', [r.args.file]) : reply(false, 'Invalid backup file name') },
-	backup_delete: { args: { file: '' }, call: (r) => match(r.args.file, /^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$/) ? run_action('backup-delete', [r.args.file]) : reply(false, 'Invalid backup file name') },
 	wechat_install: { call: () => run_action('wechat-install') },
 	wechat_login: { call: () => run_action('wechat-login') },
 	wechat_login_cancel: { call: () => run_action('wechat-login-cancel') },

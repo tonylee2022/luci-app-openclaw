@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openclaw
 # 版本号唯一来源 (LuCI 惯例: 写在 Makefile)。构建时由此生成 /usr/share/openclaw/VERSION 供运行时读取。
-PKG_VERSION:=1.1.9
+PKG_VERSION:=1.2.0
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=tonylee2022 <tonylee2022@users.noreply.github.com>
@@ -61,7 +61,6 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_BIN) ./root/usr/libexec/openclaw-paths.sh $(1)/usr/libexec/openclaw-paths.sh
 	$(INSTALL_BIN) ./root/usr/libexec/openclaw-node.sh $(1)/usr/libexec/openclaw-node.sh
 	$(INSTALL_BIN) ./root/usr/libexec/openclaw-workspace.sh $(1)/usr/libexec/openclaw-workspace.sh
-	$(INSTALL_BIN) ./root/usr/libexec/openclaw-backup.sh $(1)/usr/libexec/openclaw-backup.sh
 	$(INSTALL_BIN) ./root/usr/libexec/openclaw-rpc.sh $(1)/usr/libexec/openclaw-rpc.sh
 	$(INSTALL_BIN) ./root/usr/libexec/openclaw-wizard.sh $(1)/usr/libexec/openclaw-wizard.sh
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/openclaw

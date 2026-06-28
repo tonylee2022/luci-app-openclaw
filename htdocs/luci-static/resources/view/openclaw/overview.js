@@ -8,7 +8,7 @@
 
 return view.extend({
 	load: function() {
-		return Promise.all([ api.status(), api.backupList(), api.setupLog(), api.uninstallLog() ]);
+		return Promise.all([ api.status(), api.setupLog(), api.uninstallLog() ]);
 	},
 
 	updateStatus: function() {
@@ -557,38 +557,6 @@ return view.extend({
 		]);
 	},
 
-	showBackups: function() {
-		var body = E('div', {}, _('Loading...'));
-		var bkStatus = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
-		var refresh = L.bind(function() {
-			return api.backupList().then(L.bind(function(result) {
-				var info = result.data || {};
-				var pathInput = E('input', { type: 'text', 'class': 'cbi-input-text', style: 'width:20em;max-width:60%', value: info.backup_custom ? (info.backup_dir || '') : '', placeholder: info.backup_default || '' });
-				var pathRow = E('div', { 'class': 'oc-backup-path' }, [
-					E('div', { 'class': 'oc-hint' }, _('Backup directory (outside the install directory; not removed when uninstalling the runtime):') + ' ' + (info.backup_dir || '-')),
-					E('div', { 'class': 'oc-actions', style: 'margin-top:6px' }, [
-						pathInput,
-						ocui.button(_('Save path'), 'cbi-button-action', function() { var v = (pathInput.value || '').replace(/^\s+|\s+$/g, ''); return ocui.runOp(bkStatus, { running: _('Updating backup path...'), success: _('Backup path updated.'), submit: function() { return api.backupPathSet(v); }, onDone: refresh }); }),
-						info.backup_custom ? ocui.button(_('Restore defaults'), '', function() { return ocui.runOp(bkStatus, { running: _('Restoring default path...'), success: _('Default backup path restored.'), submit: function() { return api.backupPathSet(''); }, onDone: refresh }); }) : E('span')
-					])
-				]);
-				var rows = (result.data.backups || []).map(L.bind(function(item) {
-					return E('tr', {}, [ E('td', {}, item.backup_type === 'config' ? _('Config only') : _('Full')), E('td', {}, item.time || item.filename), E('td', {}, item.size_str), E('td', { 'class': 'oc-table-actions' }, [
-						ocui.button(_('Verify'), '', function() { return ocui.runOp(bkStatus, { running: _('Verifying backup...'), success: _('Backup verified.'), submit: function() { return api.backupVerify(item.filename); } }); }),
-						ocui.button(_('Restore'), 'cbi-button-action', function() { return ocui.confirm(_('Restoring overwrites the current state and restarts the service. Continue?'), { danger: true, confirmLabel: _('Restore') }).then(function(ok) { if (!ok) return; return ocui.runOp(bkStatus, { running: _('Restoring backup...'), success: _('Backup restored; service is restarting.'), submit: function() { return api.backupRestore(item.filename); }, onDone: refresh }); }); }),
-						ocui.button(_('Delete'), 'cbi-button-negative', function() { return ocui.confirm(_('Delete this backup?'), { danger: true, confirmLabel: _('Delete') }).then(function(ok) { if (!ok) return; return ocui.runOp(bkStatus, { running: _('Deleting backup...'), success: _('Backup deleted.'), submit: function() { return api.backupDelete(item.filename); }, onDone: refresh }); }); })
-					]) ]);
-				}, this));
-				dom.content(body, [ E('div', { 'class': 'oc-actions' }, [
-					ocui.button(_('Create config backup'), 'cbi-button-positive', function() { return ocui.runOp(bkStatus, { running: _('Creating config backup...'), success: _('Config backup created.'), submit: function() { return api.backupCreate(true); }, onDone: refresh }); }),
-					ocui.button(_('Create full backup'), 'cbi-button-action', function() { return ocui.runOp(bkStatus, { running: _('Creating full backup...'), success: _('Full backup created.'), submit: function() { return api.backupCreate(false); }, onDone: refresh }); })
-				]), bkStatus, pathRow, E('table', { 'class': 'oc-table' }, [ E('tr', {}, [ E('th', {}, _('Type')), E('th', {}, _('Time / file')), E('th', {}, _('Size')), E('th', {}, _('Action')) ]) ].concat(rows)) ]);
-			}, this));
-		}, this);
-		ui.showModal(_('Backup and restore'), [ body, E('div', { 'class': 'right' }, [ ocui.closeButton(_('Close')) ]) ]);
-		refresh();
-	},
-
 	render: function(data) {
 		var self = this;
 		this._stableVersion = ((data[0] || {}).data || {}).stable_version || '';
@@ -624,9 +592,8 @@ return view.extend({
 			act(_('Restart gateway only'), 'cbi-button-action', L.bind(this.serviceAction, this, 'restart_gateway')),
 			act(_('Stop'), 'oc-btn-amber', L.bind(this.serviceAction, this, 'stop')),
 			this.autostartBtn,
-			act(_('Check for upgrades'), 'cbi-button-action', L.bind(this.checkUpgrade, this)),
+			act(_('Plugin upgrade'), 'cbi-button-action', L.bind(this.checkUpgrade, this)),
 			ocui.button(_('Runtime upgrade'), 'cbi-button-action', L.bind(this.showEnvUpgrade, this)),
-			ocui.button(_('Backup / Restore'), 'cbi-button-action', L.bind(this.showBackups, this)),
 			act(_('Uninstall runtime'), 'cbi-button-negative', L.bind(this.uninstall, this))
 		]);
 		this.actionStatus = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
@@ -636,7 +603,7 @@ return view.extend({
 		this.taskState = E('div', { 'class': 'oc-task-state' }, _('No running tasks.'));
 		this.taskLog = E('pre', { 'class': 'oc-log' }, '');
 		this.taskPanel = E('div', { 'class': 'oc-card', 'style': 'display:none' }, [ E('div', { 'class': 'oc-card-title oc-task-title' }, [ this.taskTitle, this.taskClose ]), E('div', { 'class': 'oc-card-body' }, [ E('div', { 'class': 'oc-task-wrap' }, [ this.taskState, this.taskLog ]) ]) ]);
-		var page = E('div', {}, [ E('link', { rel: 'stylesheet', href: L.resource('openclaw/openclaw.css') }), E('div', { 'class': 'oc-header' }, [ E('h2', {}, _('OpenClaw AI Gateway')), E('p', { 'class': 'oc-muted' }, _('Manage the OpenClaw runtime, procd service, upgrades, and backups.')) ]), E('div', { 'class': 'oc-card' }, [ E('div', { 'class': 'oc-card-title' }, _('Status overview')), E('div', { 'class': 'oc-card-body' }, [ E('div', { 'class': 'oc-status-list' }, statusItems) ]) ]), E('div', { 'class': 'oc-card' }, [ E('div', { 'class': 'oc-card-title' }, _('Quick actions')), E('div', { 'class': 'oc-card-body' }, [ actions, this.actionStatus ]) ]), this.taskPanel,
+		var page = E('div', {}, [ ocui.cssLink(), E('div', { 'class': 'oc-header' }, [ E('h2', {}, _('OpenClaw AI Gateway')), E('p', { 'class': 'oc-muted' }, _('Manage the OpenClaw runtime, procd service, and upgrades.')) ]), E('div', { 'class': 'oc-card' }, [ E('div', { 'class': 'oc-card-title' }, _('Status overview')), E('div', { 'class': 'oc-card-body' }, [ E('div', { 'class': 'oc-status-list' }, statusItems) ]) ]), E('div', { 'class': 'oc-card' }, [ E('div', { 'class': 'oc-card-title' }, _('Quick actions')), E('div', { 'class': 'oc-card-body' }, [ actions, this.actionStatus ]) ]), this.taskPanel,
 			E('div', { 'class': 'oc-card' }, [ E('div', { 'class': 'oc-card-title' }, _('Quick guide')), E('div', { 'class': 'oc-card-body' }, [ E('ol', { 'class': 'oc-guide' }, [
 				E('li', {}, _('First time: click Install runtime, then configure models/channels under Configuration > Official setup or via openclaw-shell.')),
 				E('li', {}, _('After config changes, click Restart or Restart gateway to apply; a Running status badge means it is healthy.')),

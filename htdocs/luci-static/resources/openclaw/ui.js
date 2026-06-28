@@ -5,6 +5,13 @@
 // OpenClaw 统一操作交互 (以「仅重启网关」为模板): 内联状态条 + 操作运行器。
 // button/closeButton 已统一收口至此; 状态条与操作运行器在按钮 handler 中调用。
 return baseclass.extend({
+	// 统一的样式表 <link>: 带版本号 query 强制浏览器在 CSS 变更后取新文件
+	// (部分主题/代理对无 query 的静态资源缓存极顽固, 强刷也未必失效)。
+	// 改动 openclaw.css 后递增 CSS_VERSION, 即可让所有视图加载到最新样式。
+	CSS_VERSION: '3',
+	cssLink: function() {
+		return E('link', { rel: 'stylesheet', href: L.resource('openclaw/openclaw.css') + '?v=' + this.CSS_VERSION });
+	},
 	// 跟随当前 LuCI 主题(明/暗)给 <html> 加/去 oc-dark 类, 使插件自带的明暗样式跟着主题切换,
 	// 而非只认 OS 的 prefers-color-scheme。检测: 采样 body 文字颜色亮度(暗色主题文字浅、亮色文字深),
 	// 比采样背景可靠(背景可能是壁纸/透明)。主题切换通常会刷新页面, 故渲染时检测即可; 另延时复检一次。

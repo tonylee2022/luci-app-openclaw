@@ -474,7 +474,7 @@ return view.extend({
 		this.tgStatus = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
 		this.tgState = E('span', {}, _('Loading...'));
 		this.tgLog = E('pre', { 'class': 'oc-log', 'style': 'display:none' }, '');
-		this.dmScopeLabel = E('span', { 'class': 'oc-muted', 'style': 'font-size:.82em;font-weight:400' }, '');
+		this.dmScopeLabel = E('span', { 'style': 'font-size:.82em;font-weight:400' }, '');
 		this._wechatPoll = L.bind(this.refreshWechat, this);
 		return E('div', {}, [
 			E('div', { 'class': 'oc-card' }, [
@@ -675,8 +675,18 @@ return view.extend({
 		return api.wechatStatus().then(L.bind(function(result) {
 			if (!result.ok) return;
 			var d = result.data || {};
-			this.wxPlugin.textContent = d.plugin_installed ? _('Installed') + (d.plugin_version ? ' v' + d.plugin_version : '') : _('Not installed');
-			this.wxLogin.textContent = d.logged_in ? _('Logged in') : _('Not logged in');
+			// 状态用徽章呈现, 与上方「消息渠道列表」一致: 已安装=灰(oc-info)、已登录=绿(oc-ok)、否定态=琥珀(oc-warn)。
+			// 状态徽章, 与上方「消息渠道列表」一致(着色全由 .oc-badge 类层叠决定, 不再内联)。
+			if (d.plugin_installed) {
+				var wxPluginEls = [ E('span', { 'class': 'oc-badge oc-info' }, _('Installed')) ];
+				if (d.plugin_version) wxPluginEls.push(E('span', { 'style': 'margin-left:.5rem' }, 'v' + d.plugin_version));
+				dom.content(this.wxPlugin, wxPluginEls);
+			} else {
+				dom.content(this.wxPlugin, E('span', { 'class': 'oc-badge oc-warn' }, _('Not installed')));
+			}
+			dom.content(this.wxLogin, d.logged_in
+				? E('span', { 'class': 'oc-badge oc-ok' }, _('Logged in'))
+				: E('span', { 'class': 'oc-badge oc-warn' }, _('Not logged in')));
 			dom.content(this.wxAccounts, (d.accounts || []).length ? d.accounts.map(L.bind(function(account) {
 				return E('div', { 'class': 'oc-field' }, [
 					E('span', {}, account.name || account.id),
@@ -756,7 +766,7 @@ return view.extend({
 		return api.dmScope().then(L.bind(function(r) {
 			if (!this.dmScopeLabel) return;
 			var scope = ((r.data || {}).scope) || 'main';
-			dom.content(this.dmScopeLabel, [ _('Session isolation:') + this.dmScopeName(scope) + ' ', E('code', { 'style': 'opacity:.6' }, scope) ]);
+			dom.content(this.dmScopeLabel, [ _('Session isolation:') + this.dmScopeName(scope) + ' ', E('code', { 'style': 'opacity:.85' }, scope) ]);
 		}, this)).catch(function() {});
 	},
 
@@ -828,7 +838,13 @@ return view.extend({
 				} else {
 					var detail = [ E('span', { 'class': 'oc-badge oc-info' }, _('Configured')) ];
 					if (tgIdLabel) detail.push(E('span', { 'style': 'margin-left:.5rem' }, tgIdLabel));
-					detail.push(E('span', { 'style': 'margin-left:.5rem' }, tgPaired.length ? _('Paired users: %s').format(tgPaired.join('、')) : _('Not paired')));
+					// 「已配对」用绿色徽章, 后跟原色文字「用户：<ID>」; 未配对用琥珀徽章。
+					if (tgPaired.length) {
+						detail.push(E('span', { 'class': 'oc-badge oc-ok', 'style': 'margin-left:.5rem' }, _('Paired')));
+						detail.push(E('span', { 'style': 'margin-left:.5rem' }, _('Users: %s').format(tgPaired.join('、'))));
+					} else {
+						detail.push(E('span', { 'class': 'oc-badge oc-warn', 'style': 'margin-left:.5rem' }, _('Not paired')));
+					}
 					dom.content(this.tgState, detail);
 				}
 			}
@@ -965,7 +981,7 @@ return view.extend({
 
 		if (!this.status.oc_version) {
 			return E('div', {}, [
-				E('link', { rel: 'stylesheet', href: L.resource('openclaw/openclaw.css') }),
+				ocui.cssLink(),
 				E('div', { 'class': 'oc-header' }, [ E('h2', {}, _('Configuration')) ]),
 				E('div', { 'class': 'oc-card' }, [ E('div', { 'class': 'oc-card-body' }, [
 					E('p', { 'class': 'oc-badge oc-error' }, _('OpenClaw runtime is not installed; install it under Basic Settings first.'))
@@ -990,7 +1006,7 @@ return view.extend({
 		}));
 
 		var page = E('div', {}, [
-			E('link', { rel: 'stylesheet', href: L.resource('openclaw/openclaw.css') }),
+			ocui.cssLink(),
 			E('div', { 'class': 'oc-header' }, [
 				E('h2', {}, _('Configuration')),
 				E('p', { 'class': 'oc-muted' }, _('Graphical access to the official OpenClaw CLI: health check, doctor fix, provider and channel configuration, log queries.'))

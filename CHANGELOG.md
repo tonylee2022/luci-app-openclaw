@@ -1,5 +1,13 @@
 ﻿# 更新记录
 
+## [1.2.0]
+
+- **移除备份/恢复功能**：实测发现配置备份只含 `openclaw.json`、不含认证凭证（凭证另存于 `.openclaw/credentials`、网关 token 在 UCI），恢复后仍需重输全部密钥；完整备份则因含大量（绝对路径）软链接被恢复/导入的安全校验拒绝，本质不可恢复。该功能价值有限且易误导，故整体移除：删除基本配置里的「备份/恢复」入口与全部相关后端 action、ucode 方法、ACL、前端代码、`openclaw-backup.sh` 助手及其测试。
+- **版本号管理收敛**：删除冗余的 `VERSION` 文件，插件版本号回归 LuCI 惯例只在 `Makefile` 的 `PKG_VERSION` 声明（构建时生成 `/usr/share/openclaw/VERSION` 供运行时读取）；删除 `VERSION.json`，运行时依赖版本（Node/OpenClaw）以 `openclaw-env` 为唯一来源，契约测试改为直接守护 `init.d` 与 `openclaw-env` 的一致性。
+- **发版与构建解耦**：CI 仅在推送 `v*` 标签（或手动 dispatch）时创建 Release；推送 `main` 只跑构建与校验、不再「改版本号即自动发版」，避免日常提交误触发发布。
+- **界面优化**：Web 控制台「在新窗口打开」改为标题行右侧的蓝色按钮；消息渠道/微信/Telegram 的状态徽章配色统一（修复深色模式 `.oc-field` 着色规则泄漏到嵌套徽章的问题）；「会话隔离」说明文字提亮；Telegram「已配对」改为绿色标签 + 原色用户 ID；基本配置「检测升级」更名为「插件升级」。
+- **样式缓存根治**：新增 `ocui.cssLink()`，给 `openclaw.css` 链接附带版本号 query，改动样式后递增 `CSS_VERSION` 即可让所有视图加载最新样式，免受浏览器/主题对静态资源的顽固缓存影响。
+
 ## [1.1.9]
 
 - **新增中英双语界面（i18n）**：恢复标准 LuCI 多语言机制。前端文案、菜单标题、操作反馈与后端返回 UI 的消息统一以英文作为翻译键，新增简体中文语言包 `po/zh_Hans/openclaw.po`，随包编译为 `usr/lib/lua/luci/i18n/openclaw.zh-cn.lmo`。LuCI 界面语言设为 English 显示英文、设为简体中文显示中文，自动跟随切换。新增纯 Python 的 `scripts/po2lmo.py`（字节级对齐 LuCI 官方 `po2lmo`，无需 OpenWrt SDK 即可在本地/CI 把 po 编译为 lmo），并接入 `build_ipk.sh` / `build_run.sh`；新增 `tests/test_openclaw_i18n.sh` 做漏译与编译校验。注：网页内嵌终端（配置向导 / openclaw-shell）由 ttyd 运行、不经 LuCI 渲染层，其输出仍为中文。

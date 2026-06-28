@@ -2,7 +2,6 @@
 set -u
 
 . "${OPENCLAW_PATHS_HELPER:-/usr/libexec/openclaw-paths.sh}"
-. "${OPENCLAW_BACKUP_HELPER:-/usr/libexec/openclaw-backup.sh}"
 
 OPERATION_LOCK="${OPENCLAW_OPERATION_LOCK:-/var/lock/openclaw-operation.lock}"
 
@@ -14,12 +13,6 @@ fail() {
 load_paths() {
 	base=$(uci -q get openclaw.main.install_path || echo /opt)
 	oc_load_paths "$base" || fail "Invalid UCI install path"
-	# 备份目录可经 UCI 覆盖, 但必须在安装根目录之外; 非法值静默回退到默认 OC_BACKUP_DIR。
-	bp=$(uci -q get openclaw.main.backup_path || true)
-	if [ -n "${bp:-}" ]; then
-		bp=$(oc_normalize_backup_dir "$bp") && OC_BACKUP_DIR="$bp"
-	fi
-	export OC_BACKUP_DIR
 }
 
 task_running() {
@@ -156,32 +149,6 @@ case "${1:-}" in
 		uci commit openclaw
 		if [ "$val" = "1" ]; then /etc/init.d/openclaw enable; else /etc/init.d/openclaw disable; fi
 		echo "Autostart updated"
-		;;
-	backup-path-set)
-		load_paths
-		# 当前生效目录 = OC_BACKUP_DIR(load_paths 已应用 UCI 覆盖)。
-		from="$OC_BACKUP_DIR"
-		val="${2:-}"
-		if [ -z "$val" ]; then
-			target="$OC_BACKUP_DIR_DEFAULT"
-		else
-			target=$(oc_normalize_backup_dir "$val") || fail "Invalid backup path: must be absolute and outside the install directory"
-		fi
-		if [ "$target" != "$from" ]; then
-			mkdir -p "$target" || fail "Failed to create backup directory"
-			chown openclaw:openclaw "$target" 2>/dev/null || true
-			# 迁移已有备份到新目录, 保持列表连续。
-			mv "$from"/*-openclaw-backup.tar.gz "$target/" 2>/dev/null || true
-		fi
-		if [ -z "$val" ]; then
-			uci -q delete openclaw.main.backup_path
-			uci commit openclaw
-			echo "Default backup path restored."
-		else
-			uci set openclaw.main.backup_path="$target"
-			uci commit openclaw
-			echo "Backup path updated."
-		fi
 		;;
 	setup)
 		version="${2:-}"
@@ -384,73 +351,6 @@ case "${1:-}" in
 			kill_tree "$p"
 		done
 		rm -f /var/run/openclaw-wizard.pid /var/run/openclaw-wizard.port
-		;;
-	backup-create)
-		acquire_operation_lock backup-create
-		trap 'release_operation_lock' EXIT INT TERM
-		load_paths
-		only_config="${2:-1}"
-		case "$only_config" in 0|1) ;; *) fail "Invalid backup type" ;; esac
-		entry=$(find_openclaw_entry) || fail "OpenClaw is not installed"
-		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
-		mkdir -p "$OC_BACKUP_DIR"
-		chown openclaw:openclaw "$OC_BACKUP_DIR" 2>/dev/null || true
-		# 迁移历史版本遗留在安装路径内的备份, 避免卸载丢失。
-		mv "$OC_STATE_DIR"/backups/*-openclaw-backup.tar.gz "$OC_BACKUP_DIR/" 2>/dev/null || true
-		args="backup create --no-include-workspace"
-		[ "$only_config" = 0 ] || args="$args --only-config"
-		run_home="$OC_HOME"
-		[ "$only_config" = 1 ] || run_home="$OC_BACKUP_DIR"
-		# 必须以 openclaw 身份运行: 以 root 运行会触发 OpenClaw 临时目录安全校验失败(openclaw-0), 并产生 root 属主文件。
-		su -s /bin/sh openclaw -c "cd $(oc_quote "$OC_BACKUP_DIR") && HOME=$(oc_quote "$run_home") OPENCLAW_HOME=$(oc_quote "$OC_HOME") OPENCLAW_STATE_DIR=$(oc_quote "$OC_STATE_DIR") OPENCLAW_CONFIG_PATH=$(oc_quote "$CONFIG_FILE") NPM_CONFIG_PREFIX=$(oc_quote "$OC_GLOBAL") NPM_CONFIG_CACHE=$(oc_quote "$OC_NPM_CACHE") TMPDIR=$(oc_quote "$OC_TMP") $NODE_BASE/bin/node $entry $args"
-		mv "$OC_HOME"/*-openclaw-backup.tar.gz "$OC_BACKUP_DIR/" 2>/dev/null || true
-		chown openclaw:openclaw "$OC_BACKUP_DIR"/*-openclaw-backup.tar.gz 2>/dev/null || true
-		;;
-	backup-verify)
-		acquire_operation_lock backup-verify
-		trap 'release_operation_lock' EXIT INT TERM
-		load_paths
-		file="${2:-}"
-		if [ -z "$file" ]; then
-			file=$(ls -t "$OC_BACKUP_DIR"/*-openclaw-backup.tar.gz 2>/dev/null | head -1)
-		else
-			echo "$file" | grep -Eq '^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$' || fail "Invalid backup file name"
-			file="$OC_BACKUP_DIR/$file"
-		fi
-		[ -f "$file" ] || fail "Backup file does not exist"
-		entry=$(find_openclaw_entry) || fail "OpenClaw is not installed"
-		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
-		# 以 openclaw 身份运行(带 env), 否则 root 触发临时目录安全校验失败。
-		su -s /bin/sh openclaw -c "$(oc_cli_env) $NODE_BASE/bin/node $entry backup verify $(oc_quote "$file")"
-		;;
-	backup-delete)
-		acquire_operation_lock backup-delete
-		trap 'release_operation_lock' EXIT INT TERM
-		load_paths
-		file="${2:-}"
-		echo "$file" | grep -Eq '^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$' || fail "Invalid backup file name"
-		[ -f "$OC_BACKUP_DIR/$file" ] || fail "Backup file does not exist"
-		rm -f "$OC_BACKUP_DIR/$file"
-		;;
-	backup-restore)
-		acquire_operation_lock backup-restore
-		trap 'release_operation_lock' EXIT INT TERM
-		load_paths
-		file="${2:-}"
-		echo "$file" | grep -Eq '^[A-Za-z0-9._+-]+-openclaw-backup\.tar\.gz$' || fail "Invalid backup file name"
-		archive="$OC_BACKUP_DIR/$file"
-		[ -f "$archive" ] || fail "Backup file does not exist"
-		restore_stage=$(mktemp -d "${OC_TMP:-/tmp}/openclaw-restore.XXXXXX") || fail "Failed to create restore temp directory"
-		trap 'rm -rf "$restore_stage"; release_operation_lock' EXIT INT TERM
-		restore_source=$(oc_prepare_backup_restore "$archive" "$OC_STATE_DIR" "$restore_stage") || fail "Backup contains unsafe paths, links, or non-state content"
-		[ -f "$restore_source/openclaw.json" ] || fail "Backup is missing openclaw.json"
-		"$NODE_BASE/bin/node" -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$restore_source/openclaw.json" || fail "Invalid backup configuration"
-		cp -f "$CONFIG_FILE" "$CONFIG_FILE.pre-restore" 2>/dev/null || true
-		/etc/init.d/openclaw stop >/dev/null 2>&1 || true
-		mkdir -p "$OC_STATE_DIR"
-		cp -a "$restore_source/." "$OC_STATE_DIR/"
-		chown -R openclaw:openclaw "$OC_STATE_DIR" 2>/dev/null || true
-		/etc/init.d/openclaw start >/dev/null 2>&1 &
 		;;
 	wechat-install)
 		load_paths
