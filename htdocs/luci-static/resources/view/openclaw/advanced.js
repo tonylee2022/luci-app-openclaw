@@ -511,9 +511,9 @@ return view.extend({
 							return api.wechatUpdateCheck().then(function(r) {
 								if (!r.ok) { ocui.setStatus(self.wxStatus, 'error', _(r.message || 'Detection failed')); ocui.hideStatusLater(self.wxStatus); return; }
 								if (!r.data.has_upgrade) { ocui.setStatus(self.wxStatus, 'success', _('Already the latest version.')); ocui.hideStatusLater(self.wxStatus); return; }
-								// 发现新版本: 内联展示并提供「立即升级」按钮, 不弹窗
+								// 发现新版本: 内联展示并提供「立即升级」按钮, 不弹窗。黄色提示, 与绿色「已是最新」区分。
 								window.clearTimeout(self.wxStatus._ocHideTimer);
-								self.wxStatus.className = 'oc-action-status oc-task-running';
+								self.wxStatus.className = 'oc-action-status oc-task-warn';
 								self.wxStatus.style.display = '';
 								dom.content(self.wxStatus, [
 									E('span', {}, _('New WeChat plugin version %s available.').format(r.data.latest_version)), ' ',

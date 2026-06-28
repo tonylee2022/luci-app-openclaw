@@ -320,10 +320,11 @@ return view.extend({
 				ocui.hideStatusLater(self.actionStatus);
 				return;
 			}
-			// 发现新版本: 不再弹窗, 在状态信息区内联展示并提供「立即升级」按钮
+			// 发现新版本: 不再弹窗, 在状态信息区内联展示并提供「立即升级」按钮。
+			// 用黄色(warn)提示有可用更新, 区别于「已是最新」的绿色(success)。
 			var version = result.data.plugin_latest;
 			window.clearTimeout(self.actionStatus._ocHideTimer);
-			self.actionStatus.className = 'oc-action-status oc-task-running';
+			self.actionStatus.className = 'oc-action-status oc-task-warn';
 			self.actionStatus.style.display = '';
 			dom.content(self.actionStatus, [
 				E('span', {}, _('New version %s available (current %s).').format(version, result.data.plugin_current)),
@@ -519,7 +520,8 @@ return view.extend({
 							? _('New OpenClaw version %s available (current %s).').format(d.latest, d.current)
 							: _('OpenClaw core is up to date (%s); plugin/dependency updates are available.').format(d.current);
 						window.clearTimeout(status._ocHideTimer);
-						status.className = 'oc-action-status oc-task-running';
+						// 黄色提示有可用更新, 与「已是最新」的绿色区分。
+						status.className = 'oc-action-status oc-task-warn';
 						status.style.display = '';
 						dom.content(status, [
 							E('span', {}, msg), ' ',
@@ -533,9 +535,9 @@ return view.extend({
 						if (!r.ok) { ocui.setStatus(status, 'error', _(r.message || 'Version check failed')); return; }
 						var d = r.data || {};
 						if (!d.has_update) { ocui.setStatus(status, 'success', _('Already the latest version (%s)').format(d.current)); ocui.hideStatusLater(status); return; }
-						// 发现新版本: 内联展示并提供「立即升级」按钮, 不弹窗
+						// 发现新版本: 内联展示并提供「立即升级」按钮, 不弹窗。黄色提示, 与绿色「已是最新」区分。
 						window.clearTimeout(status._ocHideTimer);
-						status.className = 'oc-action-status oc-task-running';
+						status.className = 'oc-action-status oc-task-warn';
 						status.style.display = '';
 						dom.content(status, [
 							E('span', {}, _('New version %s available (current %s).').format(d.latest, d.current)), ' ',
