@@ -60,7 +60,7 @@ Run OpenClaw on your router and use LuCI to install its runtime, manage the serv
 | Firmware | OpenWrt **23.05+** or a derivative such as LEDE, ImmortalWrt, or iStoreOS |
 | Architecture | x86_64 or aarch64 (ARM64) |
 | C library | musl, detected automatically |
-| Dependencies | luci-base, rpcd-mod-ucode, curl, openssl-util, tar, ttyd, qrencode, libstdcpp |
+| Dependencies | luci-base, rpcd-mod-ucode, curl, openssl-util, ttyd, qrencode, libstdcpp |
 | Storage | At least **2 GB** of free space |
 | Memory | 1 GB or more recommended |
 
