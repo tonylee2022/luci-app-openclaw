@@ -334,7 +334,11 @@ function env_upgrade_check() {
 	let latest = current, core_update = false, queried = false;
 	try {
 		let j = json(run('/usr/bin/openclaw update --dry-run --yes --json 2>/dev/null'));
-		if (j?.targetVersion) { queried = true; latest = `${j.targetVersion}`; core_update = `${j.currentVersion}` != latest; }
+		if (j?.currentVersion) {
+			queried = true;
+			latest = j?.targetVersion ? "" + j.targetVersion : "" + j.currentVersion;
+			core_update = "" + j.currentVersion != latest;
+		}
 	} catch (e) {}
 	if (!queried) return reply(false, 'Failed to check for updates (check your network)');
 	let plugin_update = false;

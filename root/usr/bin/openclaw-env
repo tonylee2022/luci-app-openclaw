@@ -382,7 +382,7 @@ download_node() {
 	[ -d /overlay/upper ] && rm -rf "/overlay/upper${staging}" 2>/dev/null
 	ensure_mkdir "$staging"
 	# 完整性检测: gzip 包 tar 必能列出内容; 列不出即下载损坏。
-	if [ -z "$(tar tf "$tmp_file" 2>/dev/null | head -1)" ]; then
+	if [ -z "$(tar tzf "$tmp_file" 2>/dev/null | head -1)" ]; then
 		log_error "Node.js 包损坏或非 gzip 格式，无法解压"
 		rm -rf "$staging"; rm -f "$tmp_file"
 		exit 1
@@ -396,7 +396,7 @@ download_node() {
 		local tmp_extract="/tmp/node-extract-$$"
 		rm -rf "$tmp_extract"
 		ensure_mkdir "$tmp_extract"
-		tar xf "$tmp_file" -C "$tmp_extract"
+		tar xzf "$tmp_file" -C "$tmp_extract"
 		# 找顶层目录 (node-vX.X.X-linux-xxx)
 		local top_dir
 		top_dir=$(ls "$tmp_extract" 2>/dev/null | head -1)
