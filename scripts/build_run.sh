@@ -116,7 +116,7 @@ esac
 # ttyd 提供配置向导终端; tar 解 Node.js .tar.gz(gzip 为 busybox 内置, 无需 xz)
 echo "正在检查依赖..."
 opkg update >/dev/null 2>&1 || true
-for dep in luci-base rpcd-mod-ucode curl openssl-util tar ttyd qrencode libstdcpp; do
+for dep in luci-base rpcd-mod-ucode curl openssl-util tar ttyd qrencode libstdcpp shadow-utils shadow-su; do
 	if ! opkg list-installed 2>/dev/null | grep -q "^${dep} "; then
 		echo "  安装依赖 $dep ..."
 		opkg install "$dep" 2>/dev/null || echo "  ⚠ 安装 $dep 失败，请手动 opkg install $dep"
@@ -151,7 +151,7 @@ mkdir -p "$INFO_DIR"
 cat > "$INFO_DIR/$PKG.control" << CTLEOF
 Package: $PKG
 Version: $PKG_VER
-Depends: luci-base, rpcd-mod-ucode, curl, openssl-util, script-utils, ttyd, qrencode, libstdcpp
+Depends: luci-base, rpcd-mod-ucode, curl, openssl-util, script-utils, ttyd, qrencode, libstdcpp, shadow-utils, shadow-su
 Section: luci
 Architecture: all
 Installed-Size: 0
@@ -187,7 +187,7 @@ cat >> "$STATUS_FILE" << STEOF
 
 Package: $PKG
 Version: $PKG_VER
-Depends: luci-base, rpcd-mod-ucode, curl, openssl-util, script-utils, ttyd, qrencode, libstdcpp
+Depends: luci-base, rpcd-mod-ucode, curl, openssl-util, script-utils, ttyd, qrencode, libstdcpp, shadow-utils, shadow-su
 Status: install user installed
 Architecture: all
 Conffiles:

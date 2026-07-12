@@ -95,7 +95,7 @@ mkdir -p "$CTRL_DIR"
 cat > "$CTRL_DIR/control" << EOF
 Package: ${PKG_NAME}
 Version: ${PKG_VERSION}-${PKG_RELEASE}
-Depends: luci-base, rpcd-mod-ucode, curl, openssl-util, script-utils, ttyd, qrencode, libstdcpp
+Depends: luci-base, rpcd-mod-ucode, curl, openssl-util, script-utils, ttyd, qrencode, libstdcpp, shadow-utils, shadow-su
 Source: https://github.com/tonylee2022/luci-app-openclaw
 SourceName: ${PKG_NAME}
 License: GPL-3.0
