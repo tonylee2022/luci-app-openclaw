@@ -93,8 +93,8 @@ opkg install "luci-app-openclaw_${VER}-1_all.ipk"
 
 ```bash
 VER=$(curl -sI "https://github.com/tonylee2022/luci-app-openclaw/releases/latest" 2>/dev/null | grep -i "location:" | sed 's/.*tag\/v\{0,1\}//' | tr -d '\r\n')
-wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}/luci-app-openclaw-${VER}-1.apk"
-apk add --allow-untrusted "luci-app-openclaw-${VER}-1.apk"
+wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}/luci-app-openclaw-${VER}-r1.apk"
+apk add --allow-untrusted "luci-app-openclaw-${VER}-r1.apk"
 ```
 
 ### 方式四：集成到固件编译

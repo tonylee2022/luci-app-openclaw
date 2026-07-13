@@ -25,7 +25,7 @@ PKG_NAME="luci-app-openclaw"
 PKG_VERSION=$(sed -n 's/^PKG_VERSION:=[[:space:]]*//p' "$PKG_DIR/Makefile" | tr -d '[:space:]')
 [ -n "$PKG_VERSION" ] || PKG_VERSION="1.0.0"
 PKG_RELEASE="1"
-PKG_VERSION_RELEASE="${PKG_VERSION}-${PKG_RELEASE}"
+PKG_VERSION_RELEASE="${PKG_VERSION}-r${PKG_RELEASE}"
 PKG_ARCH="noarch"
 PKG_DEPENDS="luci-base rpcd-mod-ucode curl openssl-util script-utils ttyd qrencode libstdcpp shadow-utils shadow-su"
 

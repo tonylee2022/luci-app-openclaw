@@ -16,8 +16,8 @@ grep -q 'IPK_FILE="$OUT_DIR/${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"' 
 grep -q '\${BUILD_RUN:-1}' scripts/build_ipk.sh || \
 	fail "ipk package builder must allow workflow to skip duplicate run build"
 
-grep -q 'PKG_VERSION_RELEASE="${PKG_VERSION}-${PKG_RELEASE}"' scripts/build_apk.sh || \
-	fail "apk version must use OpenWrt VERSION-RELEASE without -r"
+grep -q 'PKG_VERSION_RELEASE="${PKG_VERSION}-r${PKG_RELEASE}"' scripts/build_apk.sh || \
+	fail "apk version must use apk-tools VERSION-rRELEASE format"
 grep -q 'PKG_ARCH="noarch"' scripts/build_apk.sh || \
 	fail "apk arch must be noarch for all/LuCI packages"
 grep -q 'APK_FILE="$OUT_DIR/${PKG_NAME}-${PKG_VERSION_RELEASE}.apk"' scripts/build_apk.sh || \
@@ -39,5 +39,7 @@ grep -q 'OpenWrt 23.05-24.10 / opkg .ipk' .github/workflows/build.yml || \
 	fail "release body must label ipk compatibility"
 grep -q 'OpenWrt 25.12+ / apk .apk' .github/workflows/build.yml || \
 	fail "release body must label apk compatibility"
+grep -q 'luci-app-openclaw-${{ steps.version.outputs.version }}-r1.apk' .github/workflows/build.yml || \
+	fail "release body must use apk-tools -r release suffix"
 
 echo ok

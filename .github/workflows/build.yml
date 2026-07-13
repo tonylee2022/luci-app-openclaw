@@ -154,8 +154,8 @@ jobs:
 
             **安装方式三：OpenWrt 25.12+ / apk .apk**
             ```bash
-            wget https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${{ steps.version.outputs.version }}/luci-app-openclaw-${{ steps.version.outputs.version }}-1.apk
-            apk add --allow-untrusted luci-app-openclaw-${{ steps.version.outputs.version }}-1.apk
+            wget https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${{ steps.version.outputs.version }}/luci-app-openclaw-${{ steps.version.outputs.version }}-r1.apk
+            apk add --allow-untrusted luci-app-openclaw-${{ steps.version.outputs.version }}-r1.apk
             ```
 
             [使用文档](https://github.com/tonylee2022/luci-app-openclaw#readme) · [问题反馈](https://github.com/tonylee2022/luci-app-openclaw/issues)
