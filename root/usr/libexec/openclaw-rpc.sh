@@ -246,9 +246,26 @@ case "${1:-}" in
 	upgrade)
 		version="${2:-}"
 		echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Invalid version format"
-		url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-app-openclaw_${version}-1_all.ipk"
+		if command -v apk >/dev/null 2>&1 && { [ -d /lib/apk/db ] || [ -d /usr/lib/apk/db ]; }; then
+			pkg_url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-app-openclaw-${version}-r1.apk"
+			i18n_url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-i18n-openclaw-zh-cn-${version}-r1.apk"
+			pkg_file="/tmp/luci-app-openclaw-update.apk"
+			i18n_file="/tmp/luci-i18n-openclaw-zh-cn-update.apk"
+			install_cmd="apk add --allow-untrusted $(oc_quote "$pkg_file")"
+			i18n_install_cmd="apk add --allow-untrusted $(oc_quote "$i18n_file")"
+		elif command -v opkg >/dev/null 2>&1; then
+			pkg_url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-app-openclaw_${version}-1_all.ipk"
+			i18n_url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-i18n-openclaw-zh-cn_${version}-1_all.ipk"
+			pkg_file="/tmp/luci-app-openclaw-update.ipk"
+			i18n_file="/tmp/luci-i18n-openclaw-zh-cn-update.ipk"
+			install_cmd="opkg install --force-reinstall $(oc_quote "$pkg_file")"
+			i18n_install_cmd="opkg install --force-reinstall $(oc_quote "$i18n_file")"
+		else
+			fail "No supported package manager found (opkg/apk)"
+		fi
 		# opkg --force-reinstall 会用包内默认值覆盖 conffile /etc/config/openclaw(install_path/port/bind/token/enabled),
-		# 故升级前抓取用户当前配置, 在 opkg(含 postinst)之后还原, 避免设置丢失。配置不可读时(oip 为空)跳过还原以免清空。
+		# apk 升级同样会触发包脚本/配置文件处理。升级前抓取用户当前配置, 在安装完成后还原, 避免设置丢失。
+		# 配置不可读时(oip 为空)跳过还原以免清空。
 		oip=$(uci -q get openclaw.main.install_path || true)
 		oport=$(uci -q get openclaw.main.port || true)
 		obind=$(uci -q get openclaw.main.bind || true)
@@ -264,7 +281,7 @@ case "${1:-}" in
 			[ -z "$oen" ] || restore="$restore uci set openclaw.main.enabled=$(oc_quote "$oen");"
 			restore="$restore uci commit openclaw;"
 		fi
-		cmd="curl -fsSL --connect-timeout 15 --max-time 120 -o /tmp/luci-app-openclaw-update.ipk $(oc_quote "$url"); rc=\$?; if [ \$rc -ne 0 ]; then echo 'Download failed'; exit \$rc; fi; opkg install --force-reinstall /tmp/luci-app-openclaw-update.ipk; rc=\$?; rm -f /tmp/luci-app-openclaw-update.ipk; ${restore} exit \$rc"
+		cmd="curl -fsSL --connect-timeout 15 --max-time 120 -o $(oc_quote "$pkg_file") $(oc_quote "$pkg_url"); rc=\$?; if [ \$rc -ne 0 ]; then echo 'Download failed'; exit \$rc; fi; curl -fsSL --connect-timeout 15 --max-time 120 -o $(oc_quote "$i18n_file") $(oc_quote "$i18n_url") || { echo 'i18n package download failed, skip i18n update'; rm -f $(oc_quote "$i18n_file"); }; $install_cmd; rc=\$?; if [ \$rc -eq 0 ] && [ -f $(oc_quote "$i18n_file") ]; then $i18n_install_cmd || echo 'i18n package install failed, main package upgraded'; fi; rm -f $(oc_quote "$pkg_file") $(oc_quote "$i18n_file"); ${restore} exit \$rc"
 		start_task /tmp/openclaw-plugin-upgrade "$cmd"
 		;;
 	cli-doctor-lint)

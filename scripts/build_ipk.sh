@@ -15,6 +15,7 @@ case "$OUT_DIR" in
 esac
 mkdir -p "$OUT_DIR"
 PKG_NAME="luci-app-openclaw"
+I18N_PKG_NAME="luci-i18n-openclaw-zh-cn"
 PKG_VERSION=$(sed -n 's/^PKG_VERSION:=[[:space:]]*//p' "$PKG_DIR/Makefile" | tr -d '[:space:]')
 [ -n "$PKG_VERSION" ] || PKG_VERSION="1.0.0"
 PKG_RELEASE="1"
@@ -57,17 +58,9 @@ mkdir -p "$DATA_DIR/www/luci-static/resources/openclaw" "$DATA_DIR/www/luci-stat
 cp "$PKG_DIR/htdocs/luci-static/resources/openclaw/"* "$DATA_DIR/www/luci-static/resources/openclaw/"
 cp "$PKG_DIR/htdocs/luci-static/resources/view/openclaw/"*.js "$DATA_DIR/www/luci-static/resources/view/openclaw/"
 
-# LuCI i18n 中文语言包: po -> lmo (纯 Python po2lmo, 无需 OpenWrt SDK)。
-# 文件名用 LuCI 的简体中文别名 zh-cn (对应 po/zh_Hans/, 见 luci.mk LUCI_LC_ALIAS)。
-if [ -f "$PKG_DIR/po/zh_Hans/openclaw.po" ]; then
-	if command -v python3 >/dev/null 2>&1; then
-		mkdir -p "$DATA_DIR/usr/lib/lua/luci/i18n"
-		python3 "$PKG_DIR/scripts/po2lmo.py" "$PKG_DIR/po/zh_Hans/openclaw.po" \
-			"$DATA_DIR/usr/lib/lua/luci/i18n/openclaw.zh-cn.lmo"
-	else
-		echo "警告: 未找到 python3, 跳过中文语言包生成 (界面将仅显示英文)" >&2
-	fi
-fi
+# LuCI i18n 中文语言包不放入 .ipk 主包。
+# OpenWrt 标准包会把翻译拆到 luci-i18n-openclaw-zh-cn；主包也携带
+# 同名 lmo 时，升级会与 i18n 包发生文件所有权冲突。
 
 # LuCI menu and rpcd ucode backend
 mkdir -p "$DATA_DIR/usr/share/luci/menu.d" "$DATA_DIR/usr/share/rpcd/ucode"
@@ -244,13 +237,83 @@ rm -f "$IPK_FILE"
 (cd "$STAGING" && ar r "$IPK_FILE" debian-binary control.tar.gz data.tar.gz >/dev/null)
 
 IPK_SIZE=$(wc -c < "$IPK_FILE" | tr -d ' ')
+
+I18N_IPK_FILE=""
+I18N_INSTALLED_SIZE=""
+if [ -f "$PKG_DIR/po/zh_Hans/openclaw.po" ]; then
+	if command -v python3 >/dev/null 2>&1; then
+		I18N_DATA_DIR="$STAGING/i18n-data"
+		I18N_CTRL_DIR="$STAGING/i18n-control"
+		I18N_PKG_DIR="$STAGING/i18n-pkg"
+		mkdir -p "$I18N_DATA_DIR/usr/lib/lua/luci/i18n" "$I18N_CTRL_DIR" "$I18N_PKG_DIR"
+
+		python3 "$PKG_DIR/scripts/po2lmo.py" "$PKG_DIR/po/zh_Hans/openclaw.po" \
+			"$I18N_DATA_DIR/usr/lib/lua/luci/i18n/openclaw.zh-cn.lmo"
+
+		I18N_INSTALLED_SIZE=$(du -sk "$I18N_DATA_DIR" | awk '{print $1}')
+		(cd "$I18N_DATA_DIR" && tar czf "$I18N_PKG_DIR/data.tar.gz" .)
+
+		cat > "$I18N_CTRL_DIR/control" << EOF
+Package: ${I18N_PKG_NAME}
+Version: ${PKG_VERSION}-${PKG_RELEASE}
+Depends: ${PKG_NAME}
+Source: https://github.com/tonylee2022/luci-app-openclaw
+SourceName: ${PKG_NAME}
+License: GPL-3.0
+Section: luci
+SourceDateEpoch: $(date +%s)
+Maintainer: tonylee2022 <tonylee2022@users.noreply.github.com>
+Architecture: all
+Installed-Size: ${I18N_INSTALLED_SIZE}
+Description: Simplified Chinese translation for luci-app-openclaw
+EOF
+
+		cat > "$I18N_CTRL_DIR/postinst" << 'EOF'
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] || {
+	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* /tmp/luci-indexcache.*.json 2>/dev/null
+	exit 0
+}
+EOF
+		chmod +x "$I18N_CTRL_DIR/postinst"
+
+		cat > "$I18N_CTRL_DIR/postrm" << 'EOF'
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] || {
+	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* /tmp/luci-indexcache.*.json 2>/dev/null
+	exit 0
+}
+EOF
+		chmod +x "$I18N_CTRL_DIR/postrm"
+
+		(cd "$I18N_CTRL_DIR" && tar czf "$I18N_PKG_DIR/control.tar.gz" .)
+		echo "2.0" > "$I18N_PKG_DIR/debian-binary"
+
+		I18N_IPK_FILE="$OUT_DIR/${I18N_PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"
+		rm -f "$I18N_IPK_FILE"
+		(cd "$I18N_PKG_DIR" && ar r "$I18N_IPK_FILE" debian-binary control.tar.gz data.tar.gz >/dev/null)
+	else
+		echo "警告: 未找到 python3, 跳过中文语言包生成 (界面将仅显示英文)" >&2
+	fi
+fi
+
 echo ""
 echo "=== 构建完成 ==="
 echo "输出文件: $IPK_FILE"
 echo "文件大小: ${IPK_SIZE} bytes"
 echo "安装大小: ${INSTALLED_SIZE} KB"
+if [ -n "$I18N_IPK_FILE" ]; then
+	I18N_IPK_SIZE=$(wc -c < "$I18N_IPK_FILE" | tr -d ' ')
+	echo "语言包: $I18N_IPK_FILE"
+	echo "语言包大小: ${I18N_IPK_SIZE} bytes"
+	echo "语言包安装大小: ${I18N_INSTALLED_SIZE} KB"
+fi
 echo ""
-echo "安装方法: opkg install ${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"
+if [ -n "$I18N_IPK_FILE" ]; then
+	echo "安装方法: opkg install ${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk ${I18N_PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"
+else
+	echo "安装方法: opkg install ${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"
+fi
 
 if [ "${BUILD_RUN:-1}" != "0" ]; then
 	# ── 同步构建 .run 包 ──

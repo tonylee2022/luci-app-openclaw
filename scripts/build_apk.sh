@@ -22,6 +22,7 @@ esac
 mkdir -p "$OUT_DIR"
 
 PKG_NAME="luci-app-openclaw"
+I18N_PKG_NAME="luci-i18n-openclaw-zh-cn"
 PKG_VERSION=$(sed -n 's/^PKG_VERSION:=[[:space:]]*//p' "$PKG_DIR/Makefile" | tr -d '[:space:]')
 [ -n "$PKG_VERSION" ] || PKG_VERSION="1.0.0"
 PKG_RELEASE="1"
@@ -78,16 +79,9 @@ mkdir -p "$DATA_DIR/www/luci-static/resources/openclaw" "$DATA_DIR/www/luci-stat
 cp "$PKG_DIR/htdocs/luci-static/resources/openclaw/"* "$DATA_DIR/www/luci-static/resources/openclaw/"
 cp "$PKG_DIR/htdocs/luci-static/resources/view/openclaw/"*.js "$DATA_DIR/www/luci-static/resources/view/openclaw/"
 
-# LuCI i18n 中文语言包
-if [ -f "$PKG_DIR/po/zh_Hans/openclaw.po" ]; then
-	if command -v python3 >/dev/null 2>&1; then
-		mkdir -p "$DATA_DIR/usr/lib/lua/luci/i18n"
-		python3 "$PKG_DIR/scripts/po2lmo.py" "$PKG_DIR/po/zh_Hans/openclaw.po" \
-			"$DATA_DIR/usr/lib/lua/luci/i18n/openclaw.zh-cn.lmo"
-	else
-		echo "警告: 未找到 python3, 跳过中文语言包生成 (界面将仅显示英文)" >&2
-	fi
-fi
+# LuCI i18n 中文语言包不放入 .apk 主包。
+# OpenWrt 25.12+ 的 apk 包体系会把翻译拆到 luci-i18n-openclaw-zh-cn；
+# 若主包也携带同名 lmo，升级时会与该 i18n 包发生文件所有权冲突。
 
 # LuCI menu and rpcd ucode backend
 mkdir -p "$DATA_DIR/usr/share/luci/menu.d" "$DATA_DIR/usr/share/rpcd/ucode"
@@ -281,10 +275,10 @@ rm -f "$APK_FILE"
 	--info "arch:${PKG_ARCH}" \
 	--info "license:GPL-3.0" \
 	--info "origin:${PKG_NAME}" \
-		--info "url:https://github.com/tonylee2022/luci-app-openclaw" \
-		--info "maintainer:tonylee2022 <tonylee2022@users.noreply.github.com>" \
-		--info "depends:${PKG_DEPENDS}" \
-		--script "post-install:${SCRIPT_DIR_TMP}/post-install" \
+	--info "url:https://github.com/tonylee2022/luci-app-openclaw" \
+	--info "maintainer:tonylee2022 <tonylee2022@users.noreply.github.com>" \
+	--info "depends:${PKG_DEPENDS}" \
+	--script "post-install:${SCRIPT_DIR_TMP}/post-install" \
 	--script "post-upgrade:${SCRIPT_DIR_TMP}/post-upgrade" \
 	--script "pre-deinstall:${SCRIPT_DIR_TMP}/pre-deinstall" \
 	--script "post-deinstall:${SCRIPT_DIR_TMP}/post-deinstall" \
@@ -292,10 +286,83 @@ rm -f "$APK_FILE"
 	--output "$APK_FILE"
 
 APK_SIZE=$(wc -c < "$APK_FILE" | tr -d ' ')
+
+I18N_APK_FILE=""
+I18N_INSTALLED_SIZE=""
+if [ -f "$PKG_DIR/po/zh_Hans/openclaw.po" ]; then
+	if command -v python3 >/dev/null 2>&1; then
+		I18N_DATA_DIR="$STAGING/i18n-data"
+		mkdir -p "$I18N_DATA_DIR/usr/lib/lua/luci/i18n" "$I18N_DATA_DIR/lib/apk/packages"
+
+		python3 "$PKG_DIR/scripts/po2lmo.py" "$PKG_DIR/po/zh_Hans/openclaw.po" \
+			"$I18N_DATA_DIR/usr/lib/lua/luci/i18n/openclaw.zh-cn.lmo"
+
+		(cd "$I18N_DATA_DIR" && find . -type f -o -type l) | sed 's|^\./|/|' | sort > "$I18N_DATA_DIR/lib/apk/packages/${I18N_PKG_NAME}.list"
+		I18N_INSTALLED_SIZE=$(du -sk "$I18N_DATA_DIR" | awk '{print $1}')
+
+		cat > "$SCRIPT_DIR_TMP/i18n-post-install" << 'EOF'
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] || {
+	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* /tmp/luci-indexcache.*.json 2>/dev/null
+	exit 0
+}
+EOF
+		chmod +x "$SCRIPT_DIR_TMP/i18n-post-install"
+
+		cat > "$SCRIPT_DIR_TMP/i18n-post-upgrade" << 'EOF'
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] || {
+	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* /tmp/luci-indexcache.*.json 2>/dev/null
+	exit 0
+}
+EOF
+		chmod +x "$SCRIPT_DIR_TMP/i18n-post-upgrade"
+
+		cat > "$SCRIPT_DIR_TMP/i18n-post-deinstall" << 'EOF'
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] || {
+	rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* /tmp/luci-indexcache.*.json 2>/dev/null
+	exit 0
+}
+EOF
+		chmod +x "$SCRIPT_DIR_TMP/i18n-post-deinstall"
+
+		I18N_APK_FILE="$OUT_DIR/${I18N_PKG_NAME}-${PKG_VERSION_RELEASE}.apk"
+		rm -f "$I18N_APK_FILE"
+		"$APK_TOOL" mkpkg \
+			--info "name:${I18N_PKG_NAME}" \
+			--info "version:${PKG_VERSION_RELEASE}" \
+			--info "description:Simplified Chinese translation for luci-app-openclaw" \
+			--info "arch:${PKG_ARCH}" \
+			--info "license:GPL-3.0" \
+			--info "origin:${PKG_NAME}" \
+			--info "url:https://github.com/tonylee2022/luci-app-openclaw" \
+			--info "maintainer:tonylee2022 <tonylee2022@users.noreply.github.com>" \
+			--info "depends:${PKG_NAME}" \
+			--script "post-install:${SCRIPT_DIR_TMP}/i18n-post-install" \
+			--script "post-upgrade:${SCRIPT_DIR_TMP}/i18n-post-upgrade" \
+			--script "post-deinstall:${SCRIPT_DIR_TMP}/i18n-post-deinstall" \
+			--files "$I18N_DATA_DIR" \
+			--output "$I18N_APK_FILE"
+	else
+		echo "警告: 未找到 python3, 跳过中文语言包生成 (界面将仅显示英文)" >&2
+	fi
+fi
+
 echo ""
 echo "=== 构建完成 ==="
 echo "输出文件: $APK_FILE"
 echo "文件大小: ${APK_SIZE} bytes"
 echo "安装大小: ${INSTALLED_SIZE} KB"
+if [ -n "$I18N_APK_FILE" ]; then
+	I18N_APK_SIZE=$(wc -c < "$I18N_APK_FILE" | tr -d ' ')
+	echo "语言包: $I18N_APK_FILE"
+	echo "语言包大小: ${I18N_APK_SIZE} bytes"
+	echo "语言包安装大小: ${I18N_INSTALLED_SIZE} KB"
+fi
 echo ""
-echo "安装方法: apk add --allow-untrusted ${PKG_NAME}-${PKG_VERSION_RELEASE}.apk"
+if [ -n "$I18N_APK_FILE" ]; then
+	echo "安装方法: apk add --allow-untrusted ${PKG_NAME}-${PKG_VERSION_RELEASE}.apk ${I18N_PKG_NAME}-${PKG_VERSION_RELEASE}.apk"
+else
+	echo "安装方法: apk add --allow-untrusted ${PKG_NAME}-${PKG_VERSION_RELEASE}.apk"
+fi

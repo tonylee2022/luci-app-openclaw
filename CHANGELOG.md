@@ -1,5 +1,11 @@
 ﻿# 更新记录
 
+## [1.2.3]
+
+- **规范化拆分发布包**：`.ipk` 与 `.apk` 均拆为主包 `luci-app-openclaw` 和中文语言包 `luci-i18n-openclaw-zh-cn`，主包不再携带 `openclaw.zh-cn.lmo`，避免与 OpenWrt/LuCI 标准 i18n 包发生文件所有权冲突。
+- **修复网页插件升级包格式差异**：插件升级会按系统包管理器选择 `opkg/ipk` 或 `apk/apk` 资产；主包升级必须成功，语言包尽力更新，避免已安装 OpenWrt 官方风格语言包时拖垮主插件升级。
+- **更新工作流与安装文档**：GitHub Actions 同时发布 `.run`、主 `.ipk`、i18n `.ipk`、主 `.apk`、i18n `.apk`，README 与 Release 说明同步改为两包安装命令。
+
 ## [1.2.1]
 
 - **修复插件升级覆盖 UCI 设置**：兼容 `opkg --force-reinstall` 与终端直接执行 `opkg install` 的路径，升级前暂存并在安装后恢复 `enabled`、端口、绑定方式、token 与安装路径，避免升级后开机自启变为关闭或运行环境路径回到默认值。

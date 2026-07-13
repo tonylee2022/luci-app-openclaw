@@ -149,13 +149,15 @@ jobs:
             **安装方式二：OpenWrt 23.05-24.10 / opkg .ipk**
             ```bash
             wget https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${{ steps.version.outputs.version }}/luci-app-openclaw_${{ steps.version.outputs.version }}-1_all.ipk
-            opkg install luci-app-openclaw_${{ steps.version.outputs.version }}-1_all.ipk
+            wget https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${{ steps.version.outputs.version }}/luci-i18n-openclaw-zh-cn_${{ steps.version.outputs.version }}-1_all.ipk
+            opkg install luci-app-openclaw_${{ steps.version.outputs.version }}-1_all.ipk luci-i18n-openclaw-zh-cn_${{ steps.version.outputs.version }}-1_all.ipk
             ```
 
             **安装方式三：OpenWrt 25.12+ / apk .apk**
             ```bash
             wget https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${{ steps.version.outputs.version }}/luci-app-openclaw-${{ steps.version.outputs.version }}-r1.apk
-            apk add --allow-untrusted luci-app-openclaw-${{ steps.version.outputs.version }}-r1.apk
+            wget https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${{ steps.version.outputs.version }}/luci-i18n-openclaw-zh-cn-${{ steps.version.outputs.version }}-r1.apk
+            apk add --allow-untrusted luci-app-openclaw-${{ steps.version.outputs.version }}-r1.apk luci-i18n-openclaw-zh-cn-${{ steps.version.outputs.version }}-r1.apk
             ```
 
             [使用文档](https://github.com/tonylee2022/luci-app-openclaw#readme) · [问题反馈](https://github.com/tonylee2022/luci-app-openclaw/issues)

@@ -89,7 +89,8 @@ sh "luci-app-openclaw_${VER}.run"
 ```bash
 VER=$(curl -sI "https://github.com/tonylee2022/luci-app-openclaw/releases/latest" 2>/dev/null | grep -i "location:" | sed 's/.*tag\/v\{0,1\}//' | tr -d '\r\n')
 wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}/luci-app-openclaw_${VER}-1_all.ipk"
-opkg install "luci-app-openclaw_${VER}-1_all.ipk"
+wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}/luci-i18n-openclaw-zh-cn_${VER}-1_all.ipk"
+opkg install "luci-app-openclaw_${VER}-1_all.ipk" "luci-i18n-openclaw-zh-cn_${VER}-1_all.ipk"
 ```
 
 ### Option 3: OpenWrt 25.12+ / `.apk` package
@@ -97,7 +98,8 @@ opkg install "luci-app-openclaw_${VER}-1_all.ipk"
 ```bash
 VER=$(curl -sI "https://github.com/tonylee2022/luci-app-openclaw/releases/latest" 2>/dev/null | grep -i "location:" | sed 's/.*tag\/v\{0,1\}//' | tr -d '\r\n')
 wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}/luci-app-openclaw-${VER}-r1.apk"
-apk add --allow-untrusted "luci-app-openclaw-${VER}-r1.apk"
+wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}/luci-i18n-openclaw-zh-cn-${VER}-r1.apk"
+apk add --allow-untrusted "luci-app-openclaw-${VER}-r1.apk" "luci-i18n-openclaw-zh-cn-${VER}-r1.apk"
 ```
 
 ### Option 4: Build into firmware

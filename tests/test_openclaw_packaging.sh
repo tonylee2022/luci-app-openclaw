@@ -13,6 +13,10 @@ grep -q 'ar r "$IPK_FILE" debian-binary control.tar.gz data.tar.gz' scripts/buil
 	fail "ipk package must be an ar container for opkg"
 grep -q 'IPK_FILE="$OUT_DIR/${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"' scripts/build_ipk.sh || \
 	fail "ipk filename must keep OpenWrt opkg naming"
+grep -q 'I18N_PKG_NAME="luci-i18n-openclaw-zh-cn"' scripts/build_ipk.sh || \
+	fail "ipk builder must define the LuCI i18n split package"
+grep -q 'I18N_IPK_FILE="$OUT_DIR/${I18N_PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"' scripts/build_ipk.sh || \
+	fail "ipk builder must emit a split LuCI i18n package"
 grep -q '\${BUILD_RUN:-1}' scripts/build_ipk.sh || \
 	fail "ipk package builder must allow workflow to skip duplicate run build"
 
@@ -22,10 +26,18 @@ grep -q 'PKG_ARCH="noarch"' scripts/build_apk.sh || \
 	fail "apk arch must be noarch for all/LuCI packages"
 grep -q 'APK_FILE="$OUT_DIR/${PKG_NAME}-${PKG_VERSION_RELEASE}.apk"' scripts/build_apk.sh || \
 	fail "apk filename must keep OpenWrt apk naming"
+grep -q 'I18N_PKG_NAME="luci-i18n-openclaw-zh-cn"' scripts/build_apk.sh || \
+	fail "apk builder must define the LuCI i18n split package"
+grep -q 'I18N_APK_FILE="$OUT_DIR/${I18N_PKG_NAME}-${PKG_VERSION_RELEASE}.apk"' scripts/build_apk.sh || \
+	fail "apk builder must emit a split LuCI i18n package"
 grep -q '\${PKG_NAME}.conffiles_static' scripts/build_apk.sh || \
 	fail "apk package must include conffiles_static metadata"
 grep -q '\${PKG_NAME}.list' scripts/build_apk.sh || \
 	fail "apk package must include installed file list metadata"
+grep -q 'openclaw.zh-cn.lmo' scripts/build_ipk.sh || \
+	fail "ipk split i18n package must ship LuCI lmo"
+grep -q 'openclaw.zh-cn.lmo' scripts/build_apk.sh || \
+	fail "apk split i18n package must ship LuCI lmo"
 
 grep -q 'BUILD_RUN=0 sh scripts/build_ipk.sh dist' .github/workflows/build.yml || \
 	fail "workflow must build run and ipk as separate artifacts"
@@ -41,5 +53,9 @@ grep -q 'OpenWrt 25.12+ / apk .apk' .github/workflows/build.yml || \
 	fail "release body must label apk compatibility"
 grep -q 'luci-app-openclaw-${{ steps.version.outputs.version }}-r1.apk' .github/workflows/build.yml || \
 	fail "release body must use apk-tools -r release suffix"
+grep -q 'luci-i18n-openclaw-zh-cn_${{ steps.version.outputs.version }}-1_all.ipk' .github/workflows/build.yml || \
+	fail "release body must include split ipk i18n package"
+grep -q 'luci-i18n-openclaw-zh-cn-${{ steps.version.outputs.version }}-r1.apk' .github/workflows/build.yml || \
+	fail "release body must include split apk i18n package"
 
 echo ok

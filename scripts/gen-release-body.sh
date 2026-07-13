@@ -28,11 +28,14 @@ fi
   echo ""
   echo '**在线安装** (需联网，自动下载 Node.js + OpenClaw)'
   echo '```'
-  echo '# iStoreOS'
+  echo '# .run 安装器'
   echo "sh luci-app-openclaw_${VER}.run"
   echo ''
-  echo '# OpenWrt'
-  echo "opkg install luci-app-openclaw_${VER}-1_all.ipk"
+  echo '# OpenWrt 23.05-24.10 / opkg'
+  echo "opkg install luci-app-openclaw_${VER}-1_all.ipk luci-i18n-openclaw-zh-cn_${VER}-1_all.ipk"
+  echo ''
+  echo '# OpenWrt 25.12+ / apk'
+  echo "apk add --allow-untrusted luci-app-openclaw-${VER}-r1.apk luci-i18n-openclaw-zh-cn-${VER}-r1.apk"
   echo '```'
   echo ''
   echo '[使用文档](https://github.com/tonylee2022/luci-app-openclaw#readme) · [问题反馈](https://github.com/tonylee2022/luci-app-openclaw/issues)'

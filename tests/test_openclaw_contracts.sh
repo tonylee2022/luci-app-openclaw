@@ -121,9 +121,15 @@ if grep -qi 'backup / restore\\|backup and restore' README_EN.md; then
 fi
 if grep -q 'system_check:' root/usr/share/rpcd/ucode/luci.openclaw; then fail "write probe must not remain in legacy system_check"; fi
 grep -Eq '\^\(start\|stop\|restart\|enable\|disable\|restart_gateway\)\$' root/usr/share/rpcd/ucode/luci.openclaw || fail "service action allowlist missing"
-grep -Fq -- "-1_all.ipk" root/usr/libexec/openclaw-rpc.sh || fail "upgrade must download ipk package"
-# 网页内升级必须在调用 opkg 前抓取 UCI，并在安装完成后恢复；否则 --force-reinstall
-# 在部分 opkg 版本上会把 install_path/token 等用户设置覆盖为包内默认值。
+grep -Fq -- "-1_all.ipk" root/usr/libexec/openclaw-rpc.sh || fail "upgrade must support opkg/ipk package"
+grep -Fq -- "-r1.apk" root/usr/libexec/openclaw-rpc.sh || fail "upgrade must support apk package"
+grep -Fq -- "luci-i18n-openclaw-zh-cn_\${version}-1_all.ipk" root/usr/libexec/openclaw-rpc.sh || fail "upgrade must include split opkg/ipk i18n package"
+grep -Fq -- "luci-i18n-openclaw-zh-cn-\${version}-r1.apk" root/usr/libexec/openclaw-rpc.sh || fail "upgrade must include split apk i18n package"
+grep -q 'command -v apk' root/usr/libexec/openclaw-rpc.sh || fail "upgrade must detect apk package manager"
+grep -q 'apk add --allow-untrusted' root/usr/libexec/openclaw-rpc.sh || fail "upgrade must install apk package with apk"
+grep -q 'opkg install --force-reinstall' root/usr/libexec/openclaw-rpc.sh || fail "upgrade must install ipk package with opkg"
+# 网页内升级必须在调用包管理器前抓取 UCI，并在安装完成后恢复；否则包管理器安装流程
+# 在部分版本上会把 install_path/token 等用户设置覆盖为包内默认值。
 upgrade_block=$(sed -n '/^[[:space:]]*upgrade)/,/^[[:space:]]*;;/p' root/usr/libexec/openclaw-rpc.sh)
 printf '%s' "$upgrade_block" | grep -q 'oip=$(uci -q get openclaw.main.install_path' || fail "plugin upgrade must snapshot the configured install path"
 printf '%s' "$upgrade_block" | grep -q 'uci commit openclaw' || fail "plugin upgrade must restore and commit the UCI snapshot"
