@@ -101,6 +101,11 @@ grep -Fq 'node: base + ' root/usr/share/rpcd/ucode/luci.openclaw || fail "ucode 
 for method in status system_info install_path_probe update_check setup_log upgrade_log gateway_token wechat_status wechat_install_log wechat_login_status wechat_update_check service_action setup uninstall upgrade wechat_install wechat_login wechat_logout wechat_upgrade wechat_uninstall secrets_audit; do
 	grep -q "${method}:" root/usr/share/rpcd/ucode/luci.openclaw || fail "missing rpc method: $method"
 done
+grep -q 'function semver_gt' root/usr/share/rpcd/ucode/luci.openclaw || fail "plugin update check must compare semantic versions"
+grep -q 'plugin_has_update: !!latest && semver_gt(latest, current)' root/usr/share/rpcd/ucode/luci.openclaw || fail "plugin update check must only offer newer versions"
+if grep -q 'plugin_has_update: !!latest && current != latest' root/usr/share/rpcd/ucode/luci.openclaw; then
+	fail "plugin update check must not treat any version mismatch as an upgrade"
+fi
 
 # 备份恢复功能已整体移除: 不得有任何 backup action/方法/helper 残留。
 if grep -qi 'backup' root/usr/libexec/openclaw-rpc.sh root/usr/share/rpcd/ucode/luci.openclaw root/usr/share/rpcd/acl.d/luci-app-openclaw.json htdocs/luci-static/resources/openclaw/api.js htdocs/luci-static/resources/view/openclaw/overview.js; then

@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -159,3 +160,17 @@ jobs:
             ```
 
             [使用文档](https://github.com/tonylee2022/luci-app-openclaw#readme) · [问题反馈](https://github.com/tonylee2022/luci-app-openclaw/issues)
+
+      - name: Cleanup old workflow runs
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_WORKFLOW_RUNS: 4
+        run: |
+          echo "Keeping latest ${KEEP_WORKFLOW_RUNS} completed runs for ${GITHUB_WORKFLOW}"
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow "$GITHUB_WORKFLOW" --status completed --limit 100 --json databaseId \
+            --jq '.[].databaseId' | awk "NR > ${KEEP_WORKFLOW_RUNS}" | while read -r run_id; do
+              [ -n "$run_id" ] || continue
+              echo "Deleting old workflow run: $run_id"
+              gh run delete "$run_id" --repo "$GITHUB_REPOSITORY" || true
+            done

@@ -9,8 +9,8 @@ fail() {
 [ -f scripts/build_ipk.sh ] || fail "build_ipk.sh missing"
 [ -f scripts/build_apk.sh ] || fail "build_apk.sh missing"
 
-grep -q 'ar r "$IPK_FILE" debian-binary control.tar.gz data.tar.gz' scripts/build_ipk.sh || \
-	fail "ipk package must be an ar container for opkg"
+grep -q 'tar czf "$IPK_FILE" debian-binary control.tar.gz data.tar.gz' scripts/build_ipk.sh || \
+	fail "ipk package must be a gzip tar container for this opkg"
 grep -q 'IPK_FILE="$OUT_DIR/${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"' scripts/build_ipk.sh || \
 	fail "ipk filename must keep OpenWrt opkg naming"
 grep -q 'I18N_PKG_NAME="luci-i18n-openclaw-zh-cn"' scripts/build_ipk.sh || \
@@ -55,6 +55,14 @@ grep -q 'sh scripts/build_apk.sh dist' .github/workflows/build.yml || \
 	fail "workflow must call apk package helper"
 grep -q 'dist/\*.run dist/\*.ipk dist/\*.apk' .github/workflows/build.yml || \
 	fail "workflow checksums must include run, ipk, and apk outputs"
+grep -q 'actions: write' .github/workflows/build.yml || \
+	fail "workflow must allow deleting old workflow runs"
+grep -q 'Cleanup old workflow runs' .github/workflows/build.yml || \
+	fail "workflow must clean up old workflow runs"
+grep -q 'KEEP_WORKFLOW_RUNS: 4' .github/workflows/build.yml || \
+	fail "workflow cleanup must keep a bounded recent run history"
+grep -q 'gh run delete' .github/workflows/build.yml || \
+	fail "workflow cleanup must delete old runs through gh"
 grep -q 'OpenWrt 23.05-24.10 / opkg .ipk' .github/workflows/build.yml || \
 	fail "release body must label ipk compatibility"
 grep -q 'OpenWrt 25.12+ / apk .apk' .github/workflows/build.yml || \

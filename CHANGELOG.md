@@ -1,5 +1,11 @@
 ﻿# 更新记录
 
+## [1.2.6]
+
+- **修复 opkg 安装 `.ipk` 报 malformed**：本地/工作流生成的 `.ipk` 改为当前 OpenWrt/LEDE `opkg` 可识别的 gzip tar 容器，保留 `debian-binary`、`control.tar.gz`、`data.tar.gz` 三段结构，解决插件升级时报 `pkg_init_from_file: Malformed package file` 的问题。
+- **修复升级检测误报降级**：插件升级检测改为语义化版本比较，只有 GitHub latest 版本高于当前安装版本才提示升级；本地预装未发布的新版本时不再显示“发现旧版本可升级”。
+- **维护工作流历史**：Release 工作流会在结束后清理旧运行记录，仅保留最近 4 个 completed runs，避免 Actions artifact 与历史运行长期堆积。
+
 ## [1.2.4]
 
 - **固定插件升级包格式选择**：所有构建产物写入 `/usr/share/openclaw/PACKAGE_FORMAT`，`.ipk` 标记为 `ipk`、`.apk` 标记为 `apk`、`.run` 标记为 `run`；网页插件升级优先按该标记选择 Release 资产和包管理器，旧安装或 `.run` 安装再回退运行时检测。

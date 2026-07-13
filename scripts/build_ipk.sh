@@ -225,7 +225,7 @@ EOF
 
 (cd "$CTRL_DIR" && tar czf "$STAGING/control.tar.gz" .)
 
-# ── 组装 .ipk (OpenWrt/opkg 使用 ar 容器) ──
+# ── 组装 .ipk (当前 OpenWrt/opkg 接受 gzip tar 容器) ──
 mkdir -p "$OUT_DIR"
 IPK_FILE="$OUT_DIR/${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"
 
@@ -234,8 +234,8 @@ echo "2.0" > "$STAGING/debian-binary"
 # 清理旧文件
 rm -f "$IPK_FILE"
 
-# 组装 .ipk: ar 容器中依次放 debian-binary、control.tar.gz、data.tar.gz。
-(cd "$STAGING" && ar r "$IPK_FILE" debian-binary control.tar.gz data.tar.gz >/dev/null)
+# 组装 .ipk: tar 容器中依次放 debian-binary、control.tar.gz、data.tar.gz。
+(cd "$STAGING" && tar czf "$IPK_FILE" debian-binary control.tar.gz data.tar.gz)
 
 IPK_SIZE=$(wc -c < "$IPK_FILE" | tr -d ' ')
 
@@ -292,7 +292,7 @@ EOF
 
 		I18N_IPK_FILE="$OUT_DIR/${I18N_PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"
 		rm -f "$I18N_IPK_FILE"
-		(cd "$I18N_PKG_DIR" && ar r "$I18N_IPK_FILE" debian-binary control.tar.gz data.tar.gz >/dev/null)
+		(cd "$I18N_PKG_DIR" && tar czf "$I18N_IPK_FILE" debian-binary control.tar.gz data.tar.gz)
 	else
 		echo "警告: 未找到 python3, 跳过中文语言包生成 (界面将仅显示英文)" >&2
 	fi

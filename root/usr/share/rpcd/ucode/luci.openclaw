@@ -191,6 +191,20 @@ function install_path_probe(request) {
 	return reply(data.pass, data.pass ? 'Install environment check passed' : 'Install path not writable or insufficient system resources', data);
 }
 
+function semver_gt(a, b) {
+	if (!match(a || '', /^[0-9]+\.[0-9]+\.[0-9]+$/) || !match(b || '', /^[0-9]+\.[0-9]+\.[0-9]+$/))
+		return !!a && a != b;
+	let av = split(a, '.');
+	let bv = split(b, '.');
+	for (let i = 0; i < 3; i++) {
+		let ai = +(av[i] || '0');
+		let bi = +(bv[i] || '0');
+		if (ai > bi) return true;
+		if (ai < bi) return false;
+	}
+	return false;
+}
+
 function update_check() {
 	let current = trim(readfile('/usr/share/openclaw/VERSION') || '');
 	let raw = run("curl -sf --connect-timeout 5 --max-time 10 https://api.github.com/repos/tonylee2022/luci-app-openclaw/releases/latest");
@@ -199,7 +213,7 @@ function update_check() {
 	let latest = replace(`${release?.tag_name || ''}`, /^v/, '');
 	let body = release?.body || '';
 	if (length(body) > 10000) body = substr(body, 0, 10000) + '\n...(content too long, truncated)';
-	return reply(!!latest, latest ? '' : 'Failed to fetch the latest version', { plugin_current: current, plugin_latest: latest, plugin_has_update: !!latest && current != latest, release_notes: body });
+	return reply(!!latest, latest ? '' : 'Failed to fetch the latest version', { plugin_current: current, plugin_latest: latest, plugin_has_update: !!latest && semver_gt(latest, current), release_notes: body });
 }
 
 function gateway_token() {
