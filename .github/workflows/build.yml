@@ -94,7 +94,7 @@ jobs:
         run: |
           chmod +x scripts/build_apk.sh
           docker run --rm -v "$PWD:/work" -w /work alpine:edge sh -c \
-            'apk --version && apk mkpkg --help >/dev/null && apk add --no-cache python3 openssl && sh scripts/build_apk.sh dist'
+            'apk --version && apk add --no-cache python3 openssl && sh scripts/build_apk.sh dist'
 
       - name: List outputs
         run: |
