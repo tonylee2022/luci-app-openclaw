@@ -281,11 +281,10 @@ rm -f "$APK_FILE"
 	--info "arch:${PKG_ARCH}" \
 	--info "license:GPL-3.0" \
 	--info "origin:${PKG_NAME}" \
-	--info "url:https://github.com/tonylee2022/luci-app-openclaw" \
-	--info "maintainer:tonylee2022 <tonylee2022@users.noreply.github.com>" \
-	--info "depends:${PKG_DEPENDS}" \
-	--info "installed-size:${INSTALLED_SIZE}" \
-	--script "post-install:${SCRIPT_DIR_TMP}/post-install" \
+		--info "url:https://github.com/tonylee2022/luci-app-openclaw" \
+		--info "maintainer:tonylee2022 <tonylee2022@users.noreply.github.com>" \
+		--info "depends:${PKG_DEPENDS}" \
+		--script "post-install:${SCRIPT_DIR_TMP}/post-install" \
 	--script "post-upgrade:${SCRIPT_DIR_TMP}/post-upgrade" \
 	--script "pre-deinstall:${SCRIPT_DIR_TMP}/pre-deinstall" \
 	--script "post-deinstall:${SCRIPT_DIR_TMP}/post-deinstall" \
