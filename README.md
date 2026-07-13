@@ -54,7 +54,7 @@ OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 
 | 项目 | 要求 |
 |------|------|
-| 固件 | OpenWrt **23.05+** 及其衍生版（LEDE / ImmortalWrt / iStoreOS 等） |
+| 固件 | OpenWrt **23.05+** 及其衍生版（LEDE / ImmortalWrt / iStoreOS 等）；23.05-24.10 使用 `.ipk`，25.12+ 使用 `.apk` |
 | 架构 | x86_64 或 aarch64 (ARM64) |
 | C 库 | musl（自动检测） |
 | 依赖 | luci-base、rpcd-mod-ucode、curl、openssl-util、tar、ttyd、qrencode、libstdcpp |
@@ -81,7 +81,7 @@ wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}
 sh "luci-app-openclaw_${VER}.run"
 ```
 
-### 方式二：.ipk 安装
+### 方式二：OpenWrt 23.05-24.10 / `.ipk` 安装
 
 ```bash
 VER=$(curl -sI "https://github.com/tonylee2022/luci-app-openclaw/releases/latest" 2>/dev/null | grep -i "location:" | sed 's/.*tag\/v\{0,1\}//' | tr -d '\r\n')
@@ -89,7 +89,15 @@ wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}
 opkg install "luci-app-openclaw_${VER}-1_all.ipk"
 ```
 
-### 方式三：集成到固件编译
+### 方式三：OpenWrt 25.12+ / `.apk` 安装
+
+```bash
+VER=$(curl -sI "https://github.com/tonylee2022/luci-app-openclaw/releases/latest" 2>/dev/null | grep -i "location:" | sed 's/.*tag\/v\{0,1\}//' | tr -d '\r\n')
+wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}/luci-app-openclaw-${VER}-1.apk"
+apk add --allow-untrusted "luci-app-openclaw-${VER}-1.apk"
+```
+
+### 方式四：集成到固件编译
 
 ```bash
 cd /path/to/openwrt
@@ -215,7 +223,7 @@ luci-app-openclaw/
 │           ├── luci/menu.d/          # LuCI 菜单
 │           ├── rpcd/                 # ucode API 与 ACL
 │           └── openclaw/             # VERSION 等共享资源
-├── scripts/                          # .ipk / .run 构建与发布脚本
+├── scripts/                          # .ipk / .apk / .run 构建与发布脚本
 └── .github/workflows/                # 在线构建并发布到 GitHub Release
 ```
 

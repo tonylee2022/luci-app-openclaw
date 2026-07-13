@@ -57,7 +57,7 @@ Run OpenClaw on your router and use LuCI to install its runtime, manage the serv
 
 | Item | Requirement |
 |------|-------------|
-| Firmware | OpenWrt **23.05+** or a derivative such as LEDE, ImmortalWrt, or iStoreOS |
+| Firmware | OpenWrt **23.05+** or a derivative such as LEDE, ImmortalWrt, or iStoreOS; use `.ipk` on 23.05-24.10 and `.apk` on 25.12+ |
 | Architecture | x86_64 or aarch64 (ARM64) |
 | C library | musl, detected automatically |
 | Dependencies | luci-base, rpcd-mod-ucode, curl, openssl-util, ttyd, qrencode, libstdcpp |
@@ -84,7 +84,7 @@ wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}
 sh "luci-app-openclaw_${VER}.run"
 ```
 
-### Option 2: `.ipk` package
+### Option 2: OpenWrt 23.05-24.10 / `.ipk` package
 
 ```bash
 VER=$(curl -sI "https://github.com/tonylee2022/luci-app-openclaw/releases/latest" 2>/dev/null | grep -i "location:" | sed 's/.*tag\/v\{0,1\}//' | tr -d '\r\n')
@@ -92,7 +92,15 @@ wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}
 opkg install "luci-app-openclaw_${VER}-1_all.ipk"
 ```
 
-### Option 3: Build into firmware
+### Option 3: OpenWrt 25.12+ / `.apk` package
+
+```bash
+VER=$(curl -sI "https://github.com/tonylee2022/luci-app-openclaw/releases/latest" 2>/dev/null | grep -i "location:" | sed 's/.*tag\/v\{0,1\}//' | tr -d '\r\n')
+wget "https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${VER}/luci-app-openclaw-${VER}-1.apk"
+apk add --allow-untrusted "luci-app-openclaw-${VER}-1.apk"
+```
+
+### Option 4: Build into firmware
 
 ```bash
 cd /path/to/openwrt
@@ -218,7 +226,7 @@ luci-app-openclaw/
 │           ├── luci/menu.d/          # LuCI menu
 │           ├── rpcd/                 # ucode API and ACL
 │           └── openclaw/             # Generated VERSION and shared resources
-├── scripts/                          # .ipk/.run build and release scripts
+├── scripts/                          # .ipk/.apk/.run build and release scripts
 └── .github/workflows/                # CI builds and GitHub Releases
 ```
 

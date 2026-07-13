@@ -231,7 +231,7 @@ EOF
 
 (cd "$CTRL_DIR" && tar czf "$STAGING/control.tar.gz" .)
 
-# ── 组装 .ipk (ar 格式) ──
+# ── 组装 .ipk (OpenWrt/opkg 使用 ar 容器) ──
 mkdir -p "$OUT_DIR"
 IPK_FILE="$OUT_DIR/${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"
 
@@ -240,8 +240,8 @@ echo "2.0" > "$STAGING/debian-binary"
 # 清理旧文件
 rm -f "$IPK_FILE"
 
-# 组装 .ipk — OpenWrt opkg 使用 tar.gz 格式 (非 Debian 的 ar 格式)
-(cd "$STAGING" && tar czf "$IPK_FILE" debian-binary control.tar.gz data.tar.gz)
+# 组装 .ipk: ar 容器中依次放 debian-binary、control.tar.gz、data.tar.gz。
+(cd "$STAGING" && ar r "$IPK_FILE" debian-binary control.tar.gz data.tar.gz >/dev/null)
 
 IPK_SIZE=$(wc -c < "$IPK_FILE" | tr -d ' ')
 echo ""
@@ -252,7 +252,9 @@ echo "安装大小: ${INSTALLED_SIZE} KB"
 echo ""
 echo "安装方法: opkg install ${PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"
 
-# ── 同步构建 .run 包 ──
-echo ""
-echo "=== 同步构建 .run 包 ==="
-"$SCRIPT_DIR/build_run.sh" "$OUT_DIR"
+if [ "${BUILD_RUN:-1}" != "0" ]; then
+	# ── 同步构建 .run 包 ──
+	echo ""
+	echo "=== 同步构建 .run 包 ==="
+	"$SCRIPT_DIR/build_run.sh" "$OUT_DIR"
+fi

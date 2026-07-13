@@ -71,6 +71,7 @@ jobs:
         run: |
           find root scripts tests -type f \( -name '*.sh' -o -path 'root/usr/bin/*' -o -path 'root/etc/init.d/*' -o -path 'root/etc/uci-defaults/*' \) -exec sh -n {} +
           sh tests/test_openclaw_contracts.sh
+          sh tests/test_openclaw_packaging.sh
           sh tests/test_openclaw_lock.sh
           sh tests/test_openclaw_plugin_policy.sh
           sh tests/test_openclaw_modern_luci.sh
@@ -87,7 +88,13 @@ jobs:
       - name: Build .ipk package
         run: |
           chmod +x scripts/build_ipk.sh
-          sh scripts/build_ipk.sh dist
+          BUILD_RUN=0 sh scripts/build_ipk.sh dist
+
+      - name: Build .apk package
+        run: |
+          chmod +x scripts/build_apk.sh
+          docker run --rm -v "$PWD:/work" -w /work alpine:edge sh -c \
+            'apk --version && apk mkpkg --help >/dev/null && apk add --no-cache python3 openssl && sh scripts/build_apk.sh dist'
 
       - name: List outputs
         run: |
@@ -95,7 +102,7 @@ jobs:
           ls -lh dist/
           echo ""
           echo "=== SHA256 checksums ==="
-          sha256sum dist/*.run dist/*.ipk 2>/dev/null || true
+          sha256sum dist/*.run dist/*.ipk dist/*.apk 2>/dev/null || true
 
       - name: Extract changelog
         id: changelog
@@ -139,10 +146,16 @@ jobs:
             sh luci-app-openclaw_${{ steps.version.outputs.version }}.run
             ```
 
-            **安装方式二：.ipk 安装**
+            **安装方式二：OpenWrt 23.05-24.10 / opkg .ipk**
             ```bash
             wget https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${{ steps.version.outputs.version }}/luci-app-openclaw_${{ steps.version.outputs.version }}-1_all.ipk
             opkg install luci-app-openclaw_${{ steps.version.outputs.version }}-1_all.ipk
+            ```
+
+            **安装方式三：OpenWrt 25.12+ / apk .apk**
+            ```bash
+            wget https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${{ steps.version.outputs.version }}/luci-app-openclaw-${{ steps.version.outputs.version }}-1.apk
+            apk add --allow-untrusted luci-app-openclaw-${{ steps.version.outputs.version }}-1.apk
             ```
 
             [使用文档](https://github.com/tonylee2022/luci-app-openclaw#readme) · [问题反馈](https://github.com/tonylee2022/luci-app-openclaw/issues)
