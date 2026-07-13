@@ -96,6 +96,7 @@ cp "$PKG_DIR/root/usr/share/rpcd/acl.d/"*.json "$DATA_DIR/usr/share/rpcd/acl.d/"
 # openclaw 共享资源
 mkdir -p "$DATA_DIR/usr/share/openclaw"
 printf '%s\n' "$PKG_VERSION" > "$DATA_DIR/usr/share/openclaw/VERSION"
+printf '%s\n' "apk" > "$DATA_DIR/usr/share/openclaw/PACKAGE_FORMAT"
 
 # apk conffile metadata used by OpenWrt package database
 mkdir -p "$DATA_DIR/lib/apk/packages"

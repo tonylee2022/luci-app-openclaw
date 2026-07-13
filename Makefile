@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openclaw
 # 版本号唯一来源 (LuCI 惯例: 写在 Makefile)。构建时由此生成 /usr/share/openclaw/VERSION 供运行时读取。
-PKG_VERSION:=1.2.3
+PKG_VERSION:=1.2.4
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=tonylee2022 <tonylee2022@users.noreply.github.com>
@@ -75,6 +75,7 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_BIN) ./root/usr/share/rpcd/ucode/luci.openclaw $(1)/usr/share/rpcd/ucode/luci.openclaw
 	$(INSTALL_DIR) $(1)/usr/share/openclaw
 	echo "$(PKG_VERSION)" > $(1)/usr/share/openclaw/VERSION
+	if [ "$(CONFIG_USE_APK)" = "y" ]; then echo "apk" > $(1)/usr/share/openclaw/PACKAGE_FORMAT; else echo "ipk" > $(1)/usr/share/openclaw/PACKAGE_FORMAT; fi
 endef
 
 define Package/$(PKG_NAME)/postinst

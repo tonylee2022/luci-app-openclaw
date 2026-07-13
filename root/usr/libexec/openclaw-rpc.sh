@@ -246,14 +246,21 @@ case "${1:-}" in
 	upgrade)
 		version="${2:-}"
 		echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Invalid version format"
-		if command -v apk >/dev/null 2>&1 && { [ -d /lib/apk/db ] || [ -d /usr/lib/apk/db ]; }; then
+		package_format=$(sed -n '1{s/[[:space:]]//g;p;q}' /usr/share/openclaw/PACKAGE_FORMAT 2>/dev/null || true)
+		case "$package_format" in
+			apk|ipk|run|"") ;;
+			*) package_format="" ;;
+		esac
+		if { [ "$package_format" = "apk" ] || [ -z "$package_format" ] || [ "$package_format" = "run" ]; } &&
+			command -v apk >/dev/null 2>&1 && { [ -d /lib/apk/db ] || [ -d /usr/lib/apk/db ]; }; then
 			pkg_url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-app-openclaw-${version}-r1.apk"
 			i18n_url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-i18n-openclaw-zh-cn-${version}-r1.apk"
 			pkg_file="/tmp/luci-app-openclaw-update.apk"
 			i18n_file="/tmp/luci-i18n-openclaw-zh-cn-update.apk"
 			install_cmd="apk add --allow-untrusted $(oc_quote "$pkg_file")"
 			i18n_install_cmd="apk add --allow-untrusted $(oc_quote "$i18n_file")"
-		elif command -v opkg >/dev/null 2>&1; then
+		elif { [ "$package_format" = "ipk" ] || [ -z "$package_format" ] || [ "$package_format" = "run" ]; } &&
+			command -v opkg >/dev/null 2>&1; then
 			pkg_url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-app-openclaw_${version}-1_all.ipk"
 			i18n_url="https://github.com/tonylee2022/luci-app-openclaw/releases/download/v${version}/luci-i18n-openclaw-zh-cn_${version}-1_all.ipk"
 			pkg_file="/tmp/luci-app-openclaw-update.ipk"

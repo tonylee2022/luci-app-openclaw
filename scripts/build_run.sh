@@ -85,6 +85,7 @@ install_files() {
 	# openclaw 共享资源 (运行时版本文件, 由 PKG_VERSION 生成; web-pty/oc-config 配置菜单已退役)
 	mkdir -p "$dest/usr/share/openclaw"
 	printf '%s\n' "$PKG_VERSION" > "$dest/usr/share/openclaw/VERSION"
+	printf '%s\n' "run" > "$dest/usr/share/openclaw/PACKAGE_FORMAT"
 }
 
 # 创建安装器脚本头部

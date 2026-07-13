@@ -75,6 +75,7 @@ cp "$PKG_DIR/root/usr/share/rpcd/acl.d/"*.json "$DATA_DIR/usr/share/rpcd/acl.d/"
 # openclaw 共享资源 (运行时版本文件, 由 PKG_VERSION 生成; web-pty/oc-config 配置菜单已退役)
 mkdir -p "$DATA_DIR/usr/share/openclaw"
 printf '%s\n' "$PKG_VERSION" > "$DATA_DIR/usr/share/openclaw/VERSION"
+printf '%s\n' "ipk" > "$DATA_DIR/usr/share/openclaw/PACKAGE_FORMAT"
 
 # 计算安装大小
 INSTALLED_SIZE=$(du -sk "$DATA_DIR" | awk '{print $1}')

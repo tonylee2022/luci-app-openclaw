@@ -17,6 +17,10 @@ grep -q 'I18N_PKG_NAME="luci-i18n-openclaw-zh-cn"' scripts/build_ipk.sh || \
 	fail "ipk builder must define the LuCI i18n split package"
 grep -q 'I18N_IPK_FILE="$OUT_DIR/${I18N_PKG_NAME}_${PKG_VERSION}-${PKG_RELEASE}_all.ipk"' scripts/build_ipk.sh || \
 	fail "ipk builder must emit a split LuCI i18n package"
+grep -q 'PACKAGE_FORMAT' scripts/build_ipk.sh || \
+	fail "ipk builder must stamp package format"
+grep -q 'printf .*"ipk".*>.*PACKAGE_FORMAT' scripts/build_ipk.sh || \
+	fail "ipk builder must stamp PACKAGE_FORMAT=ipk"
 grep -q '\${BUILD_RUN:-1}' scripts/build_ipk.sh || \
 	fail "ipk package builder must allow workflow to skip duplicate run build"
 
@@ -30,6 +34,10 @@ grep -q 'I18N_PKG_NAME="luci-i18n-openclaw-zh-cn"' scripts/build_apk.sh || \
 	fail "apk builder must define the LuCI i18n split package"
 grep -q 'I18N_APK_FILE="$OUT_DIR/${I18N_PKG_NAME}-${PKG_VERSION_RELEASE}.apk"' scripts/build_apk.sh || \
 	fail "apk builder must emit a split LuCI i18n package"
+grep -q 'PACKAGE_FORMAT' scripts/build_apk.sh || \
+	fail "apk builder must stamp package format"
+grep -q 'printf .*"apk".*>.*PACKAGE_FORMAT' scripts/build_apk.sh || \
+	fail "apk builder must stamp PACKAGE_FORMAT=apk"
 grep -q '\${PKG_NAME}.conffiles_static' scripts/build_apk.sh || \
 	fail "apk package must include conffiles_static metadata"
 grep -q '\${PKG_NAME}.list' scripts/build_apk.sh || \
@@ -57,5 +65,12 @@ grep -q 'luci-i18n-openclaw-zh-cn_${{ steps.version.outputs.version }}-1_all.ipk
 	fail "release body must include split ipk i18n package"
 grep -q 'luci-i18n-openclaw-zh-cn-${{ steps.version.outputs.version }}-r1.apk' .github/workflows/build.yml || \
 	fail "release body must include split apk i18n package"
+
+grep -q 'PACKAGE_FORMAT' scripts/build_run.sh || \
+	fail "run installer must stamp package format"
+grep -q 'printf .*"run".*>.*PACKAGE_FORMAT' scripts/build_run.sh || \
+	fail "run installer must stamp PACKAGE_FORMAT=run"
+grep -q 'CONFIG_USE_APK' Makefile || \
+	fail "Makefile package install must stamp package format from OpenWrt build config"
 
 echo ok

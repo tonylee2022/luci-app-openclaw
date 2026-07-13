@@ -1,5 +1,10 @@
 ﻿# 更新记录
 
+## [1.2.4]
+
+- **固定插件升级包格式选择**：所有构建产物写入 `/usr/share/openclaw/PACKAGE_FORMAT`，`.ipk` 标记为 `ipk`、`.apk` 标记为 `apk`、`.run` 标记为 `run`；网页插件升级优先按该标记选择 Release 资产和包管理器，旧安装或 `.run` 安装再回退运行时检测。
+- **增强打包契约测试**：新增对 `PACKAGE_FORMAT` 的构建脚本、Makefile 与升级逻辑检查，防止后续版本再次把 apk 系统误导到 ipk/opkg 路径。
+
 ## [1.2.3]
 
 - **规范化拆分发布包**：`.ipk` 与 `.apk` 均拆为主包 `luci-app-openclaw` 和中文语言包 `luci-i18n-openclaw-zh-cn`，主包不再携带 `openclaw.zh-cn.lmo`，避免与 OpenWrt/LuCI 标准 i18n 包发生文件所有权冲突。
