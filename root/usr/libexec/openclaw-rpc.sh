@@ -349,7 +349,7 @@ case "${1:-}" in
 			set -- /usr/libexec/openclaw-wizard.sh "$section"
 		fi
 		# 本机无 setsid; 用 nohup 后台启动并脱离 SIGHUP, 使 ttyd 在 rpc.sh 退出后存活。
-		nohup "$ttyd_bin" -p "$port" -i br-lan -o -u "$uid" -g "$gid" -t fontSize=15 -t disableLeaveAlert=true -T xterm-256color "$@" </dev/null >/dev/null 2>&1 &
+		nohup "$ttyd_bin" -p "$port" -i br-lan -o -W -u "$uid" -g "$gid" -t fontSize=15 -t disableLeaveAlert=true -T xterm-256color "$@" </dev/null >/dev/null 2>&1 &
 		echo $! > /var/run/openclaw-wizard.pid
 		# 等 ttyd 监听并把端口回传给调用方 (ucode)。本机 ss 缺失, 用 netstat 检测。
 		i=0

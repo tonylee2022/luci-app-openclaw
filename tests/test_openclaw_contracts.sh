@@ -7,6 +7,7 @@ fail() {
 }
 
 grep -Fq ') </dev/null >/dev/null 2>&1 &' root/usr/libexec/openclaw-rpc.sh || fail "background task shell must detach from rpcd stdio"
+grep -Fq 'nohup "$ttyd_bin" -p "$port" -i br-lan -o -W -u "$uid"' root/usr/libexec/openclaw-rpc.sh || fail "wizard ttyd must allow client keyboard input (-W)"
 grep -Fq 'rm -f "${prefix}.pid"' root/usr/libexec/openclaw-rpc.sh || fail "completed and stale task PID files must be removed"
 
 # 插件版本号唯一来源: Makefile PKG_VERSION (LuCI 惯例)。运行时 VERSION 文件由构建生成, 不入仓库。
