@@ -506,28 +506,59 @@ return view.extend({
 				onLog: function(d) { log.style.display = ''; var text = (d.log || _('Waiting for output...')).split('\n').filter(function(l) { return !/packages? (are|is) looking for funding/.test(l) && !/[Rr]un `npm fund`/.test(l); }).join('\n'); ocui.setLog(log, text); }
 			});
 		};
+		var checkEnvUpgrade = function() {
+			var started = Date.now(), timeoutMs = 240000;
+			return api.envUpgradeCheckStart().then(function(r) {
+				if (!r.ok) throw new Error(r.message || 'Version check failed');
+				return new Promise(function(resolve) {
+					(function tick() {
+						api.envUpgradeCheck().then(function(result) {
+							if (!result.ok) {
+								ocui.setStatus(status, 'error', _(result.message || 'Version check failed'));
+								return resolve();
+							}
+							var d = result.data || {};
+							if (!d.done) {
+								if (Date.now() - started > timeoutMs) {
+									ocui.setStatus(status, 'error', _('Operation timed out; refresh later to check.'));
+									return resolve();
+								}
+								window.setTimeout(tick, 1000);
+								return;
+							}
+							if (!d.has_update) {
+								ocui.setStatus(status, 'success', _('Already up to date (core and plugins, %s)').format(d.current));
+								ocui.hideStatusLater(status);
+								return resolve();
+							}
+							var msg = d.core_update
+								? _('New OpenClaw version %s available (current %s).').format(d.latest, d.current)
+								: _('OpenClaw core is up to date (%s); plugin/dependency updates are available.').format(d.current);
+							window.clearTimeout(status._ocHideTimer);
+							status.className = 'oc-action-status oc-task-warn';
+							status.style.display = '';
+							dom.content(status, [
+								E('span', {}, msg), ' ',
+								ocui.button(_('Upgrade now'), 'cbi-button-action', function() { return run(_('Upgrade OpenClaw'), function() { return api.envUpgradeOpenclaw(); }); })
+							]);
+							resolve();
+						}).catch(function(e) {
+							if (Date.now() - started > timeoutMs) {
+								ocui.setStatus(status, 'error', _(String(e && e.message || e || 'Version check failed')));
+								return resolve();
+							}
+							window.setTimeout(tick, 1000);
+						});
+					})();
+				});
+			});
+		};
 		ui.showModal(_('Runtime upgrade'), [
 			E('p', { 'class': 'oc-muted' }, _('Upgrade runtime components; the gateway restarts automatically to apply changes. "Switch Node version" fully replaces Node with the selected version (including downgrade), no need to uninstall Node first.')),
 			E('div', { 'class': 'oc-actions' }, [
 				ocui.button(_('Upgrade OpenClaw to latest'), 'cbi-button-positive', function() {
 					ocui.setStatus(status, 'running', _('Checking version...'));
-					return api.envUpgradeCheck().then(function(r) {
-						if (!r.ok) { ocui.setStatus(status, 'error', _(r.message || 'Version check failed')); return; }
-						var d = r.data || {};
-						if (!d.has_update) { ocui.setStatus(status, 'success', _('Already up to date (core and plugins, %s)').format(d.current)); ocui.hideStatusLater(status); return; }
-						// 发现可用更新(核心或插件): 内联展示并提供「立即升级」按钮, 不弹窗
-						var msg = d.core_update
-							? _('New OpenClaw version %s available (current %s).').format(d.latest, d.current)
-							: _('OpenClaw core is up to date (%s); plugin/dependency updates are available.').format(d.current);
-						window.clearTimeout(status._ocHideTimer);
-						// 黄色提示有可用更新, 与「已是最新」的绿色区分。
-						status.className = 'oc-action-status oc-task-warn';
-						status.style.display = '';
-						dom.content(status, [
-							E('span', {}, msg), ' ',
-							ocui.button(_('Upgrade now'), 'cbi-button-action', function() { return run(_('Upgrade OpenClaw'), function() { return api.envUpgradeOpenclaw(); }); })
-						]);
-					}).catch(function(e) { ocui.setStatus(status, 'error', _(String(e && e.message || e || 'Version check failed'))); });
+					return checkEnvUpgrade().catch(function(e) { ocui.setStatus(status, 'error', _(String(e && e.message || e || 'Version check failed'))); });
 				}),
 				ocui.button(_('Upgrade npm to latest'), 'cbi-button-action', function() {
 					ocui.setStatus(status, 'running', _('Checking version...'));

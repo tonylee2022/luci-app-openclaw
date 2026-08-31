@@ -126,6 +126,60 @@ msgstr "Bot 在线"
 msgid "Cancel"
 msgstr "取消"
 
+msgid "%s enabled plugins require capability confirmation."
+msgstr "有 %s 个已启用插件需要确认能力。"
+
+msgid "All enabled plugin capabilities are confirmed."
+msgstr "所有已启用插件的能力均已确认。"
+
+msgid "Capability"
+msgstr "能力"
+
+msgid "Capability confirmation completed."
+msgstr "插件能力确认完成。"
+
+msgid "Capability confirmation failed, exit code: %s"
+msgstr "插件能力确认失败，退出码：%s"
+
+msgid "Capability confirmation is running..."
+msgstr "正在确认插件能力..."
+
+msgid "Check after upgrading OpenClaw or plugins; capability changes require explicit confirmation."
+msgstr "升级 OpenClaw 或插件后请检查；能力发生变化时必须明确确认。"
+
+msgid "Check capability consent"
+msgstr "检查能力确认"
+
+msgid "Checking plugin capability consent..."
+msgstr "正在检查插件能力确认状态..."
+
+msgid "Confirm capabilities and fix"
+msgstr "确认能力并修复"
+
+msgid "Confirm plugin capabilities"
+msgstr "确认插件能力"
+
+msgid "Confirming allows each selected plugin to use the capabilities shown below. The server checks the pending state again before applying."
+msgstr "确认后，所选插件将获准使用下列能力；应用前服务器会再次核对待确认状态。"
+
+msgid "Confirming plugin capabilities..."
+msgstr "正在确认插件能力..."
+
+msgid "No capability details reported"
+msgstr "未报告能力详情"
+
+msgid "Only enabled plugins currently blocked by new capability declarations are listed. Nothing is installed or authorized until you review and confirm."
+msgstr "这里只列出因新增能力声明而被阻止的已启用插件；在你审阅并确认前，不会安装或授权任何内容。"
+
+msgid "Plugin capabilities confirmed and applied."
+msgstr "插件能力已确认并应用。"
+
+msgid "Plugin capability consent"
+msgstr "插件能力确认"
+
+msgid "Review and confirm selected plugins"
+msgstr "审阅并确认所选插件"
+
 msgid "Cancel all"
 msgstr "全部取消"
 
@@ -1190,3 +1244,69 @@ msgstr "qrencode 未安装"
 
 msgid "ttyd is not installed (opkg install ttyd)"
 msgstr "ttyd 未安装 (opkg install ttyd)"
+
+msgid "Approve"
+msgstr "批准"
+
+msgid "Approve console access for device \"%s\"?"
+msgstr "批准设备“%s”访问控制台？"
+
+msgid "Approve console device"
+msgstr "批准控制台设备"
+
+msgid "Approving device..."
+msgstr "正在批准设备…"
+
+msgid "Client: %s"
+msgstr "客户端：%s"
+
+msgid "Console device pairing"
+msgstr "控制台设备配对"
+
+msgid "Device approved. Reconnecting the console..."
+msgstr "设备已批准，正在重新连接控制台…"
+
+msgid "Device details are unavailable."
+msgstr "设备详细信息不可用。"
+
+msgid "Device pairing operation failed"
+msgstr "设备配对操作失败"
+
+msgid "Failed to query console device pairing requests"
+msgstr "查询控制台设备配对请求失败"
+
+msgid "No pending console devices. If the console asks for pairing, keep it open and click Refresh requests."
+msgstr "没有待批准的控制台设备。如果控制台提示配对，请保持页面打开并点击“刷新请求”。"
+
+msgid "Origin: %s"
+msgstr "来源 Origin：%s"
+
+msgid "Platform: %s"
+msgstr "平台：%s"
+
+msgid "Refresh requests"
+msgstr "刷新请求"
+
+msgid "Reject"
+msgstr "拒绝"
+
+msgid "Reject console device"
+msgstr "拒绝控制台设备"
+
+msgid "Reject the pairing request from device \"%s\"?"
+msgstr "拒绝设备“%s”的配对请求？"
+
+msgid "Rejecting device..."
+msgstr "正在拒绝设备…"
+
+msgid "Device pairing request rejected."
+msgstr "已拒绝设备配对请求。"
+
+msgid "Requested: %s"
+msgstr "请求时间：%s"
+
+msgid "Source IP: %s"
+msgstr "来源 IP：%s"
+
+msgid "Unknown device"
+msgstr "未知设备"

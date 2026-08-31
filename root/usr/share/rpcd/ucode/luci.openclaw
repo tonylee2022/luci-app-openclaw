@@ -274,15 +274,22 @@ function telegram_status(request) {
 			} catch (e) {}
 		}
 	}
-	// 已配对用户 ID: credentials/telegram-*-allowFrom.json 的 allowFrom 列表(支持多账号)。
+	// 2026.8.1 起配对 allowFrom 已迁入共享 SQLite。优先走只读查询；旧版或数据库不可用时
+	// 回退 credentials/telegram-*-allowFrom.json，兼容尚未迁移的安装。
 	let paired = [];
-	for (let f in split(trim(run('ls ' + shellquote(p.state + '/credentials') + '/telegram-*-allowFrom.json 2>/dev/null') || ''), '\n')) {
-		f = trim(f);
-		if (!length(f)) continue;
-		try {
-			let af = json(readfile(f));
-			if (type(af?.allowFrom) == 'array') for (let x in af.allowFrom) push(paired, `${x}`);
-		} catch (e) {}
+	let pairing_state = null;
+	try { pairing_state = json(run('/usr/libexec/openclaw-rpc.sh telegram-paired-ids 2>/dev/null')); } catch (e) {}
+	if (pairing_state?.available == true && type(pairing_state?.paired_ids) == 'array') {
+		for (let x in pairing_state.paired_ids) push(paired, `${x}`);
+	} else {
+		for (let f in split(trim(run('ls ' + shellquote(p.state + '/credentials') + '/telegram-*-allowFrom.json 2>/dev/null') || ''), '\n')) {
+			f = trim(f);
+			if (!length(f)) continue;
+			try {
+				let af = json(readfile(f));
+				if (type(af?.allowFrom) == 'array') for (let x in af.allowFrom) push(paired, `${x}`);
+			} catch (e) {}
+		}
 	}
 	return reply(true, '', { configured, secret_managed, enabled: tg.enabled == true, bot_id, bot_name, bot_username, paired_ids: paired });
 }
@@ -338,29 +345,47 @@ function secrets_audit() {
 	});
 }
 
-function env_upgrade_check() {
+// 只读列出「已启用且因声明能力变化而等待用户确认」的插件。
+// 后端数据由 OpenClaw 自己的 inspect JSON 生成，不在 LuCI 硬编码插件 ID 或能力类型。
+function plugin_capability_check() {
+	let out = run('/usr/libexec/openclaw-rpc.sh plugin-capability-check');
+	let value;
+	try { value = json(out); } catch (e) { return reply(false, 'Failed to parse plugin capability status'); }
+	if (type(value?.pending) != 'array') return reply(false, 'Invalid plugin capability status');
+	return reply(true, '', { pending: value.pending });
+}
+
+function env_upgrade_check_status() {
 	let p = paths();
 	if (!p) return reply(false, 'Invalid install path');
 	let current = package_version(p.root);
 	if (!current) return reply(false, 'OpenClaw is not installed');
+	let data = task_status('/tmp/openclaw-env-check');
+	if (!data.done) return reply(true, '', data);
+	if (data.exit_code != 0) return reply(false, 'Failed to check for updates (check your network)', data);
 	// 综合判断: 核心(官方 update dry-run 的 target vs current) + 插件(plugins update --all --dry-run)。
-	// 这样核心已最新但插件/依赖有更新时也能升, 与官方 openclaw update 的覆盖一致。
+	// 两条联网命令由后台任务串行执行；本方法只读取结果，避免 rpcd 请求超过 LuCI 的 XHR 时限。
 	let latest = current, core_update = false, queried = false;
 	try {
-		let j = json(run('/usr/bin/openclaw update --dry-run --yes --json 2>/dev/null'));
+		let j = json(readfile('/tmp/openclaw-env-check.core') || '');
 		if (j?.currentVersion) {
 			queried = true;
 			latest = j?.targetVersion ? "" + j.targetVersion : "" + j.currentVersion;
 			core_update = "" + j.currentVersion != latest;
 		}
 	} catch (e) {}
-	if (!queried) return reply(false, 'Failed to check for updates (check your network)');
+	if (!queried) return reply(false, 'Failed to parse update check result', data);
 	let plugin_update = false;
-	for (let line in split(run('/usr/bin/openclaw plugins update --all --dry-run 2>/dev/null') || '', '\n')) {
+	for (let line in split(readfile('/tmp/openclaw-env-check.plugins') || '', '\n')) {
 		line = trim(line);
 		if (length(line) && !match(line, /up[ -]?to[ -]?date|已是最新/i)) plugin_update = true;
 	}
-	return reply(true, '', { current, latest, has_update: core_update || plugin_update, core_update, plugin_update });
+	data.current = current;
+	data.latest = latest;
+	data.has_update = core_update || plugin_update;
+	data.core_update = core_update;
+	data.plugin_update = plugin_update;
+	return reply(true, '', data);
 }
 
 function env_npm_check() {
@@ -396,6 +421,33 @@ function cli_json(action) {
 	if (!length(out)) return reply(false, 'No command output (gateway may not be running or OpenClaw not installed)', {});
 	try { return reply(true, '', json(out)); }
 	catch (e) { return reply(false, 'Failed to parse output', { raw: out }); }
+}
+
+// Web 控制台设备配对。只向 LuCI 返回确认操作所需的元数据，
+// 不透传设备公钥、配对令牌或 CLI 的其它内部字段。
+function console_device_pairing_list() {
+	let out = run('/usr/libexec/openclaw-rpc.sh console-device-pairing-list');
+	if (!length(out)) return reply(false, 'Failed to query console device pairing requests', { pending: [] });
+	let value = {};
+	try { value = json(out); }
+	catch (e) { return reply(false, 'Failed to parse console device pairing requests', { pending: [] }); }
+	let pending = [];
+	for (let item in (type(value?.pending) == 'array' ? value.pending : [])) {
+		let request_id = `${item?.requestId || item?.request_id || item?.id || ''}`;
+		if (!match(request_id, /^[A-Za-z0-9-]{8,128}$/)) continue;
+		let device = type(item?.device) == 'object' ? item.device : {};
+		let client = type(item?.client) == 'object' ? item.client : {};
+		push(pending, {
+			request_id,
+			name: substr(`${item?.displayName || item?.deviceName || device?.displayName || device?.name || client?.displayName || item?.deviceId || item?.clientId || 'Unknown device'}`, 0, 120),
+			platform: substr(`${item?.platform || item?.deviceFamily || device?.platform || client?.platform || ''}`, 0, 80),
+			client: substr(`${item?.clientId || ''}${item?.clientMode ? ' / ' + item.clientMode : ''}`, 0, 120),
+			origin: substr(`${item?.browserOrigin || ''}`, 0, 180),
+			remote_ip: substr(`${item?.remoteIp || item?.remote_ip || item?.ip || ''}`, 0, 80),
+			requested_at: item?.requestedAt || item?.createdAt || item?.ts || item?.timestamp || ''
+		});
+	}
+	return reply(true, '', { pending, paired_count: type(value?.paired) == 'array' ? length(value.paired) : 0 });
 }
 
 // channels list 的 accounts 是配置层面的账号槽位, 登出后仍保留;
@@ -502,7 +554,8 @@ const methods = {
 	install_path_probe: { args: { install_path: '/opt' }, call: install_path_probe },
 	install_targets: { call: install_targets },
 	update_check: { call: update_check },
-	env_upgrade_check: { call: env_upgrade_check },
+	env_upgrade_check_start: { call: () => run_action('env-upgrade-check') },
+	env_upgrade_check: { call: env_upgrade_check_status },
 	env_npm_check: { call: env_npm_check },
 	setup_log: { call: () => reply(true, '', task_status('/tmp/openclaw-setup')) },
 	uninstall_log: { call: () => reply(true, '', task_status('/tmp/openclaw-uninstall')) },
@@ -519,6 +572,9 @@ const methods = {
 	perm_check: { call: perm_check },
 	perm_fix: { call: () => run_action('perm-fix') },
 	secrets_audit: { call: secrets_audit },
+	plugin_capability_check: { call: plugin_capability_check },
+	plugin_capability_accept: { args: { plugins: '' }, call: (r) => match(r.args.plugins, /^[A-Za-z0-9._-]+(,[A-Za-z0-9._-]+)*$/) ? run_action('plugin-capability-accept', [r.args.plugins]) : reply(false, 'Invalid plugin selection') },
+	plugin_capability_log: { call: () => reply(true, '', task_status('/tmp/openclaw-plugin-capability')) },
 	wechat_install_log: { call: () => reply(true, '', task_status('/tmp/openclaw-wechat-install')) },
 	wechat_login_status: { call: () => { let data = task_status('/tmp/openclaw-wechat-login', '/tmp/openclaw-wechat-qrcode.txt'); data.qrcode = data.log; data.qrcode_url = match(data.log, /https?:\/\/[A-Za-z0-9._~:\/?#@!$&'()*+,;=%-]+/g)?.[-1]?.[0] || ''; data.logged_in = match(data.log, /(登录成功|成功登录|Login success|Logged in|Local login saved auth)/) != null; if (data.logged_in) data.state = 'success'; else if (data.running && data.qrcode_url) data.state = 'qrcode'; else if (data.running) data.state = 'starting'; return reply(true, '', data); } },
 	wechat_update_check: { call: wechat_update_check },
@@ -538,6 +594,9 @@ const methods = {
 	doctor_lint: { call: () => cli_json('cli-doctor-lint') },
 	doctor_fix: { call: () => run_action('cli-doctor-fix') },
 	doctor_fix_log: { call: () => reply(true, '', task_status('/tmp/openclaw-doctor-fix')) },
+	console_device_pairing_list: { call: console_device_pairing_list },
+	console_device_pairing_approve: { args: { request_id: '' }, call: (r) => match(r.args.request_id, /^[A-Za-z0-9-]{8,128}$/) ? run_action('console-device-pairing-approve', [r.args.request_id]) : reply(false, 'Invalid device pairing request ID') },
+	console_device_pairing_reject: { args: { request_id: '' }, call: (r) => match(r.args.request_id, /^[A-Za-z0-9-]{8,128}$/) ? run_action('console-device-pairing-reject', [r.args.request_id]) : reply(false, 'Invalid device pairing request ID') },
 	health: { call: () => cli_json('cli-health') },
 	channels_list: { call: channels_list },
 	channels_status: { call: () => cli_json('cli-channels-status') },

@@ -1,5 +1,14 @@
 ﻿# 更新记录
 
+## [1.2.7]
+
+- **更新稳定版基线**：默认 OpenClaw 从 `2026.6.9` 升级到已实机验证的 `2026.8.1`；默认 Node.js 保持 `22.22.3`，Node 22 最低基线同步提高到 `22.22.3`，安装后继续按上游 `package.json` engines 范围强校验。
+- **适配 OpenClaw 2026.8.1 升级流程**：核心/插件更新检查和升级改为后台任务轮询，避免 LuCI XHR 超时；升级前后由 procd 管理 Gateway 启停，保留 UCI 中的端口、绑定、Token 和安装路径。
+- **修复 doctor 迁移与一键修复**：配置迁移统一以 `openclaw` 用户执行，只在成功后写入版本标记；受管修复会停止并释放 Gateway 共享 SQLite，完成后按原状态恢复服务。
+- **新增插件能力确认修复**：动态列出已启用且因新能力声明被阻止的插件，展示能力后由用户明确确认，后端重查状态再调用官方 `--accept-capabilities`，统一重启并执行插件诊断。
+- **兼容新版配对存储**：Telegram 已配对用户优先从 2026.8.1 共享 SQLite 读取，仅在数据库不可用时回退旧 JSON，解决升级后 LuCI 误报“未配对”。
+- **新增 Web 控制台设备配对**：控制台页面显示待批准设备的平台、客户端、Origin、来源 IP 和时间，支持二次确认后批准/拒绝并自动重连；保留 UCI Token 自动注入，同时停止写入已被新版废弃的 `dangerouslyDisableDeviceAuth`。
+
 ## [1.2.6]
 
 - **修复 opkg 安装 `.ipk` 报 malformed**：本地/工作流生成的 `.ipk` 改为当前 OpenWrt/LEDE `opkg` 可识别的 gzip tar 容器，保留 `debian-binary`、`control.tar.gz`、`data.tar.gz` 三段结构，解决插件升级时报 `pkg_init_from_file: Malformed package file` 的问题。

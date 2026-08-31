@@ -65,8 +65,8 @@ OpenClaw AI 网关的 OpenWrt / iStoreOS LuCI 管理插件。
 
 | 组件 | 默认版本 | 说明 |
 |------|----------|------|
-| OpenClaw | `2026.6.9` | 默认安装版本；可选「最新版」 |
-| Node.js | `22.22.3` | 最低要求 `22.19.0` |
+| OpenClaw | `2026.8.1` | 默认安装版本；可选「最新版」 |
+| Node.js | `22.22.3` | Node 22 最低要求 `22.22.3`；安装后按 OpenClaw engines 强校验 |
 | 微信插件 | 官方兼容版本 | `@tencent-weixin/openclaw-weixin@latest` |
 
 ## 📦 安装

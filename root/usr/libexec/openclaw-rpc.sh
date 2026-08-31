@@ -127,6 +127,15 @@ oc_cli_run() {
 	timeout 30 su -s /bin/sh openclaw -c "$(oc_cli_env) $NODE_BASE/bin/node $entry $1"
 }
 
+# 执行需连接 Gateway 的 CLI 子命令。令牌仅从 UCI 读取并作为引号保护的参数传入，
+# 不写入 openclaw.json，也不输出到 RPC 结果或日志。
+oc_cli_gateway_run() {
+	load_paths
+	gateway_token=$(uci -q get openclaw.main.token 2>/dev/null || true)
+	[ -n "$gateway_token" ] || fail "Gateway token is not configured"
+	oc_cli_run "$1 --token $(oc_quote "$gateway_token")"
+}
+
 if [ "${OPENCLAW_RPC_LIBRARY_ONLY:-0}" = "1" ]; then
 	return 0 2>/dev/null || exit 0
 fi
@@ -170,6 +179,31 @@ case "${1:-}" in
 		[ -n "$node_ver" ] && node_prefix=" NODE_VERSION=$(oc_quote "$node_ver")"
 		prefix="OC_VERSION=$(oc_quote "$version") OC_INSTALL_PATH=$(oc_quote "$base")${node_prefix}"
 		start_task /tmp/openclaw-setup "$prefix /usr/bin/openclaw-env setup; rc=\$?; if [ \$rc -eq 0 ]; then uci set openclaw.main.enabled=1; uci commit openclaw; /etc/init.d/openclaw enable; /etc/init.d/openclaw start; fi; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
+		;;
+	env-upgrade-check)
+		load_paths
+		find_openclaw_entry >/dev/null || fail "OpenClaw is not installed"
+		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
+		# 升级检查包含两次联网 CLI 调用，不能同步占用 rpcd，否则会超过 LuCI 默认的 20 秒 XHR 超时。
+		start_task /tmp/openclaw-env-check "/usr/libexec/openclaw-rpc.sh env-upgrade-check-task"
+		;;
+	env-upgrade-check-task)
+		load_paths
+		core_result=/tmp/openclaw-env-check.core
+		plugin_result=/tmp/openclaw-env-check.plugins
+		rm -f "$core_result" "$plugin_result"
+		echo "Checking OpenClaw core updates..."
+		timeout 90 /usr/bin/openclaw update --dry-run --yes --json > "$core_result" 2>/dev/null
+		rc=$?
+		if [ "$rc" -ne 0 ]; then
+			echo "Failed to check OpenClaw core updates"
+			exit "$rc"
+		fi
+		echo "Checking plugin and dependency updates..."
+		timeout 120 /usr/bin/openclaw plugins update --all --dry-run > "$plugin_result" 2>/dev/null
+		rc=$?
+		[ "$rc" -eq 0 ] || echo "Failed to check plugin and dependency updates"
+		exit "$rc"
 		;;
 	env-upgrade-openclaw)
 		load_paths
@@ -238,7 +272,7 @@ case "${1:-}" in
 		fi
 		# 清理 /tmp 残留: 网关日志目录、各任务文件(本卸载任务自身的 openclaw-uninstall.* 在用, 由 opkg 卸载的 postrm 收尾)、状态/缓存。
 		rm -rf /tmp/openclaw 2>/dev/null
-		rm -f /tmp/openclaw-setup.* /tmp/openclaw-plugin-upgrade.* /tmp/openclaw-wechat-* /tmp/openclaw-telegram-add.* /tmp/openclaw-doctor-fix.* /tmp/openclaw-env-upgrade.* /var/run/openclaw*.pid /tmp/luci-openclaw-*
+		rm -f /tmp/openclaw-setup.* /tmp/openclaw-plugin-upgrade.* /tmp/openclaw-plugin-capability.* /tmp/openclaw-wechat-* /tmp/openclaw-telegram-add.* /tmp/openclaw-doctor-fix.* /tmp/openclaw-env-check.* /tmp/openclaw-env-upgrade.* /var/run/openclaw*.pid /tmp/luci-openclaw-*
 		sed -i '/^openclaw:/d' /etc/passwd /etc/shadow /etc/group 2>/dev/null || true
 		rm -f /etc/profile.d/openclaw.sh
 		echo "OpenClaw runtime uninstalled."
@@ -294,6 +328,61 @@ case "${1:-}" in
 	cli-doctor-lint)
 		oc_cli_run "doctor --lint --json --non-interactive"
 		;;
+	console-device-pairing-list)
+		oc_cli_gateway_run "devices list --json"
+		;;
+	console-device-pairing-approve|console-device-pairing-reject)
+		request_id="${2:-}"
+		echo "$request_id" | grep -Eq '^[A-Za-z0-9-]{8,128}$' || fail "Invalid device pairing request ID"
+		device_action="approve"
+		[ "$1" = "console-device-pairing-reject" ] && device_action="reject"
+		oc_cli_gateway_run "devices $device_action $(oc_quote "$request_id") --json"
+		;;
+	plugin-capability-check)
+		load_paths
+		find_openclaw_entry >/dev/null || fail "OpenClaw is not installed"
+		inspect_file=$(mktemp) || fail "Failed to create temporary file"
+		trap 'rm -f "$inspect_file"' EXIT INT TERM
+		/usr/bin/openclaw plugins inspect --all --json > "$inspect_file" 2>/dev/null || fail "Failed to inspect plugins"
+		OPENCLAW_PLUGIN_INSPECT="$inspect_file" "$NODE_BASE/bin/node" -e '
+const fs = require("fs");
+const plugins = JSON.parse(fs.readFileSync(process.env.OPENCLAW_PLUGIN_INSPECT, "utf8"));
+const pending = (Array.isArray(plugins) ? plugins : []).filter((item) => {
+  if (!item || item.plugin?.enabled !== true) return false;
+  return (item.diagnostics || []).some((diag) => {
+    const message = typeof diag === "string" ? diag : String(diag?.message || "");
+    return message.includes("requires capability consent");
+  });
+}).map((item) => ({
+  id: String(item.plugin?.id || ""),
+  name: String(item.plugin?.name || item.plugin?.id || ""),
+  version: String(item.plugin?.version || item.plugin?.packageVersion || ""),
+  capabilities: (item.capabilities || []).map((cap) => ({
+    kind: String(cap?.kind || ""),
+    ids: Array.isArray(cap?.ids) ? cap.ids.map(String) : []
+  }))
+})).filter((item) => /^[A-Za-z0-9._-]+$/.test(item.id));
+process.stdout.write(JSON.stringify({ pending }));'
+		;;
+	plugin-capability-accept)
+		requested="${2:-}"
+		echo "$requested" | grep -Eq '^[A-Za-z0-9._-]+(,[A-Za-z0-9._-]+)*$' || fail "Invalid plugin selection"
+		load_paths
+		inspect_file=$(mktemp) || fail "Failed to create temporary file"
+		trap 'rm -f "$inspect_file"' EXIT INT TERM
+		"$0" plugin-capability-check > "$inspect_file" || fail "Failed to inspect plugins"
+		selected=$(OPENCLAW_PLUGIN_INSPECT="$inspect_file" OPENCLAW_PLUGIN_SELECTION="$requested" "$NODE_BASE/bin/node" -e '
+const fs = require("fs");
+const pending = new Set((JSON.parse(fs.readFileSync(process.env.OPENCLAW_PLUGIN_INSPECT, "utf8")).pending || []).map((item) => item.id));
+const selected = [...new Set(String(process.env.OPENCLAW_PLUGIN_SELECTION || "").split(",").filter(Boolean))];
+if (!selected.length || selected.some((id) => !pending.has(id))) process.exit(2);
+process.stdout.write(selected.join(" "));' 2>/dev/null) || fail "Plugin capability state changed; check again"
+		[ -n "$selected" ] || fail "No plugins selected"
+		trap - EXIT INT TERM
+		rm -f "$inspect_file"
+		cmd="rc=0; changed=0; for plugin_id in $selected; do echo \"Confirming declared capabilities for \$plugin_id...\"; if /usr/bin/openclaw plugins enable \"\$plugin_id\" --accept-capabilities; then changed=1; else rc=1; fi; done; if [ \"\$changed\" = 1 ]; then echo 'Restarting OpenClaw service once to apply plugin capability consent...'; /etc/init.d/openclaw restart || rc=1; fi; echo 'Running plugin diagnostics...'; /usr/bin/openclaw plugins doctor || rc=1; exit \$rc"
+		start_task /tmp/openclaw-plugin-capability "$cmd"
+		;;
 	cli-health)
 		oc_cli_run "health --json --timeout 12000"
 		;;
@@ -311,9 +400,13 @@ case "${1:-}" in
 		;;
 	cli-doctor-fix)
 		load_paths
-		entry=$(find_openclaw_entry) || fail "OpenClaw is not installed"
+		find_openclaw_entry >/dev/null || fail "OpenClaw is not installed"
 		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
-		cmd="su -s /bin/sh openclaw -c $(oc_quote "$(oc_cli_env) $NODE_BASE/bin/node $entry doctor --fix --non-interactive --no-workspace-suggestions")"
+		# 2026.8.1 起 doctor 会拒绝在 Gateway 持有共享 SQLite 状态时执行修复。
+		# 记录原运行态，停服后以 openclaw 身份修复；EXIT/TERM trap 保证成功、失败或用户取消时都恢复原状态。
+		# stop_service() 使用宽泛的 pgrep -f "openclaw.*gateway.*run"。任务 shell 的整段
+		# 命令行不能同时出现这些片段，否则会被误认成网关并收到 SIGTERM。
+		cmd="was_active=0; /etc/init.d/openclaw status >/dev/null 2>&1 && was_active=1; restore_oc() { trap - EXIT INT TERM; if [ \"\$was_active\" = 1 ]; then echo 'Starting OpenClaw service...'; /etc/init.d/openclaw start; fi; }; wait_oc_exit() { n=0; while [ \"\$n\" -lt 30 ]; do oc_pid=\$(ubus call service list '{\"name\":\"openclaw\"}' 2>/dev/null | jsonfilter -e '@.openclaw.instances.gateway.pid' 2>/dev/null); if [ -z \"\$oc_pid\" ] || ! kill -0 \"\$oc_pid\" 2>/dev/null; then return 0; fi; sleep 1; n=\$((n + 1)); done; echo 'OpenClaw service did not exit in time'; return 1; }; trap 'restore_oc; exit 130' INT TERM; if [ \"\$was_active\" = 1 ]; then echo 'Stopping OpenClaw service for managed doctor repair...'; /etc/init.d/openclaw stop || { restore_oc; exit 1; }; ubus call service delete '{\"name\":\"openclaw\"}' >/dev/null 2>&1 || true; echo 'Waiting for OpenClaw state ownership to be released...'; wait_oc_exit || { restore_oc; exit 1; }; fi; trap 'restore_oc' EXIT INT TERM; echo 'Running OpenClaw doctor repair...'; /usr/bin/openclaw doctor --fix --non-interactive --no-workspace-suggestions; rc=\$?; exit \$rc"
 		start_task /tmp/openclaw-doctor-fix "$cmd"
 		;;
 	cli-models-set)
@@ -430,7 +523,7 @@ case "${1:-}" in
 	task-cancel)
 		name="${2:-}"
 		case "$name" in
-			openclaw-setup|openclaw-uninstall|openclaw-plugin-upgrade|openclaw-wechat-install|openclaw-wechat-login|openclaw-doctor-fix) ;;
+			openclaw-setup|openclaw-uninstall|openclaw-plugin-upgrade|openclaw-plugin-capability|openclaw-wechat-install|openclaw-wechat-login|openclaw-doctor-fix) ;;
 			*) fail "Invalid task name" ;;
 		esac
 		cancel_task "/tmp/$name"
@@ -480,6 +573,27 @@ fs.writeFileSync(index,JSON.stringify(accounts.filter(x=>x!==id),null,2)+"\n");'
 		;;
 	telegram-pairing-list)
 		oc_cli_run "pairing list --channel telegram --json"
+		;;
+	telegram-paired-ids)
+		load_paths
+		# OpenClaw 2026.8.1 将频道 allowFrom 从 credentials/*.json 迁入共享 SQLite。
+		# 这里只读查询 Telegram 的已授权发送者，供 LuCI 状态页展示；旧版/无数据库时由上层回退 JSON。
+		db_path="${OC_STATE_DIR}/state/openclaw.sqlite"
+		if [ ! -x "$NODE_BASE/bin/node" ] || [ ! -f "$db_path" ]; then
+			echo '{"available":false,"paired_ids":[]}'
+			exit 0
+		fi
+		OPENCLAW_PAIRING_DB="$db_path" "$NODE_BASE/bin/node" -e '
+const { DatabaseSync } = require("node:sqlite");
+try {
+  const db = new DatabaseSync(process.env.OPENCLAW_PAIRING_DB, { readOnly: true });
+  const rows = db.prepare("SELECT entry FROM channel_pairing_allow_entries WHERE channel_key = ? ORDER BY account_id, sort_order, entry").all("telegram");
+  db.close();
+  const paired = [...new Set(rows.map((row) => String(row.entry)))];
+  process.stdout.write(JSON.stringify({ available: true, paired_ids: paired }));
+} catch (error) {
+  process.stdout.write(JSON.stringify({ available: false, paired_ids: [] }));
+}' 2>/dev/null
 		;;
 	dm-scope-set)
 		val="${2:-}"

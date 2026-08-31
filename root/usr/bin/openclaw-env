@@ -18,15 +18,15 @@
 set -e
 
 # ── Node.js 版本策略 ──
-# 默认运行时版本，用于 OpenClaw v2026.6.9+
+# 默认运行时版本，用于 OpenClaw v2026.8.1+
 NODE_VERSION_V2="22.22.3"
 # 可通过 NODE_VERSION 环境变量覆盖，但仍必须满足最低版本要求。
 NODE_VERSION="${NODE_VERSION:-${NODE_VERSION_V2}}"
 # 经过验证的 OpenClaw 稳定版本 (更新此值需同步测试)
-OC_TESTED_VERSION="2026.6.9"
-# OpenClaw 2026.6.9 package.json engines.node 的最低要求。
+OC_TESTED_VERSION="2026.8.1"
+# OpenClaw 2026.8.1 package.json engines.node 的 Node 22 最低要求。
 # 如果未来上游提高要求，安装成功后还会从 package.json 再做一次强校验。
-OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-22.19.0}"
+OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-22.22.3}"
 # 用户可通过 OC_VERSION 环境变量覆盖安装版本
 OC_VERSION="${OC_VERSION:-}"
 
@@ -833,7 +833,7 @@ do_factory_reset() {
 	if [ -x "$NODE_BIN" ] && [ -f "$config_file" ]; then
 		local new_token kv
 		new_token=$(head -c 24 /dev/urandom | hexdump -e '24/1 "%02x"' 2>/dev/null || dd if=/dev/urandom bs=24 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n' | head -c 48)
-		for kv in "gateway.port=18789" "gateway.bind=lan" "gateway.mode=local" "gateway.auth.mode=token" "gateway.controlUi.dangerouslyDisableDeviceAuth=true" "gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback=true" "gateway.tailscale.mode=off" "acp.dispatch.enabled=false" "tools.profile=coding"; do
+		for kv in "gateway.port=18789" "gateway.bind=lan" "gateway.mode=local" "gateway.auth.mode=token" "gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback=true" "gateway.tailscale.mode=off" "acp.dispatch.enabled=false" "tools.profile=coding"; do
 			_oc_json_set "$config_file" "${kv%%=*}" "${kv#*=}"
 		done
 		chown openclaw:openclaw "$config_file" 2>/dev/null || true

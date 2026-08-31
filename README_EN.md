@@ -68,8 +68,8 @@ Run OpenClaw on your router and use LuCI to install its runtime, manage the serv
 
 | Component | Default | Notes |
 |-----------|---------|-------|
-| OpenClaw | `2026.6.9` | Default tested release; the latest release can also be selected |
-| Node.js | `22.22.3` | Minimum supported version: `22.19.0` |
+| OpenClaw | `2026.8.1` | Default tested release; the latest release can also be selected |
+| Node.js | `22.22.3` | Minimum for Node 22: `22.22.3`; OpenClaw engines are enforced after installation |
 | WeChat plugin | Official compatible release | `@tencent-weixin/openclaw-weixin@latest` |
 
 ## 📦 Installation

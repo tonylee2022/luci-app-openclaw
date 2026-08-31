@@ -147,6 +147,10 @@ return view.extend({
 		this.permState = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
 		this.secretsState = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
 		this.secretsBox = E('div', {});
+		this.capabilityState = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
+		this.capabilityBox = E('div', {}, E('p', { 'class': 'oc-muted' }, _('Check after upgrading OpenClaw or plugins; capability changes require explicit confirmation.')));
+		this.capabilityTaskState = E('div', { 'class': 'oc-task-state', 'style': 'display:none' });
+		this.capabilityLog = E('pre', { 'class': 'oc-log', 'style': 'display:none' }, '');
 		return E('div', {}, [
 			E('div', { 'class': 'oc-card' }, [
 				E('div', { 'class': 'oc-card-title' }, _('Health check and fix')),
@@ -158,6 +162,18 @@ return view.extend({
 					this.healthStatus,
 					E('div', { 'class': 'oc-task-wrap' }, [ this.fixState, this.fixLog ]),
 					this.findingsBox
+				])
+			]),
+			E('div', { 'class': 'oc-card' }, [
+				E('div', { 'class': 'oc-card-title' }, _('Plugin capability consent')),
+				E('div', { 'class': 'oc-card-body' }, [
+					E('p', { 'class': 'oc-muted' }, _('Only enabled plugins currently blocked by new capability declarations are listed. Nothing is installed or authorized until you review and confirm.')),
+					E('div', { 'class': 'oc-actions' }, [
+						ocui.button(_('Check capability consent'), 'cbi-button-action', L.bind(this.checkPluginCapabilities, this))
+					]),
+					this.capabilityState,
+					this.capabilityBox,
+					E('div', { 'class': 'oc-task-wrap' }, [ this.capabilityTaskState, this.capabilityLog ])
 				])
 			]),
 			E('div', { 'class': 'oc-card' }, [
@@ -311,6 +327,104 @@ return view.extend({
 				b.addEventListener('click', dismissFix);
 				self.fixState.appendChild(b);
 			}
+		});
+	},
+
+	formatPluginCapabilities: function(plugin) {
+		var parts = (plugin.capabilities || []).map(function(cap) {
+			var ids = (cap.ids || []).join(', ');
+			return (cap.kind || _('Capability')) + (ids ? ': ' + ids : '');
+		});
+		return parts.length ? parts.join(' · ') : _('No capability details reported');
+	},
+
+	checkPluginCapabilities: function() {
+		var self = this;
+		ocui.setStatus(this.capabilityState, 'running', _('Checking plugin capability consent...'));
+		return api.pluginCapabilityCheck().then(function(result) {
+			if (!result.ok) {
+				ocui.setStatus(self.capabilityState, 'error', _(result.message || 'Capability check failed'));
+				return;
+			}
+			var pending = (result.data || {}).pending || [];
+			self.pendingPluginCapabilities = pending;
+			if (!pending.length) {
+				ocui.setStatus(self.capabilityState, 'success', _('All enabled plugin capabilities are confirmed.'));
+				dom.content(self.capabilityBox, '');
+				ocui.hideStatusLater(self.capabilityState);
+				return;
+			}
+			ocui.setStatus(self.capabilityState, 'warn', _('%s enabled plugins require capability confirmation.').format(pending.length));
+			var rows = pending.map(function(plugin) {
+				return E('div', { 'class': 'oc-finding' }, [
+					E('span', { 'class': 'oc-badge oc-warn' }, plugin.id),
+					E('div', { 'class': 'oc-finding-body' }, [
+						E('div', { 'class': 'oc-finding-msg' }, (plugin.name || plugin.id) + (plugin.version ? ' ' + plugin.version : '')),
+						E('div', { 'class': 'oc-finding-hint' }, self.formatPluginCapabilities(plugin))
+					])
+				]);
+			});
+			rows.push(E('div', { 'class': 'oc-actions', 'style': 'margin-top:.6rem' }, [
+				ocui.button(_('Review and confirm selected plugins'), 'cbi-button-positive', L.bind(self.showPluginCapabilityConfirm, self))
+			]));
+			dom.content(self.capabilityBox, rows);
+		}).catch(function(error) {
+			ocui.setStatus(self.capabilityState, 'error', _(String(error && error.message || error)));
+		});
+	},
+
+	showPluginCapabilityConfirm: function() {
+		var self = this;
+		var pending = this.pendingPluginCapabilities || [];
+		if (!pending.length) return this.checkPluginCapabilities();
+		var boxes = pending.map(function(plugin) {
+			var cb = E('input', { 'type': 'checkbox', 'value': plugin.id });
+			cb.checked = true;
+			return E('label', { 'style': 'display:flex;align-items:flex-start;gap:.5rem;padding:.35rem 0' }, [
+				cb,
+				E('span', {}, [
+					E('strong', {}, (plugin.name || plugin.id) + (plugin.version ? ' ' + plugin.version : '')),
+					E('br'),
+					E('span', { 'class': 'oc-muted' }, self.formatPluginCapabilities(plugin))
+				])
+			]);
+		});
+		var confirm = E('button', { 'class': 'cbi-button-positive btn', click: function() {
+			var selected = boxes.map(function(label) {
+				var cb = label.querySelector('input');
+				return cb.checked ? cb.value : null;
+			}).filter(Boolean);
+			if (!selected.length) return;
+			ui.hideModal();
+			return self.runPluginCapabilityFix(selected);
+		} }, _('Confirm capabilities and fix'));
+		ui.showModal(_('Confirm plugin capabilities'), [
+			E('p', { 'class': 'oc-muted' }, _('Confirming allows each selected plugin to use the capabilities shown below. The server checks the pending state again before applying.')),
+			E('div', { 'style': 'max-height:20rem;overflow:auto;border:1px solid var(--oc-border,#ddd);border-radius:4px;padding:.4rem .6rem;margin:.4rem 0' }, boxes),
+			E('div', { 'class': 'right' }, [ ocui.closeButton(_('Cancel')), confirm ])
+		]);
+	},
+
+	runPluginCapabilityFix: function(ids) {
+		var self = this;
+		this.capabilityTaskState.style.display = '';
+		this.capabilityLog.style.display = '';
+		return ocui.runOp(this.capabilityState, {
+			running: _('Confirming plugin capabilities...'),
+			success: _('Plugin capabilities confirmed and applied.'),
+			submit: function() { return api.pluginCapabilityAccept(ids.join(',')); },
+			cancel: function() { return api.taskCancel('openclaw-plugin-capability'); },
+			pollLog: function() { return api.pluginCapabilityLog(); },
+			onClose: function() {
+				self.capabilityTaskState.style.display = 'none';
+				self.capabilityLog.style.display = 'none';
+			},
+			onLog: function(data) {
+				self.capabilityTaskState.className = 'oc-task-state ' + (data.done ? (data.exit_code === 0 ? 'oc-task-success' : 'oc-task-error') : 'oc-task-running');
+				self.capabilityTaskState.textContent = data.done ? (data.exit_code === 0 ? _('Capability confirmation completed.') : _('Capability confirmation failed, exit code: %s').format(data.exit_code)) : _('Capability confirmation is running...');
+				ocui.setLog(self.capabilityLog, data.log || _('No output yet'));
+			},
+			onDone: function() { self.checkPluginCapabilities(); }
 		});
 	},
 
