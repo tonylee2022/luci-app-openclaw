@@ -97,7 +97,7 @@ return baseclass.extend({
 				if (opts.onDone) opts.onDone(true, r);
 				return;
 			}
-			var start = Date.now(), step = opts.stepMs || 2000, to = opts.timeoutMs || 600000;
+			var start = Date.now(), step = opts.stepMs || 2000, to = opts.timeoutMs || 1200000;
 			return new Promise(function(resolve) {
 				(function tick() {
 					if (closed) return resolve();
@@ -124,7 +124,14 @@ return baseclass.extend({
 						}
 						running();
 						window.setTimeout(tick, step);
-					}).catch(function() { if (!closed) window.setTimeout(tick, step); });
+					}).catch(function() {
+						if (closed) return resolve();
+						if (Date.now() - start > to) {
+							self.setStatus(el, 'error', _('Operation timed out; refresh later to check.'));
+							return resolve();
+						}
+						window.setTimeout(tick, step);
+					});
 				})();
 			});
 		}).catch(function(err) {

@@ -349,19 +349,19 @@ return view.extend({
 				// rpcd reload(SIGHUP) 加载新后端并保留登录会话, 不强制重登录; 等其 re-exec 完成后自动刷新页面取回新前端。
 				ocui.setStatus(self.actionStatus, 'running', _('Upgrade complete, reloading backend service...'));
 				api.rpcdRestart();
-				var tries = 0;
+				var started = Date.now(), timeoutMs = 1200000;
 				var waitBack = function() {
 					api.status().then(function(r) {
 						if (r && r.ok) {
 							ocui.setStatus(self.actionStatus, 'success', _('Upgrade complete, reloading page...'));
 							window.location.reload();
-						} else if (++tries < 15) {
+						} else if (Date.now() - started < timeoutMs) {
 							window.setTimeout(waitBack, 1000);
 						} else {
 							ocui.setStatus(self.actionStatus, 'success', _('Upgrade complete, please refresh the page manually.'));
 						}
 					}).catch(function() {
-						if (++tries < 15) window.setTimeout(waitBack, 1000);
+						if (Date.now() - started < timeoutMs) window.setTimeout(waitBack, 1000);
 						else ocui.setStatus(self.actionStatus, 'success', _('Upgrade complete, please refresh the page manually.'));
 					});
 				};
@@ -416,7 +416,7 @@ return view.extend({
 		poll.stop();
 		var self = this;
 		var start = Date.now();
-		var timeoutMs = 40000, stepMs = 1500;
+		var timeoutMs = 1200000, stepMs = 1500;
 		function done() { poll.start(); }
 		function tick() {
 			return self.updateStatus().then(function(d) {
@@ -507,7 +507,7 @@ return view.extend({
 			});
 		};
 		var checkEnvUpgrade = function() {
-			var started = Date.now(), timeoutMs = 240000;
+			var started = Date.now(), timeoutMs = 1200000;
 			return api.envUpgradeCheckStart().then(function(r) {
 				if (!r.ok) throw new Error(r.message || 'Version check failed');
 				return new Promise(function(resolve) {

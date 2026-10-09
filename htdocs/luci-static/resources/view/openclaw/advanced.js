@@ -54,7 +54,7 @@ return view.extend({
 		ocui.setStatus(statusEl, 'running', _('"Restart gateway" command submitted; restarting...'));
 		return api.serviceAction('restart_gateway').then(function(r) {
 			if (r && r.ok === false) { ocui.setStatus(statusEl, 'error', _(r.message || 'Restart failed')); return; }
-			var start = Date.now(), to = 40000;
+			var start = Date.now(), to = 1200000;
 			return new Promise(function(resolve) {
 				(function tick() {
 					api.status().then(function(res) {
@@ -77,7 +77,13 @@ return view.extend({
 						}
 						ocui.setStatus(statusEl, 'running', d.gateway_starting ? _('Gateway is starting, please wait...') : _('Gateway is restarting, please wait...'));
 						window.setTimeout(tick, 1500);
-					}).catch(function() { window.setTimeout(tick, 1500); });
+					}).catch(function() {
+						if (Date.now() - start > to) {
+							ocui.setStatus(statusEl, 'error', _('Restart timed out; the gateway was not ready in time. Refresh later to check.'));
+							return resolve();
+						}
+						window.setTimeout(tick, 1500);
+					});
 				})();
 			});
 		});

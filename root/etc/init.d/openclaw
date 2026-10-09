@@ -128,8 +128,8 @@ patch_iframe_headers() {
 # 搜索当前可能设置安全头的 bundle。
 local patched=0
 
-# 搜索 server.impl 和 control-ui bundle。
-for f in $(find "${OC_GLOBAL}/lib/node_modules/openclaw/dist" -type f \( -name "server.impl-*.js" -o -name "control-ui-*.js" \) 2>/dev/null); do
+# 搜索 server.impl 和 control-ui bundle，兼容新版 .mjs 模块。
+for f in $(find "${OC_GLOBAL}/lib/node_modules/openclaw/dist" -type f \( -name "server.impl-*.js" -o -name "server.impl-*.mjs" -o -name "control-ui-*.js" -o -name "control-ui-*.mjs" \) 2>/dev/null); do
 	if grep -q "X-Frame-Options.*DENY\|frame-ancestors.*none" "$f" 2>/dev/null; then
 		sed -i 's|res\.setHeader("X-Frame-Options", "DENY");|// res.setHeader("X-Frame-Options", "DENY"); // patched by luci-app-openclaw|g' "$f"
 		sed -i "s|\"frame-ancestors 'none'\"|\"frame-ancestors *\"|g" "$f"
@@ -141,7 +141,7 @@ done
 # 搜索其他可能包含安全头的 gateway bundle。
 for search_root in "${OC_GLOBAL}" "${NODE_BASE}/lib"; do
 	[ -d "$search_root" ] || continue
-	for f in $(find "$search_root" -name "gateway-cli-*.js" -type f 2>/dev/null); do
+	for f in $(find "$search_root" -type f \( -name "gateway-cli-*.js" -o -name "gateway-cli-*.mjs" \) 2>/dev/null); do
 		if grep -q "X-Frame-Options.*DENY" "$f" 2>/dev/null; then
 			sed -i "s|res.setHeader(\"X-Frame-Options\", \"DENY\");|// res.setHeader(\"X-Frame-Options\", \"DENY\"); // patched by luci-app-openclaw|g" "$f"
 			sed -i "s|\"frame-ancestors 'none'\"|\"frame-ancestors *\"|g" "$f"
