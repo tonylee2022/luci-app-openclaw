@@ -118,7 +118,7 @@ make package/luci-app-openclaw/compile V=s
 
 ## 命令行使用
 
-SSH 进入路由器后，可用以下命令（均以 `openclaw` 用户身份运行）：
+SSH 进入路由器后，可用以下命令。安装、升级运行环境需要 root；`openclaw-shell` 和 OpenClaw CLI 以 `openclaw` 用户运行：
 
 ```bash
 openclaw-shell                  # 进入隔离的 openclaw 用户子 Shell（exit 退出）
@@ -126,6 +126,12 @@ openclaw-env check              # 检查运行环境
 openclaw-env upgrade            # 升级 OpenClaw 到最新版
 openclaw-env node [x.y.z]       # 安装/更新 Node.js（不加版本号则使用默认版本）
 ```
+
+LuCI 的 OpenClaw 升级与 `openclaw-env upgrade` 共用升级助手：停服前检查安装回执，仍由官方 `openclaw update --yes --no-restart` 执行候选验证、包替换和迁移，再由 procd 恢复升级前正在运行的服务并检查网关健康。原来已停止的服务保持停止。命令行升级指定 npm `latest`，LuCI 保留官方更新渠道选择。升级失败与服务恢复失败分别记录，恢复旧服务不会被报告为升级成功。
+
+新版升级回执可能绑定 `/tmp/openclaw/managed-update-handoffs.sqlite` 的文件身份。临时数据库或目录重建后，助手只在确认回执为已完成的 `external-helper` v1 操作、安装身份匹配、无恢复助手或未释放租约时，将失效回执完整归档为全局包目录旁的 `.openclaw-receipt-archive-*`。原 SQLite 内容保留，不改写记录中的身份。未知格式、未完成操作、热日志和不安全权限会阻止自动处理；升级失败后若官方仍保留操作所有权，助手也不会强行启动网关。此时保留回执、快照和更新报告，按报告中的恢复指引处理。
+
+不要删除 `/tmp/openclaw` 或升级恢复文件来强行重试。升级可能迁移数据库，归档回执本身不提供数据回滚能力。
 
 自定义安装路径时，可为单次命令设置 `OPENCLAW_INSTALL_PATH`：
 

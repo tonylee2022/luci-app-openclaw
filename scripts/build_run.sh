@@ -53,6 +53,8 @@ install_files() {
 	# shared shell helpers
 	mkdir -p "$dest/usr/libexec"
 	cp "$PKG_DIR/root/usr/libexec/"*.sh "$dest/usr/libexec/"
+	# Node.js 回执检查器作为数据文件安装，由升级助手调用。
+	cp "$PKG_DIR/root/usr/libexec/openclaw-update-receipt.mjs" "$dest/usr/libexec/"
 	chmod +x "$dest/usr/libexec/"*.sh
 
 	# Modern LuCI JavaScript views and resources

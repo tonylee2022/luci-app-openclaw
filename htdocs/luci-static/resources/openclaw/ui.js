@@ -97,7 +97,7 @@ return baseclass.extend({
 				if (opts.onDone) opts.onDone(true, r);
 				return;
 			}
-			var start = Date.now(), step = opts.stepMs || 2000, to = opts.timeoutMs || 1200000;
+			var start = Date.now(), step = opts.stepMs || 2000, to = opts.timeoutMs || 1500000;
 			return new Promise(function(resolve) {
 				(function tick() {
 					if (closed) return resolve();

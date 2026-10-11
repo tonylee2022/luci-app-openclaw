@@ -66,6 +66,12 @@ jobs:
           # 写入版本号唯一来源 Makefile (标签/手动构建时覆盖)
           sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$VER/" Makefile
 
+      # 升级回执测试使用 node:sqlite，固定支持该接口的 Node.js 主版本。
+      - name: Set up validation Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - name: Validate source
         run: |
           find root scripts tests -type f \( -name '*.sh' -o -path 'root/usr/bin/*' -o -path 'root/etc/init.d/*' -o -path 'root/etc/uci-defaults/*' \) -exec sh -n {} +
@@ -78,6 +84,8 @@ jobs:
           sh tests/test_openclaw_node.sh
           sh tests/test_openclaw_paths.sh
           sh tests/test_openclaw_workspace.sh
+          node --check root/usr/libexec/openclaw-update-receipt.mjs
+          sh tests/test_openclaw_update.sh
 
       - name: Build .run installer (online)
         run: |

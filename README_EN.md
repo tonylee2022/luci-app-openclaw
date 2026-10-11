@@ -121,7 +121,7 @@ make package/luci-app-openclaw/compile V=s
 
 ## Command-Line Usage
 
-After connecting to the router over SSH, the following commands run as the `openclaw` user:
+After connecting over SSH, run installation and runtime upgrades as root. `openclaw-shell` and the OpenClaw CLI run as the `openclaw` user:
 
 ```bash
 openclaw-shell                  # Enter an isolated openclaw user shell; use exit to leave
@@ -129,6 +129,12 @@ openclaw-env check              # Check the runtime environment
 openclaw-env upgrade            # Upgrade OpenClaw to the latest release
 openclaw-env node [x.y.z]       # Install/update Node.js; omit the version to use the default
 ```
+
+LuCI core upgrades and `openclaw-env upgrade` share an upgrade helper. It inspects package receipts before stopping the service, uses the official `openclaw update --yes --no-restart` for candidate validation, package replacement and migrations, then restores a previously running service through procd and verifies Gateway health. A previously stopped service stays stopped. Command-line upgrades select npm `latest`; LuCI retains the official update channel selection. Upgrade and service recovery failures remain separate: restoring the old Gateway does not imply upgrade success.
+
+Recent package receipts can bind to the file identity of `/tmp/openclaw/managed-update-handoffs.sqlite`. If that temporary database or its directory has been recreated, the helper archives a stale receipt only after verifying a completed `external-helper` v1 operation, matching installation identities, no recovery helper and no unreleased leases. The original SQLite file is preserved in a sibling `.openclaw-receipt-archive-*` directory; recorded identities are never rewritten. Unknown formats, unfinished operations, hot journals and unsafe permissions prevent automatic handling. Retained update ownership also prevents an automatic Gateway restart after failure. Preserve receipts, snapshots and reports and follow the recovery instructions in the report.
+
+Do not delete `/tmp/openclaw` or update recovery artifacts to force a retry. Updates can migrate databases; receipt archival does not provide data rollback.
 
 For a custom install path, set `OPENCLAW_INSTALL_PATH` for an individual command:
 

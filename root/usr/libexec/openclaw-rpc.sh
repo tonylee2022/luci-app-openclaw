@@ -208,13 +208,8 @@ case "${1:-}" in
 	env-upgrade-openclaw)
 		load_paths
 		id openclaw >/dev/null 2>&1 || fail "The openclaw system user does not exist"
-		# 走官方 openclaw update 编排(核心 + 插件 update sync + doctor), 与官方升级一致。
-		# 官方在 systemd 上会"停网关→更新→重启"; 在 procd 上 openclaw update 不认得我们的服务(既不停也不重启),
-		# 故由我们对齐: 先 procd 停网关, 再 update(--no-restart 跳过其自带服务管理), 完成后 procd 起网关。
-		# /usr/bin/openclaw 包装器自动降权到 openclaw 并配好环境。
-		# 更新前 chown 修正 home 属主: 历史上若有 root 属主残留(如某插件目录), 以 openclaw 身份的
-		# 插件 update 会 EACCES(rename/unlink 失败); 先归位避免插件更新失败。
-		cmd="/etc/init.d/openclaw stop; chown -R openclaw:openclaw $(oc_quote "$OC_HOME") 2>/dev/null; /usr/bin/openclaw update --yes --no-restart; rc=\$?; /etc/init.d/openclaw start; rm -f /tmp/luci-openclaw-status.*; exit \$rc"
+		# 后台任务已持有操作锁，统一助手负责回执预检和 procd 恢复验证。
+		cmd="OPENCLAW_UPDATE_LOCK_HELD=1 /usr/libexec/openclaw-update.sh"
 		start_task /tmp/openclaw-env-upgrade "$cmd"
 		;;
 	env-upgrade-npm)
