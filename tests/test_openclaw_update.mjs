@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { inspectReceipt } from '../root/usr/libexec/openclaw-update-receipt.mjs';
+import { cleanupRuntimes } from '../root/usr/libexec/openclaw-update-cleanup.mjs';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-receipt-test-'));
 const id = file => { const s = fs.statSync(file, { bigint: true }); return `${s.dev}:${s.ino}`; };
@@ -63,18 +64,51 @@ async function refused(f, pattern) {
   assert.equal(fs.readdirSync(f.parent).some(n => n.startsWith('.openclaw-receipt-archive-')), false);
 }
 
+function cleanupFixture() {
+  const f = fixture(false);
+  f.runtime = path.join(f.parent, 'openclaw-update-runtime-Abc123');
+  const marker = path.join(f.runtime, 'tree', Buffer.from(path.parse(f.install).root).toString('hex'),
+    path.relative(path.parse(f.install).root, f.install), 'package.json');
+  fs.mkdirSync(path.dirname(marker), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(marker, JSON.stringify({ name: 'openclaw', version: '2026.10.3' }), { mode: 0o600 });
+  f.marker = marker;
+  f.procRoot = path.join(f.parent, 'proc');
+  const processDir = path.join(f.procRoot, '1');
+  fs.mkdirSync(path.join(processDir, 'fd'), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(processDir, 'cmdline'), '/sbin/procd\0');
+  fs.writeFileSync(path.join(processDir, 'stat'), '1 (procd) S ' + Array(25).fill('1').join(' '));
+  fs.writeFileSync(path.join(processDir, 'maps'), '');
+  fs.writeFileSync(path.join(processDir, 'environ'), '');
+  for (const name of ['cwd', 'exe', 'root']) fs.symlinkSync('/', path.join(processDir, name));
+  return f;
+}
+function clean(f, checkOnly = false) {
+  return cleanupRuntimes(f.install, { procRoot: f.procRoot, checkOnly });
+}
+
 try {
   let f = fixture();
   const before = fs.readFileSync(f.journal);
-  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath, checkOnly: true }), /stale/);
+  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath, checkOnly: true }), /official updater/);
   assert.deepEqual(fs.readFileSync(f.journal), before);
-  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath }), /Archived/);
-  assert.equal(fs.existsSync(f.control), false);
-  const archived = fs.readdirSync(f.parent).find(n => n.startsWith('.openclaw-receipt-archive-'));
-  assert.deepEqual(fs.readFileSync(path.join(f.parent, archived, 'operation.sqlite')), before);
+  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath }), /official updater/);
+  assert.deepEqual(fs.readFileSync(f.journal), before);
+  assert.equal(fs.existsSync(f.control), true);
+
+  // 真实升级保留移动前的 staging helper 来源，而不是当前 control 路径。
+  f = fixture();
+  f.d.preparation.find(v => v.name === 'helper').source =
+    f.d.preparation.find(v => v.name === 'anchor').source + '.recovery.mjs';
+  change(f, 'descriptor_json', JSON.stringify(f.d));
+  const stagedBefore = fs.readFileSync(f.journal);
+  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath, checkOnly: true }), /official updater/);
+  assert.deepEqual(fs.readFileSync(f.journal), stagedBefore);
+  f.d.preparation.find(v => v.name === 'helper').source = path.join(f.parent, 'unrelated-helper.mjs');
+  change(f, 'descriptor_json', JSON.stringify(f.d));
+  await refused(f, /Invalid completed receipt custody/);
 
   f = fixture(false);
-  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath }), /current/);
+  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath }), /official updater/);
   assert.equal(fs.existsSync(f.control), true);
 
   f = fixture();
@@ -119,7 +153,12 @@ try {
   await refused(f, /Unreleased/);
   f = fixture();
   fs.unlinkSync(f.leasePath);
-  await refused(f, /database is absent/);
+  const missingBefore = fs.readFileSync(f.journal);
+  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath }), /official updater/);
+  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath, checkOnly: true }), /official updater/);
+  assert.equal(fs.existsSync(f.leasePath), false, 'LuCI must not invent a lease database');
+  assert.deepEqual(fs.readFileSync(f.journal), missingBefore);
+  assert.equal(fs.existsSync(f.control), true);
 
   // 回滚完成后选中的旧包，同样可以拥有合法的完成回执。
   f = fixture();
@@ -129,26 +168,95 @@ try {
   f.intent.selected = 'previous';
   change(f, 'descriptor_json', JSON.stringify(f.d));
   change(f, 'intent_json', JSON.stringify(f.intent));
-  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath }), /Archived/);
+  assert.match(await inspectReceipt(f.install, { leasePath: f.leasePath }), /official updater/);
 
   // 即使记录数据库已消失，也要检查当前数据库的租约，而不是改写身份。
   f = fixture();
   const oldLeasePath = f.leasePath;
   const newLeasePath = path.join(f.parent, 'managed-update-handoffs.sqlite');
   fs.renameSync(oldLeasePath, newLeasePath);
-  assert.match(await inspectReceipt(f.install, { leasePath: newLeasePath }), /Archived/);
+  assert.match(await inspectReceipt(f.install, { leasePath: newLeasePath }), /official updater/);
 
   // 使用真实动态导出解析覆盖生产入口，避免只验证测试注入路径。
   f = fixture();
   fs.mkdirSync(path.join(f.install, 'dist'), { mode: 0o700 });
   fs.writeFileSync(path.join(f.install, 'dist', 'tmp-openclaw-dir-test.mjs'),
     `function resolvePreferredOpenClawTmpDir(){return ${JSON.stringify(path.dirname(f.leasePath))};}\nexport {resolvePreferredOpenClawTmpDir as n};\n`);
-  assert.match(await inspectReceipt(f.install), /Archived/);
+  assert.match(await inspectReceipt(f.install), /official updater/);
   const active = new DatabaseSync(f.leasePath);
   active.prepare('INSERT INTO managed_update_handoffs VALUES (?,?,?,?)').run(f.install, 'owner', '{}', 1);
   active.close();
   await assert.rejects(inspectReceipt(f.install, { checkOnly: true }), /Unreleased/);
-  console.log('ok: receipt archival and refusal cases');
+  console.log('ok: read-only receipt delegation and refusal cases');
+
+  // 删除只影响官方投影，回执和 lease 数据库的字节必须保留。
+  f = cleanupFixture();
+  const receiptBefore = fs.readFileSync(f.journal), leaseBefore = fs.readFileSync(f.leasePath);
+  let result = clean(f, true);
+  assert.equal(result.removed.length, 0);
+  assert.equal(fs.existsSync(f.runtime), true);
+  result = clean(f);
+  assert.deepEqual(result.removed, [f.runtime]);
+  assert.equal(fs.existsSync(f.runtime), false);
+  assert.deepEqual(fs.readFileSync(f.journal), receiptBefore);
+  assert.deepEqual(fs.readFileSync(f.leasePath), leaseBefore);
+
+  // 空目录结果可被正常展示，无需依赖已经删除的旧 lease。
+  result = clean(f);
+  assert.equal(result.removed.length, 0);
+
+  for (const kind of ['cmdline', 'maps', 'environ', 'fd', 'cwd', 'alias']) {
+    f = cleanupFixture();
+    const dir = path.join(f.procRoot, '1');
+    if (['cmdline', 'maps', 'environ'].includes(kind)) fs.writeFileSync(path.join(dir, kind), f.runtime);
+    else if (kind === 'fd') fs.symlinkSync(f.marker, path.join(dir, 'fd', '4'));
+    else if (kind === 'cwd') { fs.unlinkSync(path.join(dir, 'cwd')); fs.symlinkSync(f.runtime, path.join(dir, 'cwd')); }
+    else {
+      const alias = path.join(f.parent, 'script-alias');
+      fs.symlinkSync(f.marker, alias);
+      fs.writeFileSync(path.join(dir, 'cmdline'), 'node\0' + alias + '\0');
+    }
+    result = clean(f);
+    assert.equal(result.removed.length, 0, kind);
+    assert.match(result.retained.find(v => v.path === f.runtime).reason, /Runtime in use/, kind);
+    assert.equal(fs.existsSync(f.runtime), true);
+  }
+
+  f = cleanupFixture();
+  fs.unlinkSync(path.join(f.procRoot, '1', 'cwd'));
+  result = clean(f);
+  assert.match(result.retained.find(v => v.path === f.runtime).reason, /inspection incomplete/);
+  assert.equal(fs.existsSync(f.runtime), true);
+
+  f = cleanupFixture();
+  const activeLease = new DatabaseSync(f.leasePath);
+  activeLease.prepare('INSERT INTO managed_update_handoffs VALUES (?,?,?,?)').run(f.install, 'owner', '{}', 1);
+  activeLease.close();
+  assert.match(clean(f).retained.find(v => v.path === f.runtime).reason, /Unreleased/);
+  assert.equal(fs.existsSync(f.runtime), true);
+
+  f = cleanupFixture();
+  change(f, 'phase', 'publishing');
+  assert.match(clean(f).retained.find(v => v.path === f.runtime).reason, /completed package receipt/);
+  assert.equal(fs.existsSync(f.runtime), true);
+
+  for (const kind of ['extra', 'permissions', 'marker', 'symlink', 'missing-lease', 'wal']) {
+    f = cleanupFixture();
+    if (kind === 'extra') fs.writeFileSync(path.join(f.runtime, 'recovery.sqlite'), 'preserve');
+    else if (kind === 'permissions') fs.chmodSync(f.runtime, 0o777);
+    else if (kind === 'marker') fs.writeFileSync(f.marker, JSON.stringify({ name: 'unrelated' }));
+    else if (kind === 'symlink') {
+      const actual = f.runtime + '.original';
+      fs.renameSync(f.runtime, actual);
+      fs.symlinkSync(actual, f.runtime);
+    } else if (kind === 'missing-lease') fs.unlinkSync(f.leasePath);
+    else { const db = new DatabaseSync(f.leasePath); db.exec('PRAGMA journal_mode=WAL'); db.close(); }
+    result = clean(f);
+    assert.equal(result.removed.length, 0, kind);
+    assert.equal(fs.existsSync(f.runtime), true, kind);
+    assert.equal(result.status, 'warning', kind);
+  }
+  console.log('ok: runtime cleanup, custody refusals and structured results');
 } finally {
   fs.rmSync(root, { recursive: true, force: true });
 }

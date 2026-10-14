@@ -26,6 +26,23 @@ oc_update_receipt() {
 		"$OC_GLOBAL/lib/node_modules/openclaw" "$@"
 }
 
+oc_update_preview() {
+	# 官方预演使用同一目标与停服策略；拒绝或未知安装方式都不能进入停服。
+	if [ "$#" -gt 0 ]; then
+		update_preview_json=$(oc_update_cli update --dry-run --no-restart --json --tag "$1") || return 1
+	else
+		update_preview_json=$(oc_update_cli update --dry-run --no-restart --json) || return 1
+	fi
+	printf '%s' "$update_preview_json" | "$NODE_BASE/bin/node" -e '
+let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{
+try {
+ const d=JSON.parse(s);
+ if(d.dryRun!==true || !["npm","pnpm","bun"].includes(d.mode))process.exitCode=1;
+ else console.log("Official update preflight passed");
+}catch { process.exitCode=1; }
+});'
+}
+
 oc_update_health() {
 	# 只检查本机网关，不输出健康响应中的渠道和用户资料。
 	update_health_json=$(timeout 15 "${OPENCLAW_UPDATE_CLI:-/usr/bin/openclaw}" health --json 2>/dev/null) || return 1
@@ -57,6 +74,22 @@ oc_update_restore() {
 	return 1
 }
 
+oc_update_cleanup() {
+	# 恢复流程结束后以 root 读取 /proc；清理结果写入现有 LuCI 升级日志。
+	update_cleanup_json=$("$NODE_BASE/bin/node" /usr/libexec/openclaw-update-cleanup.mjs \
+		"$OC_GLOBAL/lib/node_modules/openclaw" "$OC_TMP")
+	update_cleanup_rc=$?
+	if [ -n "$update_cleanup_json" ]; then
+		printf 'Retained runtime cleanup: %s\n' "$update_cleanup_json"
+	else
+		echo 'Retained runtime cleanup: {"status":"warning","removed":[],"retained":[],"reason":"cleanup helper returned no result"}'
+	fi
+	if [ "$update_cleanup_rc" -ne 0 ]; then
+		echo "Runtime cleanup warning: helper exited $update_cleanup_rc; update outcome is preserved" >&2
+	fi
+	return 0
+}
+
 oc_update_finish() {
 	update_exit=$?
 	trap - EXIT INT TERM
@@ -64,6 +97,10 @@ oc_update_finish() {
 		if ! oc_update_restore; then
 			[ "$update_exit" -ne 0 ] || update_exit=1
 		fi
+	fi
+	# 仅在官方更新实际运行过之后清理；仍持有 LuCI 操作锁。
+	if [ "${update_attempted:-no}" = yes ]; then
+		oc_update_cleanup || echo "Runtime cleanup warning: recovery and update outcome are preserved" >&2
 	fi
 	[ "$update_owns_lock" = no ] || release_operation_lock
 	rm -f /tmp/luci-openclaw-status.*
@@ -75,6 +112,7 @@ oc_update_run() {
 	case "$update_was_running" in yes|no) ;; *) return 1 ;; esac
 	# 在停服前拒绝未完成或无法确认的回执，减少无效停机。
 	oc_update_receipt || return 1
+	oc_update_preview "$@" || return 1
 	update_before=$(oc_update_cli --version) || return 1
 	echo "Installed before update: $update_before"
 	update_restore_needed=yes
@@ -99,6 +137,7 @@ oc_update_run() {
 	done
 	# 历史备份可能含失效软链接；修正链接本身，避免越过运行目录修改目标。
 	chown -hR openclaw:openclaw "$OC_HOME" || return 1
+	update_attempted=yes
 	if [ "$#" -gt 0 ]; then
 		oc_update_cli update --yes --no-restart --tag "$1"
 	else
@@ -127,6 +166,7 @@ if [ "${OPENCLAW_UPDATE_LOCK_HELD:-0}" != 1 ]; then
 	update_owns_lock=yes
 fi
 update_restore_needed=no
+update_attempted=no
 trap oc_update_finish EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM

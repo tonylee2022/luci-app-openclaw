@@ -51,8 +51,9 @@ chmod +x "$DATA_DIR/usr/bin/openclaw-env" "$DATA_DIR/usr/bin/openclaw" "$DATA_DI
 # shared shell helpers
 mkdir -p "$DATA_DIR/usr/libexec"
 cp "$PKG_DIR/root/usr/libexec/"*.sh "$DATA_DIR/usr/libexec/"
-# Node.js 回执检查器作为数据文件安装，由升级助手调用。
+# Node.js 回执检查器与清理器作为数据文件安装，由升级助手调用。
 cp "$PKG_DIR/root/usr/libexec/openclaw-update-receipt.mjs" "$DATA_DIR/usr/libexec/"
+cp "$PKG_DIR/root/usr/libexec/openclaw-update-cleanup.mjs" "$DATA_DIR/usr/libexec/"
 chmod +x "$DATA_DIR/usr/libexec/"*.sh
 
 # Modern LuCI JavaScript views and resources

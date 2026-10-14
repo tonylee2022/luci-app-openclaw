@@ -129,7 +129,11 @@ openclaw-env node [x.y.z]       # 安装/更新 Node.js（不加版本号则使�
 
 LuCI 的 OpenClaw 升级与 `openclaw-env upgrade` 共用升级助手：停服前检查安装回执，仍由官方 `openclaw update --yes --no-restart` 执行候选验证、包替换和迁移，再由 procd 恢复升级前正在运行的服务并检查网关健康。原来已停止的服务保持停止。命令行升级指定 npm `latest`，LuCI 保留官方更新渠道选择。升级失败与服务恢复失败分别记录，恢复旧服务不会被报告为升级成功。
 
-新版升级回执可能绑定 `/tmp/openclaw/managed-update-handoffs.sqlite` 的文件身份。临时数据库或目录重建后，助手只在确认回执为已完成的 `external-helper` v1 操作、安装身份匹配、无恢复助手或未释放租约时，将失效回执完整归档为全局包目录旁的 `.openclaw-receipt-archive-*`。原 SQLite 内容保留，不改写记录中的身份。未知格式、未完成操作、热日志和不安全权限会阻止自动处理；升级失败后若官方仍保留操作所有权，助手也不会强行启动网关。此时保留回执、快照和更新报告，按报告中的恢复指引处理。
+停服前还会使用同一目标执行官方 `openclaw update --dry-run --no-restart --json` 预演；官方拒绝、结果无效或安装方式未知时不进入停服。
+
+新版升级回执可能绑定 `/tmp/openclaw/managed-update-handoffs.sqlite` 的旧文件身份。助手只读核验已完成的 `external-helper` v1 回执、安装身份和现存 lease；已完成回执不会仅因临时 lease 数据库缺失而被拒绝。新 lease 所有权及历史回执归档由官方更新器处理，LuCI 不自行创建数据库或改写历史身份。未知格式、未完成操作、热日志、不安全权限和未释放 lease 仍会阻止处理；官方保留操作所有权时也不会强行启动网关。保留回执、快照和更新报告，按官方恢复指引处理。
+
+服务恢复流程结束后，升级助手以 root 清理遗留的官方更新运行副本，避免普通用户读取 `/proc/1/cwd` 被拒绝导致副本长期堆积。清理器要求合法投影包标记、匹配的完成回执、无活动 lease、目录身份稳定且无进程引用；检查不完整时保留副本。结果写入升级日志，例如 `Retained runtime cleanup: {"status":"ok","removed":[],"retained":[]}`。`removed` 列出删除路径，`retained` 列出保留路径和原因；清理警告不会覆盖升级或服务恢复结果。
 
 不要删除 `/tmp/openclaw` 或升级恢复文件来强行重试。升级可能迁移数据库，归档回执本身不提供数据回滚能力。
 

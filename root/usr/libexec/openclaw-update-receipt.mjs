@@ -1,7 +1,7 @@
-// 仅兼容已核验的 external-helper v1 完成回执；未知格式保留并拒绝升级。
+// 只读检查已核验的完成回执；新租约与历史归档由官方更新器取得所有权后处理。
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { pathToFileURL } from 'node:url';
 
@@ -177,7 +177,10 @@ export async function inspectReceipt(installKey, { checkOnly = false, leasePath 
       d.preparation.every(v => exactKeys(v, ['name', 'source', 'sourceParentIdentity', 'identity']) &&
         expected.get(v.name) === v.identity && validIdentity(v.identity) && validIdentity(v.sourceParentIdentity) && absolute(v.source)) &&
       d.preparation.find(v => v.name === 'candidate')?.source === d.originalStageRoot &&
-      d.preparation.find(v => v.name === 'helper')?.source === path.join(control, 'recovery.mjs') &&
+      // 官方先在 staging 发布 helper，再移入 control；历史来源保留 staging 路径。
+      [path.join(control, 'recovery.mjs'),
+        `${d.preparation.find(v => v.name === 'anchor')?.source}.recovery.mjs`]
+        .includes(d.preparation.find(v => v.name === 'helper')?.source) &&
       Array.isArray(d.launchers) && d.launchers.length <= 64 &&
       new Set(d.launchers.map(v => v.name)).size === d.launchers.length &&
       d.launchers.every(v => exactKeys(v, ['name', 'previous', 'candidate', 'previousIdentity', 'candidateIdentity']) &&
@@ -192,28 +195,14 @@ export async function inspectReceipt(installKey, { checkOnly = false, leasePath 
         d.launchers.some(l => l.name === v.name)), 'Invalid completed receipt custody');
 
     const current = leasePath ?? await currentLeasePath(installKey);
-    requireCondition(stat(current), 'Current update lease database is absent; preserve receipt and inspect manually');
-    // 保留 SQLite 只读事务的共享锁，阻止检查到归档之间插入升级租约。
+    // 完成回执只是历史证据，临时 lease 数据库缺失不能重新打开已完成操作。
+    // 现存数据库仍检查并发所有权；不创建数据库、不改写身份、不自行归档。
     for (const file of new Set([current, a.databasePath])) {
       if (!stat(file)) continue;
       assertEmptyLease(file, readers);
     }
-    const stale = current !== a.databasePath || identity(a.databasePath) !== a.databaseIdentity ||
-      identity(path.dirname(a.databasePath)) !== a.parentIdentity;
     for (const reader of readers) reader.assertUnchanged();
-    if (!stale || checkOnly) return stale ? 'Completed receipt has stale executor identity' : 'Completed package receipt is current';
-
-    // 在同一父目录原子改名，完整保留原回执；不伪造新数据库身份。
-    const destination = path.join(parent, `.openclaw-receipt-archive-${key}-${randomUUID()}`);
-    requireCondition(!stat(destination) && identity(control) === d.journalParentIdentity && !stat(anchor) &&
-      fs.readdirSync(control).length === 1 && fs.readdirSync(control)[0] === 'operation.sqlite',
-      'Receipt custody changed before archival');
-    fs.renameSync(control, destination);
-    const fd = fs.openSync(parent, 'r');
-    try { fs.fsyncSync(fd); }
-    catch (error) { throw new Error(`Receipt preserved at ${destination}, but directory sync failed: ${error.message}`); }
-    finally { fs.closeSync(fd); }
-    return `Archived completed stale receipt: ${destination}`;
+    return 'Completed package receipt; official updater owns lease admission and archival';
   } finally {
     for (const reader of readers.reverse()) reader.db.close();
   }
