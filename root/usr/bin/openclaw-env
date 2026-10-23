@@ -18,15 +18,15 @@
 set -e
 
 # ── Node.js 版本策略 ──
-# 默认运行时版本，用于 OpenClaw v2026.8.1+
-NODE_VERSION_V2="22.22.3"
+# 默认运行时版本，满足 OpenClaw 2026.10.6 的 Node 24 分支要求。
+NODE_VERSION_V2="24.22.1"
 # 可通过 NODE_VERSION 环境变量覆盖，但仍必须满足最低版本要求。
 NODE_VERSION="${NODE_VERSION:-${NODE_VERSION_V2}}"
 # 经过验证的 OpenClaw 稳定版本 (更新此值需同步测试)
 OC_TESTED_VERSION="2026.8.1"
-# OpenClaw 2026.8.1 package.json engines.node 的 Node 22 最低要求。
-# 如果未来上游提高要求，安装成功后还会从 package.json 再做一次强校验。
-OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-22.22.3}"
+# 完整支持范围由 openclaw-node.sh 统一校验；此值只允许额外提高最低要求。
+# 安装后还会校验实际 OpenClaw package.json 中的完整 engines.node。
+OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-24.22.1}"
 # 用户可通过 OC_VERSION 环境变量覆盖安装版本
 OC_VERSION="${OC_VERSION:-}"
 
@@ -255,27 +255,22 @@ detect_oc_node_requirement() {
 	[ -f "$pkg_json" ] || return 1
 	[ -x "$NODE_BIN" ] || return 1
 
-	required=$(OC_PKG_JSON="$pkg_json" "$NODE_BIN" -e "
-const fs=require('fs');
-try{
-  const pkg=JSON.parse(fs.readFileSync(process.env.OC_PKG_JSON,'utf8'));
-  const spec=(pkg.engines&&pkg.engines.node)||'';
-  const m=String(spec).match(/([0-9]+\\.[0-9]+\\.[0-9]+)/);
-  if(m) process.stdout.write(m[1]);
-}catch(e){}
-" 2>/dev/null)
+	required=$(oc_read_node_requirement "$NODE_BIN" "$pkg_json" 2>/dev/null) || return 1
 	[ -n "$required" ] || return 1
 	printf '%s\n' "$required"
 }
 
 assert_node_runtime() {
-	local required="$OC_NODE_MIN_VERSION"
 	local from_pkg
-	from_pkg=$(detect_oc_node_requirement 2>/dev/null || true)
-	[ -n "$from_pkg" ] && required="$from_pkg"
-
+	if command -v oc_assert_node_version_range >/dev/null 2>&1; then
+		oc_assert_node_version_range "$NODE_BIN" "$OC_NODE_SUPPORTED_RANGE" || exit 1
+	fi
 	if command -v oc_assert_node_min_version >/dev/null 2>&1; then
-		oc_assert_node_min_version "$NODE_BIN" "$required" || exit 1
+		oc_assert_node_min_version "$NODE_BIN" "$OC_NODE_MIN_VERSION" || exit 1
+	fi
+	from_pkg=$(detect_oc_node_requirement 2>/dev/null || true)
+	if [ -n "$from_pkg" ] && command -v oc_assert_node_version_range >/dev/null 2>&1; then
+		oc_assert_node_version_range "$NODE_BIN" "$from_pkg" || exit 1
 	fi
 }
 
@@ -300,25 +295,25 @@ detect_arch() {
 
 download_node() {
 	local node_ver="$1"
+	# 下载前拒绝不支持的目标版本，不覆盖旧运行时，也不触发网关重启。
+	if command -v oc_node_version_in_range >/dev/null 2>&1; then
+		if ! oc_node_version_in_range "$node_ver" "$OC_NODE_SUPPORTED_RANGE" ||
+		   ! oc_node_version_ge "$node_ver" "$OC_NODE_MIN_VERSION"; then
+			log_error "Node.js v${node_ver} 不满足要求: ${OC_NODE_SUPPORTED_RANGE} (最低 v${OC_NODE_MIN_VERSION})"
+			exit 1
+		fi
+	fi
 	local node_arch
 	node_arch=$(detect_arch)
 	local libc_type
 	libc_type=$(detect_libc)
 
-	# 如果已存在且版本兼容，跳过
+	# 仅完整版本一致时跳过，显式切换必须支持同主版本升级和降级。
 	if [ -x "$NODE_BIN" ]; then
 		local current_ver
 		current_ver=$("$NODE_BIN" --version 2>/dev/null | sed 's/^v//')
 		if [ "$current_ver" = "$node_ver" ]; then
 			log_info "Node.js v${node_ver} 已安装, 跳过下载"
-			assert_node_runtime
-			return 0
-		fi
-		# 已装版本与目标主版本号相同则视为兼容，跳过下载(避免无谓重装)。
-		local cur_major=$(echo "$current_ver" | cut -d. -f1)
-		local want_major=$(echo "$node_ver" | cut -d. -f1)
-		if [ "$cur_major" = "$want_major" ]; then
-			log_info "Node.js v${current_ver} 已安装 (兼容 v${node_ver}), 跳过下载"
 			assert_node_runtime
 			return 0
 		fi
@@ -412,9 +407,17 @@ download_node() {
 	fi
 	rm -f "$tmp_file"
 
-	# 暂存校验：新 node 可执行且能报版本；不通过则保留现有 node, 清理暂存。
-	if [ ! -x "$staging_bin" ] || ! "$staging_bin" --version >/dev/null 2>&1; then
-		log_error "新 Node.js 校验失败，已保留现有版本"
+	# 替换前核对下载包的完整版本，防止镜像返回错误版本后覆盖现有运行时。
+	local staged_ver
+	staged_ver=$("$staging_bin" --version 2>/dev/null) || staged_ver=""
+	if [ ! -x "$staging_bin" ] || [ "$staged_ver" != "v${node_ver}" ]; then
+		log_error "新 Node.js 版本校验失败 (目标 v${node_ver}, 实际 ${staged_ver:-unknown})，已保留现有版本"
+		rm -rf "$staging"
+		exit 1
+	fi
+	# 新运行时也必须兼容已安装的 OpenClaw，校验失败时保留旧版本。
+	if ! (NODE_BIN="$staging_bin"; assert_node_runtime); then
+		log_error "新 Node.js 与 OpenClaw 不兼容，已保留现有版本"
 		rm -rf "$staging"
 		exit 1
 	fi
@@ -430,8 +433,12 @@ download_node() {
 	if [ -x "$NODE_BIN" ]; then
 		local installed_ver
 		installed_ver=$("$NODE_BIN" --version 2>/dev/null || echo "unknown")
-		log_info "Node.js ${installed_ver} 安装成功"
+		if [ "$installed_ver" != "v${node_ver}" ]; then
+			log_error "Node.js 安装版本不符 (目标 v${node_ver}, 实际 ${installed_ver})"
+			exit 1
+		fi
 		assert_node_runtime
+		log_info "Node.js ${installed_ver} 安装成功"
 	else
 		log_error "Node.js 安装验证失败"
 		exit 1

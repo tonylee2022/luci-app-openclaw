@@ -221,7 +221,7 @@ case "${1:-}" in
 		;;
 	env-upgrade-node)
 		ver="${2:-}"
-		echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Invalid Node version format (e.g. 22.22.3)"
+		echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "Invalid Node version format (e.g. 24.22.1)"
 		load_paths
 		# openclaw-env node <ver> 暂存→校验→替换(失败保留现有 node)。仅成功(rc=0)才 chown + 重启网关;
 		# 失败则不重启, 网关继续跑在现有 node 上, 不会把安装搞坏。

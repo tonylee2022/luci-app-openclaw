@@ -69,8 +69,12 @@ Run OpenClaw on your router and use LuCI to install its runtime, manage the serv
 | Component | Default | Notes |
 |-----------|---------|-------|
 | OpenClaw | `2026.8.1` | Default tested release; the latest release can also be selected |
-| Node.js | `22.22.3` | Minimum for Node 22: `22.22.3`; OpenClaw engines are enforced after installation |
+| Node.js | `24.22.1` | Supports `>=24.22.1 <25` or `>=26.12.1`; enforced during installation, version switching, and service startup |
 | WeChat plugin | Official compatible release | `@tencent-weixin/openclaw-weixin@latest` |
+
+OpenClaw `2026.10.6` raised its Node.js requirements. Node 22, Node `24.17.0`, Node 25, and Node 26 below `26.12.1` are unsupported. Before updating OpenClaw, use **Runtime upgrade → Switch Node version** to install `24.22.1`, confirm that the gateway recovers, and then update OpenClaw. Updating this LuCI app does not replace an existing Node runtime automatically; upgrade an older runtime before restarting the service.
+
+Version switching skips downloading only when the full version already matches. Upgrades and downgrades within the same major release are applied, provided the target satisfies both the supported range and the installed OpenClaw package's `engines.node`. The new runtime is extracted into staging and checked before replacing the old version, then checked again at its final path before success is reported.
 
 ## 📦 Installation
 

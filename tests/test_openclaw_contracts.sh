@@ -41,6 +41,22 @@ fi
 # 唯一真实的跨文件重复: init.d 的最低 Node.js 版本默认值必须与 openclaw-env 一致。
 grep -q "OC_NODE_MIN_VERSION=\"\${OC_NODE_MIN_VERSION:-${_NODE_MIN_VER}}\"" root/etc/init.d/openclaw || fail "service minimum Node.js version (init.d) not aligned with openclaw-env (expected ${_NODE_MIN_VER})"
 grep -q "oc_assert_node_min_version" root/usr/bin/openclaw-env || fail "Node.js minimum version check missing"
+. ./root/usr/libexec/openclaw-node.sh
+oc_node_version_in_range "$_NODE_VER" "$OC_NODE_SUPPORTED_RANGE" || fail "default Node must satisfy upstream range"
+oc_node_version_ge "$_NODE_VER" "$_NODE_MIN_VER" || fail "default Node below minimum"
+for entrypoint in root/usr/bin/openclaw-env root/etc/init.d/openclaw; do
+	grep -Fq 'oc_assert_node_version_range "$NODE_BIN" "$OC_NODE_SUPPORTED_RANGE"' "$entrypoint" || fail "upstream range check missing: $entrypoint"
+	grep -Fq 'oc_read_node_requirement' "$entrypoint" || fail "package engines check missing: $entrypoint"
+done
+for readme in README.md README_EN.md; do
+	grep -Fq "| Node.js | \`$_NODE_VER\` |" "$readme" || fail "documented default Node differs: $readme"
+	grep -Fq '>=24.22.1 <25' "$readme" || fail "Node 24 range missing: $readme"
+	grep -Fq '>=26.12.1' "$readme" || fail "Node 26 range missing: $readme"
+done
+grep -Fq "E('option', { value: '$_NODE_VER' }, 'Node $_NODE_VER')" htdocs/luci-static/resources/view/openclaw/overview.js || fail "Node UI default differs"
+if grep -Eq "value: '(22[.]22[.]3|24[.]17[.]0)'" htdocs/luci-static/resources/view/openclaw/overview.js; then
+	fail "unsupported Node must not remain a preset option"
+fi
 grep -A5 '# Node.js' root/usr/bin/openclaw-env | grep -q 'assert_node_runtime' || fail "environment check must validate Node.js version"
 if grep -q 'NODE_VERSION_V1\|v1_tarball' root/usr/bin/openclaw-env; then
 	fail "installer must not fall back to a Node.js version below the minimum"

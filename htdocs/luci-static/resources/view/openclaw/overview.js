@@ -105,10 +105,9 @@ return view.extend({
 	showSetup: function() {
 		var stableLabel = this._stableVersion ? _('Stable (%s)').format(this._stableVersion) : _('Stable');
 		var version = E('select', { 'class': 'cbi-input-select' }, [ E('option', { value: 'stable' }, stableLabel), E('option', { value: 'latest' }, _('Latest (latest)')) ]);
-		// Node.js 版本: 稳定版(默认) / 最新版 / 自定义输入
+		// 默认使用已验证的 Node 24 最低兼容版本，也允许自定义受支持的版本。
 		var nodeVerSel = E('select', { 'class': 'cbi-input-select oc-input', style: 'width:auto' }, [
-			E('option', { value: '22.22.3' }, 'Node 22.22.3'),
-			E('option', { value: '24.17.0' }, 'Node 24.17.0'),
+			E('option', { value: '24.22.1' }, 'Node 24.22.1'),
 			E('option', { value: '__custom__' }, _('Custom version...'))
 		]);
 		var nodeVerCustom = E('input', {
@@ -147,7 +146,7 @@ return view.extend({
 			if (nodeVerSel.value === '__custom__' && !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(nv)) {
 				progress.style.display = '';
 				progress.className = 'oc-task-state oc-task-error';
-				progress.textContent = _('Invalid Node.js version format, enter x.y.z (e.g. 24.17.0).');
+				progress.textContent = _('Invalid Node.js version format, enter x.y.z (e.g. 24.22.1).');
 				return;
 			}
 			install.disabled = true;
@@ -222,6 +221,7 @@ return view.extend({
 		});
 		ui.showModal(_('Install runtime'), [
 			E('p', {}, _('The installer creates an openclaw directory under the selected mount point. Choose a disk mount with enough space (>=2GB).')),
+			E('p', { 'class': 'oc-muted' }, _('Node.js requires >=24.22.1 <25 or >=26.12.1. Upgrade Node.js before updating OpenClaw.')),
 			E('div', { 'class': 'oc-form-row' }, [ E('label', {}, _('Version')), version ]),
 			E('div', { 'class': 'oc-form-row' }, [
 				E('label', {}, _('Node.js version')),
@@ -479,10 +479,9 @@ return view.extend({
 	showEnvUpgrade: function() {
 		var status = E('div', { 'class': 'oc-action-status', 'style': 'display:none' });
 		var log = E('pre', { 'class': 'oc-log', 'style': 'display:none' }, '');
-		// 更换 Node 版本: 版本选择器(与安装对话框一致) + 自定义输入。底层 env-upgrade-node 会整删 NODE_BASE 再装所选版本(含降级)。
+		// 更换 Node 版本与安装对话框一致，暂存校验后才替换现有运行时。
 		var nodeSel = E('select', { 'class': 'cbi-input-select', 'style': 'width:auto' }, [
-			E('option', { value: '22.22.3' }, 'Node 22.22.3'),
-			E('option', { value: '24.17.0' }, 'Node 24.17.0'),
+			E('option', { value: '24.22.1' }, 'Node 24.22.1'),
 			E('option', { value: '__custom__' }, _('Custom version...'))
 		]);
 		var nodeCustom = E('input', { 'class': 'cbi-input-text', placeholder: 'x.y.z', 'style': 'display:none;width:7rem;margin-left:6px' });
@@ -555,6 +554,7 @@ return view.extend({
 		};
 		ui.showModal(_('Runtime upgrade'), [
 			E('p', { 'class': 'oc-muted' }, _('Upgrade runtime components; the gateway restarts automatically to apply changes. "Switch Node version" fully replaces Node with the selected version (including downgrade), no need to uninstall Node first.')),
+			E('p', { 'class': 'oc-muted' }, _('Node.js requires >=24.22.1 <25 or >=26.12.1. Upgrade Node.js before updating OpenClaw.')),
 			E('div', { 'class': 'oc-actions' }, [
 				ocui.button(_('Upgrade OpenClaw to latest'), 'cbi-button-positive', function() {
 					ocui.setStatus(status, 'running', _('Checking version...'));
@@ -581,7 +581,7 @@ return view.extend({
 				E('span', {}, _('Node version')),
 				E('span', { 'class': 'oc-value' }, [ nodeSel, nodeCustom, ' ', ocui.button(_('Switch Node version'), 'cbi-button-action', function() {
 					var v = getNodeVer();
-					if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(v)) { ocui.setStatus(status, 'error', _('Invalid Node version format, enter x.y.z (e.g. 24.17.0).')); return; }
+					if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(v)) { ocui.setStatus(status, 'error', _('Invalid Node version format, enter x.y.z (e.g. 24.22.1).')); return; }
 					return run(_('Switch Node version'), function() { return api.envUpgradeNode(v); });
 				}) ])
 			]),

@@ -15,7 +15,7 @@ EXTRA_HELP="    setup            下载 Node.js 并安装 OpenClaw
 # 统一路径解析可以兼容 /mnt/data/openclaw 输入，避免双拼路径。
 [ -r /usr/libexec/openclaw-paths.sh ] && . /usr/libexec/openclaw-paths.sh
 [ -r /usr/libexec/openclaw-node.sh ] && . /usr/libexec/openclaw-node.sh
-OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-22.22.3}"
+OC_NODE_MIN_VERSION="${OC_NODE_MIN_VERSION:-24.22.1}"
 OC_CONFIGURED_PATH="$(uci -q get openclaw.main.install_path 2>/dev/null || echo '/opt')"
 if command -v oc_load_paths >/dev/null 2>&1; then
 	if ! oc_load_paths "$OC_CONFIGURED_PATH"; then
@@ -268,6 +268,9 @@ echo "未找到 Node.js: $NODE_BIN"
 echo "请运行: openclaw-env setup"
 return 1
 fi
+if command -v oc_assert_node_version_range >/dev/null 2>&1; then
+	oc_assert_node_version_range "$NODE_BIN" "$OC_NODE_SUPPORTED_RANGE" || return 1
+fi
 if command -v oc_assert_node_min_version >/dev/null 2>&1; then
 	oc_assert_node_min_version "$NODE_BIN" "$OC_NODE_MIN_VERSION" >/dev/null || {
 		echo "Node.js 版本过低，OpenClaw 需要 >= v${OC_NODE_MIN_VERSION}"
@@ -285,6 +288,13 @@ oc_entry=$(get_oc_entry)
 if [ -z "$oc_entry" ]; then
 echo "OpenClaw 未安装。请运行: openclaw-env setup"
 return 1
+fi
+if command -v oc_read_node_requirement >/dev/null 2>&1; then
+	local node_requirement
+	node_requirement=$(oc_read_node_requirement "$NODE_BIN" "$(dirname "$oc_entry")/package.json" 2>/dev/null || true)
+	if [ -n "$node_requirement" ]; then
+		oc_assert_node_version_range "$NODE_BIN" "$node_requirement" || return 1
+	fi
 fi
 
 	# 同步 UCI 到 JSON

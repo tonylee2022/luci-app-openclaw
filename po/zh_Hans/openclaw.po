@@ -513,17 +513,17 @@ msgstr "Bot Token 格式无效（应形如 123456789:ABC...）"
 msgid "Invalid Node version format"
 msgstr "Node 版本号格式无效"
 
-msgid "Invalid Node version format (e.g. 22.22.3)"
-msgstr "Node 版本号格式无效 (如 22.22.3)"
+msgid "Invalid Node version format (e.g. 24.22.1)"
+msgstr "Node 版本号格式无效 (如 24.22.1)"
 
-msgid "Invalid Node version format, enter x.y.z (e.g. 24.17.0)."
-msgstr "Node 版本格式无效，请输入 x.y.z（如 24.17.0）。"
+msgid "Invalid Node version format, enter x.y.z (e.g. 24.22.1)."
+msgstr "Node 版本格式无效，请输入 x.y.z（如 24.22.1）。"
 
 msgid "Invalid Node.js version format"
 msgstr "Node.js 版本号格式无效"
 
-msgid "Invalid Node.js version format, enter x.y.z (e.g. 24.17.0)."
-msgstr "Node.js 版本格式无效，请输入 x.y.z 格式（如 24.17.0）。"
+msgid "Invalid Node.js version format, enter x.y.z (e.g. 24.22.1)."
+msgstr "Node.js 版本格式无效，请输入 x.y.z 格式（如 24.22.1）。"
 
 msgid "Invalid QR code text"
 msgstr "二维码文本无效"
@@ -713,6 +713,9 @@ msgstr "Node.js 路径"
 
 msgid "Node.js runtime"
 msgstr "Node.js 运行时"
+
+msgid "Node.js requires >=24.22.1 <25 or >=26.12.1. Upgrade Node.js before updating OpenClaw."
+msgstr "Node.js 需满足 >=24.22.1 <25 或 >=26.12.1。更新 OpenClaw 前，请先升级 Node.js。"
 
 msgid "Node.js runtime kept."
 msgstr "Node.js 运行时已保留。"
