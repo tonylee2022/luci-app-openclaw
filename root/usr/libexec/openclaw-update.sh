@@ -27,7 +27,7 @@ oc_update_receipt() {
 }
 
 oc_update_preview() {
-	# 官方预演使用同一目标与停服策略；拒绝或未知安装方式都不能进入停服。
+	# 官方预演使用同一升级目标；拒绝或未知安装方式都不能进入包替换。
 	if [ "$#" -gt 0 ]; then
 		update_preview_json=$(oc_update_cli update --dry-run --no-restart --json --tag "$1") || return 1
 	else
@@ -37,7 +37,8 @@ oc_update_preview() {
 let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{
 try {
  const d=JSON.parse(s);
- if(d.dryRun!==true || !["npm","pnpm","bun"].includes(d.mode))process.exitCode=1;
+ if(d.dryRun!==true || !["npm","pnpm","bun"].includes(d.mode) ||
+    ("failures" in d && (!Array.isArray(d.failures) || d.failures.length>0)))process.exitCode=1;
  else console.log("Official update preflight passed");
 }catch { process.exitCode=1; }
 });'
@@ -112,7 +113,6 @@ oc_update_run() {
 	case "$update_was_running" in yes|no) ;; *) return 1 ;; esac
 	# 在停服前拒绝未完成或无法确认的回执，减少无效停机。
 	oc_update_receipt || return 1
-	oc_update_preview "$@" || return 1
 	update_before=$(oc_update_cli --version) || return 1
 	echo "Installed before update: $update_before"
 	update_restore_needed=yes
@@ -120,7 +120,7 @@ oc_update_run() {
 		echo "Failed to stop OpenClaw; update was not started" >&2
 		return 1
 	fi
-	# procd 的 stop 异步完成，等待它释放进程后才能迁移数据库。
+	# procd 的 stop 异步完成，上游预演需要确认网关已释放状态。
 	update_stop_deadline=$(( $(date +%s) + ${OPENCLAW_UPDATE_STOP_WAIT:-60} ))
 	while :; do
 		update_running=$(oc_update_running) || return 1
@@ -135,6 +135,11 @@ oc_update_run() {
 		fi
 		sleep 2
 	done
+	echo "Running official update preflight after Gateway shutdown..."
+	if ! oc_update_preview "$@"; then
+		echo "Official update preflight failed; package update was not started" >&2
+		return 1
+	fi
 	# 历史备份可能含失效软链接；修正链接本身，避免越过运行目录修改目标。
 	chown -hR openclaw:openclaw "$OC_HOME" || return 1
 	update_attempted=yes

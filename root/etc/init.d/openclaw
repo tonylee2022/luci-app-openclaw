@@ -123,13 +123,93 @@ fix_managed_plugin_ownership() {
 	chown -R openclaw:openclaw "$projects" 2>/dev/null || true
 }
 
+patch_modern_iframe_headers() {
+	local addresses listeners
+	addresses="$(uci -q get network.lan.ipaddr 2>/dev/null || :) $(uci -q get network.lan.ip6addr 2>/dev/null || :)"
+	listeners="$(uci -q get uhttpd.main.listen_http 2>/dev/null || :)"
+	# 以包属主更新控制台模块，避免特权进程写入运行用户掌控的目录。
+	su -s /bin/sh -c 'exec "$@"' -- openclaw sh "$NODE_BIN" --input-type=module - "$1" "$addresses" "$listeners" <<'NODE'
+import fs from 'node:fs';
+import net from 'node:net';
+import path from 'node:path';
+
+const [file, addresses, listeners] = process.argv.slice(2);
+const origins = new Set();
+for (const addressWithPrefix of addresses.trim().split(/\s+/)) {
+	const address = addressWithPrefix.split('/')[0];
+	const family = net.isIP(address);
+	if (!family) continue;
+	const host = family === 6 ? `[${address}]` : address;
+	const wildcard = family === 6 ? '[::]' : '0.0.0.0';
+	for (const listener of listeners.trim().split(/\s+/)) {
+		const binding = listener.match(/^(.*):([0-9]{1,5})$/);
+		if (!binding || (binding[1] !== wildcard && binding[1] !== host)) continue;
+		const port = Number(binding[2]);
+		if (port > 0 && port <= 65535) origins.add(new URL(`http://${host}:${port}`).origin);
+	}
+}
+
+const stat = fs.lstatSync(file);
+if (!stat.isFile() || stat.uid !== process.getuid() || stat.size > 65536) throw Error('Unsafe Control UI CSP module');
+const source = fs.readFileSync(file, 'utf8');
+const builder = source.match(/^function buildControlUiCspHeader\((\w+)\) \{\n(?:\t\1 = [^\n]+; \/\/ patched by luci-app-openclaw\n)?/m);
+if (!builder) throw Error('Unrecognized Control UI CSP builder');
+const options = builder[1];
+const allowed = JSON.stringify([...origins]);
+const originalBuilder = `function buildControlUiCspHeader(${options}) {\n`;
+// HTML 渲染会重建 CSP，使用与初始响应头相同的直连来源。
+const replacementBuilder = origins.size ? originalBuilder +
+	`\t${options} = { ...${options}, frameAncestors: ${options}?.frameAncestors ?? ${allowed} }; // patched by luci-app-openclaw\n`
+	: originalBuilder;
+const match = source.match(/^function applyControlUiSecurityHeaders\((\w+), (\w+)\) \{\n[\s\S]*?^\}/m);
+if (!match) throw Error('Unrecognized Control UI header handler');
+const [handler, response, context] = match;
+const upstreamAncestors = `${context}?.frameAncestors`;
+const originalHandler = handler
+	.replace(/^\tconst luciFrameAncestors = [^\n]+; \/\/ patched by luci-app-openclaw\n/m, '')
+	.replaceAll('luciFrameAncestors', upstreamAncestors);
+const original = [
+	`\tif (${upstreamAncestors}.length) ${response}.removeHeader("X-Frame-Options");`,
+	`\telse ${response}.setHeader("X-Frame-Options", "DENY");`,
+	`\t${response}.setHeader("Content-Security-Policy", buildControlUiCspHeader({ frameAncestors: ${upstreamAncestors} }));`
+].join('\n');
+if (!originalHandler.includes(original)) throw Error('Unrecognized Control UI frame policy');
+const replacement = origins.size ? originalHandler.replace(original, [
+	`\tconst luciFrameAncestors = ${upstreamAncestors} ?? ${allowed}; // patched by luci-app-openclaw`,
+	original.replaceAll(upstreamAncestors, 'luciFrameAncestors')
+].join('\n')) : originalHandler;
+const patched = source.replace(handler, replacement).replace(builder[0], replacementBuilder);
+if (patched !== source) {
+	const workspace = fs.mkdtempSync(path.join(path.dirname(file), '.luci-iframe-'));
+	const temporary = path.join(workspace, path.basename(file));
+	try {
+		fs.writeFileSync(temporary, patched, { mode: stat.mode & 0o777 });
+		fs.renameSync(temporary, file);
+	} finally {
+		if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+		fs.rmdirSync(workspace);
+	}
+}
+NODE
+}
+
 patch_iframe_headers() {
-# 移除 OpenClaw 网关的 X-Frame-Options 和 frame-ancestors 限制，允许 LuCI iframe 嵌入
-# 搜索当前可能设置安全头的 bundle。
-local patched=0
+local dist="${OC_GLOBAL}/lib/node_modules/openclaw/dist" modern=0 patched=0 f
+
+# 新版控制台从上下文生成 CSP，直连时仅允许 LAN 上 LuCI 的 HTTP 来源。
+for f in "$dist"/control-ui-csp-*.mjs "$dist"/control-ui-csp-*.js; do
+	[ -f "$f" ] || continue
+	modern=1
+	if patch_modern_iframe_headers "$f"; then
+		logger -t openclaw "Configured LAN LuCI iframe policy in $f"
+	else
+		logger -t openclaw "Could not configure LAN LuCI iframe policy in $f"
+	fi
+done
+[ "$modern" -eq 0 ] || return 0
 
 # 搜索 server.impl 和 control-ui bundle，兼容新版 .mjs 模块。
-for f in $(find "${OC_GLOBAL}/lib/node_modules/openclaw/dist" -type f \( -name "server.impl-*.js" -o -name "server.impl-*.mjs" -o -name "control-ui-*.js" -o -name "control-ui-*.mjs" \) 2>/dev/null); do
+for f in $(find "$dist" -type f \( -name "server.impl-*.js" -o -name "server.impl-*.mjs" -o -name "control-ui-*.js" -o -name "control-ui-*.mjs" \) 2>/dev/null); do
 	if grep -q "X-Frame-Options.*DENY\|frame-ancestors.*none" "$f" 2>/dev/null; then
 		sed -i 's|res\.setHeader("X-Frame-Options", "DENY");|// res.setHeader("X-Frame-Options", "DENY"); // patched by luci-app-openclaw|g' "$f"
 		sed -i "s|\"frame-ancestors 'none'\"|\"frame-ancestors *\"|g" "$f"

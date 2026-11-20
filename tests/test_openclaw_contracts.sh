@@ -126,6 +126,11 @@ fi
 grep -q 'env_upgrade_check_start:.*env-upgrade-check' root/usr/share/rpcd/ucode/luci.openclaw || fail "runtime update check must start as a background task"
 grep -q "task_status('/tmp/openclaw-env-check')" root/usr/share/rpcd/ucode/luci.openclaw || fail "runtime update check status must be polled from task files"
 grep -q 'start_task /tmp/openclaw-env-check' root/usr/libexec/openclaw-rpc.sh || fail "runtime update check must not block rpcd"
+core_check=$(sed -n '/^[[:space:]]*env-upgrade-check-task)/,/^[[:space:]]*;;/p' root/usr/libexec/openclaw-rpc.sh)
+printf '%s\n' "$core_check" | grep -Fq '/usr/bin/openclaw update status --json' || fail "runtime core check must query official read-only update status"
+if printf '%s\n' "$core_check" | grep -q '/usr/bin/openclaw update .*--dry-run'; then
+	fail "runtime core check must not enter update preflight"
+fi
 if sed -n '/function env_upgrade_check_status()/,/^}/p' root/usr/share/rpcd/ucode/luci.openclaw | grep -q "run('/usr/bin/openclaw"; then
 	fail "runtime update status RPC must not execute network CLI commands synchronously"
 fi

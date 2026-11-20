@@ -133,7 +133,7 @@ openclaw-env node [x.y.z]       # 安装/更新 Node.js（不加版本号则使�
 
 LuCI 的 OpenClaw 升级与 `openclaw-env upgrade` 共用升级助手：停服前检查安装回执，仍由官方 `openclaw update --yes --no-restart` 执行候选验证、包替换和迁移，再由 procd 恢复升级前正在运行的服务并检查网关健康。原来已停止的服务保持停止。命令行升级指定 npm `latest`，LuCI 保留官方更新渠道选择。升级失败与服务恢复失败分别记录，恢复旧服务不会被报告为升级成功。
 
-停服前还会使用同一目标执行官方 `openclaw update --dry-run --no-restart --json` 预演；官方拒绝、结果无效或安装方式未知时不进入停服。
+助手等待 procd 确认网关退出，再使用同一目标执行官方 `openclaw update --dry-run --no-restart --json` 预演。官方拒绝、结果无效或安装方式未知时中止升级，并在确认回执安全后恢复原先运行的网关。
 
 新版升级回执可能绑定 `/tmp/openclaw/managed-update-handoffs.sqlite` 的旧文件身份。助手只读核验已完成的 `external-helper` v1 回执、安装身份和现存 lease；已完成回执不会仅因临时 lease 数据库缺失而被拒绝。新 lease 所有权及历史回执归档由官方更新器处理，LuCI 不自行创建数据库或改写历史身份。未知格式、未完成操作、热日志、不安全权限和未释放 lease 仍会阻止处理；官方保留操作所有权时也不会强行启动网关。保留回执、快照和更新报告，按官方恢复指引处理。
 

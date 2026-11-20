@@ -41,9 +41,11 @@ oc_update_cli() {
 	if [ "$1" = --version ]; then echo "OpenClaw test-version"; return 0; fi
 	event "cli $*"
 	if [ "${2:-}" = --dry-run ]; then
+		[ "$(oc_update_running)" = no ] || return 1
 		[ "$CASE_NAME" != preview-fail ] || return 1
 		if [ "$CASE_NAME" = preview-invalid ]; then echo "invalid";
 		elif [ "$CASE_NAME" = preview-skipped ]; then echo "{\"mode\":\"unknown\"}";
+		elif [ "$CASE_NAME" = preview-refused ]; then echo "{\"dryRun\":true,\"mode\":\"npm\",\"failures\":[{\"reason\":\"invalid-config\"}]}";
 		else echo "{\"dryRun\":true,\"mode\":\"npm\"}"; fi
 		return 0
 	fi
@@ -84,21 +86,37 @@ grep -q '^service start$' "$TEST_ROOT/update-fail/events"
 grep -q 'service recovery does not imply upgrade success' "$TEST_ROOT/update-fail/log"
 run_case health-fail 1
 run_case preflight-fail 1
-! grep -q '^service ' "$TEST_ROOT/preflight-fail/events"
-! grep -q '^cleanup$' "$TEST_ROOT/preflight-fail/events"
-for refused_preview in preview-fail preview-invalid preview-skipped; do
+
+assert_no_event() {
+	if grep -Eq "$2" "$TEST_ROOT/$1/events"; then
+		echo "FAIL: $1 recorded unexpected event matching $2"
+		exit 1
+	fi
+}
+
+assert_no_event preflight-fail '^(service |cli update |cleanup$)'
+for refused_preview in preview-fail preview-invalid preview-skipped preview-refused; do
 	run_case "$refused_preview" 1
-	! grep -q '^service ' "$TEST_ROOT/$refused_preview/events"
+	grep -q '^service stop$' "$TEST_ROOT/$refused_preview/events"
+	grep -q '^service start$' "$TEST_ROOT/$refused_preview/events"
+	grep -q '^health$' "$TEST_ROOT/$refused_preview/events"
+	grep -q 'Official update preflight failed' "$TEST_ROOT/$refused_preview/log"
+	assert_no_event "$refused_preview" '^(cli update --yes|ownership |cleanup$)'
 done
 grep -q '^cli update --dry-run --no-restart --json --tag latest$' "$TEST_ROOT/success/events"
-# 必须先通过官方预演再停服。
-awk '/^cli update --dry-run/{preview=1} /^service stop$/{if(!preview)exit 1; stopped=1} END{if(!stopped)exit 1}' "$TEST_ROOT/success/events"
+# 先由 procd 停服，再通过官方预演，最后才执行正式升级。
+awk '
+/^service stop$/ { stopped = 1 }
+/^cli update --dry-run / { if (!stopped) exit 1; previewed = 1 }
+/^cli update --yes / { if (!previewed) exit 1; updated = 1 }
+END { if (!updated) exit 1 }
+' "$TEST_ROOT/success/events"
 run_case stopped 0
-! grep -q '^service start$' "$TEST_ROOT/stopped/events"
+assert_no_event stopped '^service start$'
 run_case stop-fail 1
-! grep -q '^cli update --yes' "$TEST_ROOT/stop-fail/events"
+assert_no_event stop-fail '^cli update '
 run_case still-running 1
-! grep -q '^cli update --yes' "$TEST_ROOT/still-running/events"
+assert_no_event still-running '^cli update '
 run_case delayed-stop 0
 grep -q '^wait$' "$TEST_ROOT/delayed-stop/events"
 grep -q '^cli update' "$TEST_ROOT/delayed-stop/events"

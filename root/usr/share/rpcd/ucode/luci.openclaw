@@ -363,18 +363,24 @@ function env_upgrade_check_status() {
 	let data = task_status('/tmp/openclaw-env-check');
 	if (!data.done) return reply(true, '', data);
 	if (data.exit_code != 0) return reply(false, 'Failed to check for updates (check your network)', data);
-	// 综合判断: 核心(官方 update dry-run 的 target vs current) + 插件(plugins update --all --dry-run)。
-	// 两条联网命令由后台任务串行执行；本方法只读取结果，避免 rpcd 请求超过 LuCI 的 XHR 时限。
-	let latest = current, core_update = false, queried = false;
+	// 只读取后台任务的官方核心状态和插件预演结果，避免联网查询阻塞 rpcd。
+	let status;
 	try {
-		let j = json(readfile('/tmp/openclaw-env-check.core') || '');
-		if (j?.currentVersion) {
-			queried = true;
-			latest = j?.targetVersion ? "" + j.targetVersion : "" + j.currentVersion;
-			core_update = "" + j.currentVersion != latest;
-		}
-	} catch (e) {}
-	if (!queried) return reply(false, 'Failed to parse update check result', data);
+		status = json(readfile('/tmp/openclaw-env-check.core') || '');
+	} catch (e) {
+		return reply(false, 'Failed to parse update check result', data);
+	}
+	let availability = status?.availability;
+	if (type(availability?.hasRegistryUpdate) != 'bool')
+		return reply(false, 'Failed to parse update check result', data);
+	// 上游可能在注册表查询失败时仍返回有效 JSON 和退出码 0。
+	let registry_version = status?.update?.registry?.latestVersion;
+	if (status?.update?.error || type(registry_version) != 'string' || !length(registry_version))
+		return reply(false, 'Failed to check for updates (check your network)', data);
+	let core_update = availability.hasRegistryUpdate;
+	let latest = core_update ? availability.latestVersion : current;
+	if (type(latest) != 'string' || !length(latest))
+		return reply(false, 'Failed to parse update check result', data);
 	let plugin_update = false;
 	for (let line in split(readfile('/tmp/openclaw-env-check.plugins') || '', '\n')) {
 		line = trim(line);

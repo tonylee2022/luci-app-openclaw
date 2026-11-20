@@ -69,16 +69,38 @@ function packageParents(installKey) {
 
 function runtimeMarker(directory, installKey, owner) {
   safe(directory, owner, true);
-  requireCondition(fs.readdirSync(directory).join(',') === 'tree', 'Unexpected files in runtime directory');
-  safe(path.join(directory, 'tree'), owner, true);
+  const layout = fs.readdirSync(directory).sort().join(',');
+  requireCondition(['tree', 'retained-files.json,tree', 'retained-files.json,tree,update-native-gate.mjs'].includes(layout),
+    'Unexpected files in runtime directory');
+  const tree = path.join(directory, 'tree');
+  safe(tree, owner, true);
   const base = path.parse(installKey).root;
-  const marker = path.join(directory, 'tree', Buffer.from(base).toString('hex'),
-    path.relative(base, installKey), 'package.json');
+  const projectedRoot = path.join(tree, Buffer.from(base).toString('hex'));
+  const originalMarker = path.join(installKey, 'package.json');
+  const marker = path.join(projectedRoot, path.relative(base, originalMarker));
   const s = stat(marker);
   // 投影文件可与安装包共享 inode，不能要求单硬链接。
   requireCondition(s?.isFile() && s.uid === owner && fs.realpathSync(marker) === marker &&
     (s.mode & 0o022n) === 0n && s.size <= 1048576n, 'No safe official OpenClaw runtime marker');
   requireCondition(JSON.parse(fs.readFileSync(marker, 'utf8')).name === 'openclaw', 'Unknown runtime package');
+  if (layout === 'tree') return;
+
+  // 上游清单记录的是源路径，只核对其在运行副本中的投影。
+  const manifest = path.join(directory, 'retained-files.json');
+  requireCondition(safe(manifest, owner, false).size <= 64n * 1024n * 1024n, 'Oversized retained runtime manifest');
+  const files = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+  requireCondition(Array.isArray(files) && files.includes(originalMarker), 'Invalid retained runtime manifest');
+  for (const original of files) {
+    requireCondition(typeof original === 'string' && original !== base && path.resolve(original) === original,
+      'Invalid retained runtime source path');
+    const projected = path.join(projectedRoot, path.relative(base, original));
+    requireCondition(stat(projected)?.isFile() && fs.realpathSync(projected) === projected,
+      'Invalid retained runtime file projection');
+  }
+  if (layout.endsWith(',update-native-gate.mjs')) {
+    const launcher = path.join(directory, 'update-native-gate.mjs');
+    requireCondition(safe(launcher, owner, false).size <= 1048576n, 'Oversized retained native launcher');
+  }
 }
 
 // 只输出 PID、检查类型和错误码，进程参数、环境及打开文件内容不进入日志。
@@ -130,7 +152,7 @@ export function inspectRuntimeReferences(roots, procRoot = '/proc') {
   return { checkedProcesses, references };
 }
 
-export function cleanupRuntimes(installKey, { temporaryDirectories = [], procRoot = '/proc', checkOnly = false } = {}) {
+export function cleanupRuntimes(installKey, { temporaryDirectories = [], procRoot = '/proc', checkOnly = false, targetRuntime } = {}) {
   const result = { status: 'ok', removed: [], retained: [], checkedProcesses: 0, checkOnly };
   const readers = [];
   const candidates = [];
@@ -147,6 +169,7 @@ export function cleanupRuntimes(installKey, { temporaryDirectories = [], procRoo
         requireCondition(entries.length <= 4096, 'Runtime directory inventory exceeds bounded lookup');
         for (const name of entries.filter(name => /^openclaw-update-runtime-[A-Za-z0-9]{6}$/.test(name))) {
           const file = path.join(parent, name);
+          if (targetRuntime && file !== targetRuntime) continue;
           try { runtimeMarker(file, installKey, owner); candidates.push({ file, before: signature(file) }); }
           catch (error) { retain(file, error.message); }
         }

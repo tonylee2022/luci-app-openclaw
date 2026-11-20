@@ -193,7 +193,8 @@ case "${1:-}" in
 		plugin_result=/tmp/openclaw-env-check.plugins
 		rm -f "$core_result" "$plugin_result"
 		echo "Checking OpenClaw core updates..."
-		timeout 90 /usr/bin/openclaw update --dry-run --yes --json > "$core_result" 2>/dev/null
+		# 版本查询使用只读状态命令，避免预演进入网关停服校验。
+		timeout 90 /usr/bin/openclaw update status --json > "$core_result" 2>/dev/null
 		rc=$?
 		if [ "$rc" -ne 0 ]; then
 			echo "Failed to check OpenClaw core updates"
